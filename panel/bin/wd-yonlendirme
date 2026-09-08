@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Yönlendirme ve site kuralları
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-yonlendirme
+
+NE YAPAR?
+  Alan adı başına nginx kuralları üretir: yol yönlendirmeleri, www tercihi,
+  HTTPS zorlama, güvenlik başlıkları, hotlink koruması ve IP engelleme.
+  cPanel'deki "Redirects" ile Plesk'teki "Apache & nginx Settings"in
+  karşılığıdır; HestiaCP'de yalnızca TEK bir alan adı yönlendirmesi vardır,
+  yol bazlı kural yoktur.
+
+NEREYE YAZAR?
+  <home>/conf/web/<domain>/nginx.conf_wd
+  HestiaCP'nin ürettiği vhost dosyası sonunda şunu içerir:
+      include <home>/conf/web/<domain>/nginx.conf_*;
+  Bu uzantı noktası Let's Encrypt tarafından da kullanılır ve alan adı yeniden
+  oluşturulduğunda korunur.
+
+NEDEN AYRI BİR KÖK BETİK?
+  Bozuk bir nginx parçası TÜM siteleri düşürür. Bu yüzden yazma işlemi
+  şöyle yapılır:
+      1. mevcut dosya yedeklenir
+      2. yeni içerik yazılır
+      3. `nginx -t` ile TÜM yapılandırma doğrulanır
+      4. geçersizse ESKİSİ GERİ YÜKLENİR ve hata döner
+      5. geçerliyse nginx yeniden yüklenir
+  Panel bu adımları tek başına yapamaz (dosya root'a ait ve reload gerekir).
+
+Kullanım:
+  wd-yonlendirme oku USER DOMAIN          mevcut kuralları JSON döner
+  wd-yonlendirme yaz USER DOMAIN          kuralları STDIN'den JSON al, uygula
+  wd-yonlendirme sil USER DOMAIN          kuralları kaldır
+  wd-yonlendirme onizle USER DOMAIN       üretilecek nginx parçasını yaz
+"""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+HESTIA = "/usr/local/hestia"
+
+# Güvenlik başlıkları: adı -> (başlık, değer)
+BASLIKLAR = {
+    "nosniff": ("X-Content-Type-Options", "nosniff"),
+    "frame": ("X-Frame-Options", "SAMEORIGIN"),
+    "referrer": ("Referrer-Policy", "strict-origin-when-cross-origin"),
+    "hsts": ("Strict-Transport-Security", "max-age=31536000; includeSubDomains"),
+}
+
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+# Yol: yalnızca güvenli karakterler. nginx yapılandırmasına gireceği için
+# tırnak, süslü parantez ve satır sonu KESİNLİKLE kabul edilmez.
+YOL_DESENI = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@/%-]{0,512}$")
+HEDEF_DESENI = re.compile(r"^(https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]{3,700}|/[A-Za-z0-9._~!$&'()*+,;=:@/%-]{0,512})$")
+IP_DESENI = re.compile(r"^[0-9a-fA-F:.]{3,45}(/\d{1,3})?$")
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def ev_dizini(user):
+    try:
+        with open("/etc/passwd", encoding="utf-8") as fh:
+            for s in fh:
+                p = s.split(":")
+                if p[0] == user and len(p) > 5:
+                    return p[5].rstrip("/")
+    except Exception:
+        pass
+    return None
+
+
+def domain_gecerli(user, domain):
+    """Alan adı gerçekten bu kullanıcıya mı ait? (panelin doğrulamasına ek)"""
+    try:
+        r = subprocess.run(
+            [HESTIA + "/bin/v-list-web-domain", user, domain, "json"],
+            capture_output=True, text=True, timeout=30)
+        if r.returncode != 0 or not r.stdout.strip():
+            return False
+        d = json.loads(r.stdout)
+        return domain in d
+    except Exception:
+        return False
+
+
+def yollar(user, domain):
+    home = ev_dizini(user)
+    if not home:
+        return None, None
+    kok = os.path.join(home, "conf", "web", domain)
+    return os.path.join(kok, "nginx.conf_wd"), os.path.join(kok, "wd-yonlendirme.json")
+
+
+# ------------------------------------------------------------------- üretici
+def parca_uret(kurallar, domain):
+    """Kural sözlüğünden nginx parçası üretir."""
+    s = ["# WebDanismani - uretilmis kurallar. Elle duzenlemeyin.\n",
+         "# Panel > Yonlendirmeler sayfasindan yonetilir.\n\n"]
+
+    # --- IP engelleme ---
+    for ip in kurallar.get("engelli_ip", []):
+        s.append("deny %s;\n" % ip)
+    if kurallar.get("engelli_ip"):
+        s.append("\n")
+
+    # --- Güvenlik başlıkları ---
+    acik = [k for k in kurallar.get("basliklar", []) if k in BASLIKLAR]
+    for k in acik:
+        ad, deger = BASLIKLAR[k]
+        # `always`: hata sayfalarında da gönderilsin.
+        s.append('add_header %s "%s" always;\n' % (ad, deger))
+    if acik:
+        s.append("\n")
+
+    # --- Hotlink koruması ---
+    if kurallar.get("hotlink"):
+        izinli = kurallar.get("hotlink_izinli", [])
+        referans = ["none", "blocked", "server_names"] + izinli
+        s.append("location ~* \\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)$ {\n")
+        s.append("\tvalid_referers %s;\n" % " ".join(referans))
+        s.append("\tif ($invalid_referer) { return 403; }\n")
+        s.append("}\n\n")
+
+    # --- Yol yönlendirmeleri ---
+    for r in kurallar.get("yollar", []):
+        kaynak = r.get("kaynak", "")
+        hedef = r.get("hedef", "")
+        kod = 301 if int(r.get("kod", 301)) == 301 else 302
+        if not kaynak or not hedef:
+            continue
+        if r.get("tam"):
+            # Tam eşleşme: yalnızca bu adres
+            s.append('location = %s { return %d "%s"; }\n' % (kaynak, kod, hedef))
+        else:
+            # Önek eşleşmesi: alt yollar da taşınır
+            s.append("location %s {\n\treturn %d %s$request_uri;\n}\n"
+                     % (kaynak, kod, hedef.rstrip("/")))
+    if kurallar.get("yollar"):
+        s.append("\n")
+
+    return "".join(s)
+
+
+def nginx_dogrula():
+    r = subprocess.run(["nginx", "-t"], capture_output=True, text=True, timeout=60)
+    return r.returncode == 0, (r.stderr or r.stdout).strip()
+
+
+def nginx_yenile():
+    subprocess.run(["systemctl", "reload", "nginx"], capture_output=True, timeout=60)
+
+
+# ------------------------------------------------------------------ doğrulama
+def kurallari_dogrula(k):
+    """Kullanıcıdan gelen her değer burada süzülür; nginx'e ham veri girmez."""
+    temiz = {"yollar": [], "basliklar": [], "engelli_ip": [],
+             "hotlink": False, "hotlink_izinli": []}
+
+    for r in (k.get("yollar") or [])[:60]:
+        kaynak = str(r.get("kaynak", "")).strip()
+        hedef = str(r.get("hedef", "")).strip()
+        if not YOL_DESENI.match(kaynak):
+            return None, "Geçersiz kaynak yol: %s" % kaynak[:60]
+        if not HEDEF_DESENI.match(hedef):
+            return None, "Geçersiz hedef: %s" % hedef[:60]
+        temiz["yollar"].append({
+            "kaynak": kaynak, "hedef": hedef,
+            "kod": 302 if str(r.get("kod")) == "302" else 301,
+            "tam": bool(r.get("tam")),
+        })
+
+    for b in (k.get("basliklar") or []):
+        if b in BASLIKLAR:
+            temiz["basliklar"].append(b)
+
+    for ip in (k.get("engelli_ip") or [])[:200]:
+        ip = str(ip).strip()
+        if not IP_DESENI.match(ip):
+            return None, "Geçersiz IP: %s" % ip[:40]
+        temiz["engelli_ip"].append(ip)
+
+    temiz["hotlink"] = bool(k.get("hotlink"))
+    for d in (k.get("hotlink_izinli") or [])[:30]:
+        d = str(d).strip()
+        if not AD_DESENI.match(d):
+            return None, "Geçersiz hotlink alan adı: %s" % d[:60]
+        temiz["hotlink_izinli"].append(d)
+
+    return temiz, None
+
+
+# --------------------------------------------------------------------- işlem
+def oku(user, domain):
+    _, jyol = yollar(user, domain)
+    if not jyol or not os.path.isfile(jyol):
+        print(json.dumps({"ok": True, "kurallar": {
+            "yollar": [], "basliklar": [], "engelli_ip": [],
+            "hotlink": False, "hotlink_izinli": []}}, ensure_ascii=False))
+        return 0
+    try:
+        with open(jyol, encoding="utf-8") as fh:
+            k = json.load(fh)
+    except Exception:
+        k = {}
+    print(json.dumps({"ok": True, "kurallar": k}, ensure_ascii=False))
+    return 0
+
+
+def yaz(user, domain, kurallar_ham):
+    conf, jyol = yollar(user, domain)
+    if not conf:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+
+    temiz, h = kurallari_dogrula(kurallar_ham)
+    if temiz is None:
+        return hata(h)
+
+    os.makedirs(os.path.dirname(conf), exist_ok=True)
+    yedek = conf + ".wd-yedek"
+    vardi = os.path.isfile(conf)
+    if vardi:
+        shutil.copy2(conf, yedek)
+
+    parca = parca_uret(temiz, domain)
+    with open(conf, "w", encoding="utf-8") as fh:
+        fh.write(parca)
+    os.chmod(conf, 0o644)
+
+    ok, cikti = nginx_dogrula()
+    if not ok:
+        # GERİ AL: bozuk bir parca tum siteleri dusurur.
+        if vardi:
+            shutil.move(yedek, conf)
+        else:
+            os.unlink(conf)
+        nginx_dogrula()
+        return hata("nginx yapılandırması geçersiz, değişiklik geri alındı: "
+                    + cikti.splitlines()[-1][:200])
+
+    if os.path.isfile(yedek):
+        os.unlink(yedek)
+
+    with open(jyol, "w", encoding="utf-8") as fh:
+        json.dump(temiz, fh, ensure_ascii=False, indent=2)
+    os.chmod(jyol, 0o644)
+
+    nginx_yenile()
+    print(json.dumps({"ok": True, "kural": len(temiz["yollar"]),
+                      "baslik": len(temiz["basliklar"]),
+                      "engelli": len(temiz["engelli_ip"])}, ensure_ascii=False))
+    return 0
+
+
+def sil(user, domain):
+    conf, jyol = yollar(user, domain)
+    if not conf:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+    for y in (conf, jyol):
+        if y and os.path.isfile(y):
+            os.unlink(y)
+    ok, cikti = nginx_dogrula()
+    if ok:
+        nginx_yenile()
+    print(json.dumps({"ok": ok, "hata": None if ok else cikti[-200:]},
+                     ensure_ascii=False))
+    return 0 if ok else 1
+
+
+def main():
+    if len(sys.argv) < 4:
+        sys.stderr.write(__doc__)
+        return 2
+    mod, user, domain = sys.argv[1], sys.argv[2], sys.argv[3]
+
+    if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
+        return hata("Geçersiz kullanıcı ya da alan adı.")
+    if not domain_gecerli(user, domain):
+        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+
+    if mod == "oku":
+        return oku(user, domain)
+    if mod == "sil":
+        return sil(user, domain)
+    if mod in ("yaz", "onizle"):
+        try:
+            gelen = json.loads(sys.stdin.read() or "{}")
+        except ValueError:
+            return hata("Kural JSON'u çözülemedi.")
+        if mod == "onizle":
+            temiz, h = kurallari_dogrula(gelen)
+            if temiz is None:
+                return hata(h)
+            print(parca_uret(temiz, domain))
+            return 0
+        return yaz(user, domain, gelen)
+
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

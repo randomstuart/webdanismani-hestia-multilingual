@@ -1,0 +1,413 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — PHP ayarları (alan adı başına)
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-phpayar
+
+NEDEN VAR?
+  cPanel'deki "MultiPHP INI Editor" karşılığı. HestiaCP'de müşteri
+  upload_max_filesize gibi değerleri panelden değiştiremez; php.ini sunucu
+  geneli ve root'a ait.
+
+NASIL?
+  PHP-FPM, belge kökündeki `.user.ini` dosyasını okur (user_ini.filename).
+  Bu dosya SİTE SAHİBİNE ait olduğu için ne root yetkisi ne de php-fpm
+  yeniden yüklemesi gerekir; PHP en geç `user_ini.cache_ttl` (300 sn) içinde
+  yeni değeri alır.
+
+TAVAN DEĞERLER
+  wd-kaynak bir kademe atadıysa `php_admin_value` zaten aşılamaz; burada da
+  aynı tavan uygulanır ki müşteri "kaydettim ama çalışmıyor" demesin. Kademe
+  yoksa makul sabit tavanlar geçerlidir.
+
+HATA GÜNLÜĞÜ
+  log_errors açılınca hatalar `<domain>/private/php-hata.log`'a yazılır (site
+  kullanıcısı yazabilir; `logs/` dizini web sunucusunun ve root'undur). Panel
+  bu betik üzerinden son satırları okur.
+
+Kullanım:
+  wd-phpayar oku USER DOMAIN            mevcut değerler + tavanlar (JSON)
+  wd-phpayar yaz USER DOMAIN            STDIN'den JSON al, .user.ini yaz
+  wd-phpayar sil USER DOMAIN            .user.ini'yi kaldır (varsayılana dön)
+  wd-phpayar gunluk USER DOMAIN [N]     hata günlüğünün son N satırı
+  wd-phpayar gunluk-temizle USER DOMAIN
+"""
+
+import json
+import os
+import pwd
+import re
+import subprocess
+import sys
+
+HESTIA = "/usr/local/hestia"
+KAYNAK_CACHE = HESTIA + "/wd/cache/kaynak.json"
+KAYNAK_AYAR = HESTIA + "/wd/kaynak.json"
+
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+BOYUT_DESENI = re.compile(r"^(\d{1,5})\s*([kmg]?)b?$", re.I)
+
+# Sabit tavanlar (kademe yoksa)
+TAVAN_BELLEK_MB = 512
+TAVAN_SURE_SN = 300
+TAVAN_YUKLEME_MB = 512
+TAVAN_INPUT_VARS = 10000
+
+SAAT_DILIMLERI = [
+    "Europe/Istanbul", "UTC", "Europe/London", "Europe/Berlin", "Europe/Paris",
+    "Europe/Amsterdam", "Europe/Moscow", "Asia/Baku", "Asia/Dubai", "Asia/Tashkent",
+    "America/New_York", "America/Chicago", "America/Los_Angeles", "Asia/Tokyo",
+]
+
+# NOT: allow_url_fopen gibi PHP_INI_SYSTEM yönergeleri .user.ini'de GEÇERSİZDİR;
+# burada yalnızca PHP_INI_PERDIR / PHP_INI_ALL olanlar yönetilir.
+YONETILEN = ["upload_max_filesize", "post_max_size", "memory_limit",
+             "max_execution_time", "max_input_time", "max_input_vars",
+             "display_errors", "log_errors", "error_log", "date.timezone",
+             "short_open_tag", "session.gc_maxlifetime"]
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def ev_dizini(user):
+    try:
+        return pwd.getpwnam(user).pw_dir.rstrip("/")
+    except KeyError:
+        return None
+
+
+def domain_bilgi(user, domain):
+    try:
+        r = subprocess.run([HESTIA + "/bin/v-list-web-domain", user, domain, "json"],
+                           capture_output=True, text=True, timeout=30)
+        if r.returncode != 0 or not r.stdout.strip():
+            return None
+        d = json.loads(r.stdout)
+        return d.get(domain)
+    except Exception:
+        return None
+
+
+def mb_cevir(deger):
+    """'8M' / '512K' / '1G' -> MB (float). Geçersizse None."""
+    m = BOYUT_DESENI.match(str(deger).strip())
+    if not m:
+        return None
+    n = int(m.group(1))
+    b = m.group(2).lower()
+    if b == "k":
+        return n / 1024.0
+    if b == "g":
+        return n * 1024.0
+    return float(n)
+
+
+def kademe_tavani(domain):
+    """wd-kaynak kademesi varsa (bellek MB, süre sn, ad) döner."""
+    try:
+        with open(KAYNAK_CACHE, encoding="utf-8") as fh:
+            c = json.load(fh)
+        with open(KAYNAK_AYAR, encoding="utf-8") as fh:
+            a = json.load(fh)
+    except Exception:
+        return None
+    for s in c.get("siteler", []):
+        if s.get("domain") != domain:
+            continue
+        m = re.match(r"^wd-([a-z0-9]+)-PHP-\d_\d$", str(s.get("mevcut", "")))
+        if not m:
+            return None
+        k = (a.get("kademeler") or {}).get(m.group(1))
+        if not k:
+            return None
+        bellek = mb_cevir(k.get("bellek", "0"))
+        return {"bellek_mb": int(bellek or 0), "sure": int(k.get("sure", 0) or 0),
+                "ad": k.get("ad", m.group(1))}
+    return None
+
+
+def tavanlar(domain):
+    k = kademe_tavani(domain)
+    t = {"bellek_mb": TAVAN_BELLEK_MB, "sure": TAVAN_SURE_SN,
+         "yukleme_mb": TAVAN_YUKLEME_MB, "input_vars": TAVAN_INPUT_VARS, "kademe": None}
+    if k:
+        t["bellek_mb"] = min(t["bellek_mb"], k["bellek_mb"]) if k["bellek_mb"] else t["bellek_mb"]
+        t["sure"] = min(t["sure"], k["sure"]) if k["sure"] else t["sure"]
+        t["kademe"] = k["ad"]
+        # yükleme belleği aşamaz: bellek 128M ise 128M'lik dosya da işlenemez
+        t["yukleme_mb"] = min(t["yukleme_mb"], t["bellek_mb"])
+    return t
+
+
+def yollar(user, domain):
+    home = ev_dizini(user)
+    if not home:
+        return None, None, None
+    kok = os.path.join(home, "web", domain)
+    return (os.path.join(kok, "public_html", ".user.ini"),
+            os.path.join(kok, "private", "php-hata.log"),
+            kok)
+
+
+def ini_oku(yol):
+    d = {}
+    if not os.path.isfile(yol):
+        return d
+    try:
+        with open(yol, encoding="utf-8", errors="replace") as fh:
+            for s in fh:
+                s = s.strip()
+                if not s or s.startswith(";") or s.startswith("#") or "=" not in s:
+                    continue
+                k, v = s.split("=", 1)
+                d[k.strip()] = v.strip().strip('"')
+    except Exception:
+        pass
+    return d
+
+
+def ini_yaz(yol, degerler, user, korunan):
+    """Yönetilen anahtarları yazar; dosyadaki YABANCI satırları korur."""
+    satirlar = ["; WebDanismani - Panel > PHP Ayarlari sayfasindan yonetilir.",
+                "; Bu blok otomatik yazilir; asagidaki kendi satirlariniz korunur.",
+                ""]
+    for k in YONETILEN:
+        if k in degerler:
+            satirlar.append("%s = %s" % (k, degerler[k]))
+    if korunan:
+        satirlar.append("")
+        satirlar.append("; --- kullanici satirlari ---")
+        satirlar.extend(korunan)
+    icerik = "\n".join(satirlar) + "\n"
+    gecici = yol + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        fh.write(icerik)
+    pw = pwd.getpwnam(user)
+    os.chown(gecici, pw.pw_uid, pw.pw_gid)
+    os.chmod(gecici, 0o644)
+    os.replace(gecici, yol)
+
+
+def yabanci_satirlar(yol):
+    """Dosyadaki, bizim yönetmediğimiz satırlar (yorum hariç)."""
+    out = []
+    if not os.path.isfile(yol):
+        return out
+    try:
+        with open(yol, encoding="utf-8", errors="replace") as fh:
+            for s in fh:
+                t = s.strip()
+                if not t or t.startswith(";") or t.startswith("#"):
+                    continue
+                if "=" in t and t.split("=", 1)[0].strip() in YONETILEN:
+                    continue
+                out.append(t)
+    except Exception:
+        pass
+    return out[:40]
+
+
+def dogrula(gelen, tav):
+    """Kullanıcı girdisini süzer; tavanı aşanı KIRPAR (reddetmek yerine)."""
+    temiz = {}
+    notlar = []
+
+    def boyut(anahtar, tavan_mb, varsayilan):
+        v = str(gelen.get(anahtar, varsayilan)).strip().upper()
+        mb = mb_cevir(v)
+        if mb is None:
+            return None, "%s geçersiz: %s" % (anahtar, v[:20])
+        if mb > tavan_mb:
+            notlar.append("%s tavana (%dM) indirildi" % (anahtar, tavan_mb))
+            mb = tavan_mb
+        if mb < 1:
+            mb = 1
+        return "%dM" % int(mb), None
+
+    v, h = boyut("upload_max_filesize", tav["yukleme_mb"], "8M")
+    if h:
+        return None, h, notlar
+    temiz["upload_max_filesize"] = v
+    v, h = boyut("post_max_size", tav["yukleme_mb"], "10M")
+    if h:
+        return None, h, notlar
+    # post >= upload olmalı, yoksa yükleme sessizce başarısız olur
+    if mb_cevir(v) < mb_cevir(temiz["upload_max_filesize"]):
+        v = temiz["upload_max_filesize"]
+        notlar.append("post_max_size, upload_max_filesize'a eşitlendi")
+    temiz["post_max_size"] = v
+    v, h = boyut("memory_limit", tav["bellek_mb"], "128M")
+    if h:
+        return None, h, notlar
+    temiz["memory_limit"] = v
+
+    def sayi(anahtar, tavan, varsayilan, en_az=1):
+        try:
+            n = int(str(gelen.get(anahtar, varsayilan)).strip())
+        except ValueError:
+            return None, "%s sayı olmalı" % anahtar
+        if n > tavan:
+            notlar.append("%s tavana (%d) indirildi" % (anahtar, tavan))
+            n = tavan
+        if n < en_az:
+            n = en_az
+        return str(n), None
+
+    v, h = sayi("max_execution_time", tav["sure"], 30)
+    if h:
+        return None, h, notlar
+    temiz["max_execution_time"] = v
+    v, h = sayi("max_input_time", tav["sure"], 60, -1)
+    if h:
+        return None, h, notlar
+    temiz["max_input_time"] = v
+    v, h = sayi("max_input_vars", tav["input_vars"], 1000, 100)
+    if h:
+        return None, h, notlar
+    temiz["max_input_vars"] = v
+    v, h = sayi("session.gc_maxlifetime", 86400 * 7, 1440, 300)
+    if h:
+        return None, h, notlar
+    temiz["session.gc_maxlifetime"] = v
+
+    for anahtar in ("display_errors", "log_errors", "short_open_tag"):
+        temiz[anahtar] = "On" if str(gelen.get(anahtar, "")).lower() in ("1", "on", "true") else "Off"
+
+    tz = str(gelen.get("date.timezone", "Europe/Istanbul")).strip()
+    if tz not in SAAT_DILIMLERI:
+        tz = "Europe/Istanbul"
+    temiz["date.timezone"] = tz
+    return temiz, None, notlar
+
+
+# --------------------------------------------------------------------- işlem
+def oku(user, domain, bilgi):
+    ini, gunluk, kok = yollar(user, domain)
+    if not ini:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+    tav = tavanlar(domain)
+    mevcut = ini_oku(ini)
+    php = re.search(r"PHP-(\d)_(\d)", str(bilgi.get("BACKEND", "")))
+    surum = ("%s.%s" % (php.group(1), php.group(2))) if php else ""
+    if not surum:
+        # Stok şablon: sistem varsayılanı
+        try:
+            r = subprocess.run(["php", "-r", "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;"],
+                               capture_output=True, text=True, timeout=15)
+            surum = r.stdout.strip() if r.returncode == 0 else ""
+        except Exception:
+            surum = ""
+    gunluk_boyut = os.path.getsize(gunluk) if os.path.isfile(gunluk) else 0
+    print(json.dumps({
+        "ok": True,
+        "var": os.path.isfile(ini),
+        "degerler": mevcut,
+        "tavan": tav,
+        "php": surum,
+        "sablon": bilgi.get("BACKEND", ""),
+        "gunluk_yolu": gunluk,
+        "gunluk_boyut": gunluk_boyut,
+        "yabanci": yabanci_satirlar(ini),
+        "saat_dilimleri": SAAT_DILIMLERI,
+    }, ensure_ascii=False))
+    return 0
+
+
+def yaz(user, domain, gelen):
+    ini, gunluk, kok = yollar(user, domain)
+    if not ini:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+    if not os.path.isdir(os.path.dirname(ini)):
+        return hata("Belge kökü yok: " + os.path.dirname(ini))
+    tav = tavanlar(domain)
+    temiz, h, notlar = dogrula(gelen, tav)
+    if temiz is None:
+        return hata(h)
+    if temiz["log_errors"] == "On":
+        os.makedirs(os.path.dirname(gunluk), exist_ok=True)
+        temiz["error_log"] = gunluk
+    korunan = yabanci_satirlar(ini)
+    try:
+        ini_yaz(ini, temiz, user, korunan)
+    except Exception as e:
+        return hata("Yazılamadı: %s" % e)
+    print(json.dumps({"ok": True, "notlar": notlar, "degerler": temiz}, ensure_ascii=False))
+    return 0
+
+
+def sil(user, domain):
+    ini, _, _ = yollar(user, domain)
+    if ini and os.path.isfile(ini):
+        os.unlink(ini)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def gunluk_oku(user, domain, n):
+    _, gunluk, _ = yollar(user, domain)
+    if not gunluk or not os.path.isfile(gunluk):
+        print(json.dumps({"ok": True, "satirlar": [], "boyut": 0}))
+        return 0
+    n = max(10, min(500, n))
+    try:
+        with open(gunluk, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            boyut = fh.tell()
+            oku_boyut = min(boyut, 256 * 1024)
+            fh.seek(boyut - oku_boyut)
+            veri = fh.read().decode("utf-8", "replace")
+    except Exception as e:
+        return hata("Günlük okunamadı: %s" % e)
+    satirlar = [s for s in veri.splitlines() if s.strip()][-n:]
+    print(json.dumps({"ok": True, "satirlar": satirlar, "boyut": boyut}, ensure_ascii=False))
+    return 0
+
+
+def gunluk_temizle(user, domain):
+    _, gunluk, _ = yollar(user, domain)
+    if gunluk and os.path.isfile(gunluk):
+        with open(gunluk, "w"):
+            pass
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 4:
+        sys.stderr.write(__doc__)
+        return 2
+    mod, user, domain = sys.argv[1], sys.argv[2], sys.argv[3]
+    if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
+        return hata("Geçersiz kullanıcı ya da alan adı.")
+    bilgi = domain_bilgi(user, domain)
+    if not bilgi:
+        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+
+    if mod == "oku":
+        return oku(user, domain, bilgi)
+    if mod == "yaz":
+        try:
+            gelen = json.loads(sys.stdin.read() or "{}")
+        except ValueError:
+            return hata("JSON çözülemedi.")
+        return yaz(user, domain, gelen)
+    if mod == "sil":
+        return sil(user, domain)
+    if mod == "gunluk":
+        try:
+            n = int(sys.argv[4]) if len(sys.argv) > 4 else 80
+        except ValueError:
+            n = 80
+        return gunluk_oku(user, domain, n)
+    if mod == "gunluk-temizle":
+        return gunluk_temizle(user, domain)
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

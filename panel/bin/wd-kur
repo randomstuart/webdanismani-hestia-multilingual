@@ -1,0 +1,442 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Uygulama kurucu
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-kur
+
+NEDEN VAR?
+  Softaculous HestiaCP'yi desteklemez. Kendi yazılımlarınızı (ya da
+  paketlediğiniz herhangi bir PHP uygulamasını) bir kataloğa koyup
+  müşteri sitelerine tek tıkla kurmak için.
+
+KATALOG
+  /usr/local/hestia/wd/uygulamalar/<KOD>/manifest.json
+  /usr/local/hestia/wd/uygulamalar/<KOD>/paket.zip
+
+  manifest.json alanları:
+    kod, ad, surum, aciklama, php_min ("8.1"), db (true/false),
+    kabuk (true: license.key zorunlu), kurulum_yolu ("/install.php"),
+    zip_kok ("blog/" - zip içindeki uygulama kökü, boş = zip kökü),
+    config: {"dosya": "config/config.php", "sablon": "...{{DB_AD}}..."}   (isteğe bağlı)
+      yer tutucular: {{DB_AD}} {{DB_KULLANICI}} {{DB_SIFRE}} {{DB_SUNUCU}}
+                     {{SITE_URL}} {{ALAN_ADI}} {{LISANS}}
+
+KURULUM ADIMLARI
+  1. hedef dizin boş mu (Hestia iskelet dosyaları sayılmaz)
+  2. zip güvenli açılır (zip-slip korumalı), sahiplik site kullanıcısına verilir
+  3. gerekirse veritabanı açılır (v-add-database)
+  4. config şablonu ve license.key yazılır
+  5. .wd-kur.json işareti bırakılır (panel "kurulu uygulamalar" listesi)
+
+Kullanım:
+  wd-kur liste                                  katalog (JSON)
+  wd-kur katalog-ekle KOD ZIPYOL                STDIN: manifest JSON
+  wd-kur katalog-sil KOD
+  wd-kur kur USER DOMAIN KOD [LISANS] [ALTDIZIN]   (panel --stdin ile JSON verir)
+  wd-kur durum USER DOMAIN                      alan adında kurulu uygulamalar
+"""
+
+import json
+import os
+import pwd
+import re
+import secrets
+import shutil
+import stat
+import subprocess
+import sys
+import time
+import zipfile
+
+HESTIA = "/usr/local/hestia"
+KATALOG = HESTIA + "/wd/uygulamalar"
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+KOD_DESENI = re.compile(r"^[A-Z0-9][A-Z0-9_-]{1,30}$")
+ALT_DESENI = re.compile(r"^[A-Za-z0-9._-]{1,60}$")
+LISANS_DESENI = re.compile(r"^[A-Za-z0-9][A-Za-z0-9\-_.:]{7,120}$")
+ISKELET = {"index.html", "robots.txt", ".htaccess", "favicon.ico", ".well-known", "cgi-bin", ".user.ini"}
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def ev_dizini(user):
+    try:
+        return pwd.getpwnam(user).pw_dir.rstrip("/")
+    except KeyError:
+        return None
+
+
+def hestia(cmd, timeout=120):
+    try:
+        r = subprocess.run([HESTIA + "/bin/" + cmd[0]] + cmd[1:], capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def domain_bilgi(user, domain):
+    rc, out, _ = hestia(["v-list-web-domain", user, domain, "json"])
+    if rc != 0 or not out:
+        return None
+    try:
+        return json.loads(out).get(domain)
+    except ValueError:
+        return None
+
+
+# -------------------------------------------------------------------- katalog
+def manifest_oku(kod):
+    y = os.path.join(KATALOG, kod, "manifest.json")
+    try:
+        with open(y, encoding="utf-8") as fh:
+            m = json.load(fh)
+    except Exception:
+        return None
+    m["kod"] = kod
+    m["paket_var"] = os.path.isfile(os.path.join(KATALOG, kod, "paket.zip"))
+    m["paket_boyut"] = os.path.getsize(os.path.join(KATALOG, kod, "paket.zip")) if m["paket_var"] else 0
+    return m
+
+
+def katalog():
+    out = []
+    if not os.path.isdir(KATALOG):
+        return out
+    for kod in sorted(os.listdir(KATALOG)):
+        if KOD_DESENI.match(kod):
+            m = manifest_oku(kod)
+            if m:
+                out.append(m)
+    return out
+
+
+def liste():
+    print(json.dumps({"ok": True, "uygulamalar": katalog()}, ensure_ascii=False))
+    return 0
+
+
+def manifest_dogrula(g, kod):
+    m = {
+        "kod": kod,
+        "ad": str(g.get("ad", "")).strip()[:80] or kod,
+        "surum": re.sub(r"[^0-9A-Za-z.\-]", "", str(g.get("surum", "1.0")))[:20] or "1.0",
+        "aciklama": str(g.get("aciklama", "")).strip()[:300],
+        "php_min": re.sub(r"[^0-9.]", "", str(g.get("php_min", "8.1")))[:6] or "8.1",
+        "db": bool(g.get("db", True)),
+        "kabuk": bool(g.get("kabuk", False)),
+        "kurulum_yolu": str(g.get("kurulum_yolu", "/install.php")).strip()[:120],
+        "zip_kok": str(g.get("zip_kok", "")).strip().strip("/")[:80],
+        "ikon": re.sub(r"[^a-z0-9-]", "", str(g.get("ikon", "fa-cube")))[:40] or "fa-cube",
+    }
+    if m["kurulum_yolu"] and not m["kurulum_yolu"].startswith("/"):
+        m["kurulum_yolu"] = "/" + m["kurulum_yolu"]
+    cfg = g.get("config")
+    if isinstance(cfg, dict) and cfg.get("dosya") and cfg.get("sablon"):
+        dosya = str(cfg["dosya"]).strip().lstrip("/")
+        if ".." in dosya or not re.match(r"^[A-Za-z0-9._/-]{1,160}$", dosya):
+            return None, "config.dosya geçersiz"
+        m["config"] = {"dosya": dosya, "sablon": str(cfg["sablon"])[:20000]}
+    return m, None
+
+
+def katalog_ekle(kod, zip_yol):
+    if not KOD_DESENI.match(kod):
+        return hata("Kod yalnızca A-Z, 0-9, - ve _ içerebilir (2-31 karakter).")
+    try:
+        g = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return hata("Manifest JSON'u çözülemedi.")
+    m, h = manifest_dogrula(g, kod)
+    if m is None:
+        return hata(h)
+    hedef = os.path.join(KATALOG, kod)
+    os.makedirs(hedef, exist_ok=True)
+    if zip_yol and zip_yol != "-":
+        if not os.path.isfile(zip_yol) or not zipfile.is_zipfile(zip_yol):
+            return hata("Geçerli bir ZIP dosyası değil.")
+        shutil.copyfile(zip_yol, os.path.join(hedef, "paket.zip"))
+        try:
+            os.unlink(zip_yol)
+        except OSError:
+            pass
+    with open(os.path.join(hedef, "manifest.json"), "w", encoding="utf-8") as fh:
+        json.dump(m, fh, ensure_ascii=False, indent=2)
+    os.chmod(hedef, 0o755)
+    os.chmod(os.path.join(hedef, "manifest.json"), 0o644)
+    if os.path.isfile(os.path.join(hedef, "paket.zip")):
+        os.chmod(os.path.join(hedef, "paket.zip"), 0o600)
+    print(json.dumps({"ok": True, "kod": kod}))
+    return 0
+
+
+def katalog_sil(kod):
+    if not KOD_DESENI.match(kod):
+        return hata("Geçersiz kod.")
+    hedef = os.path.join(KATALOG, kod)
+    if os.path.isdir(hedef):
+        shutil.rmtree(hedef)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+# ------------------------------------------------------------------ kurulum
+def dizin_bos_mu(yol):
+    try:
+        for ad in os.listdir(yol):
+            if ad not in ISKELET:
+                return False
+    except FileNotFoundError:
+        return True
+    return True
+
+
+def chown_agac(yol, uid, gid):
+    os.chown(yol, uid, gid)
+    for kok, dizinler, dosyalar in os.walk(yol):
+        for d in dizinler:
+            p = os.path.join(kok, d)
+            os.chown(p, uid, gid)
+            os.chmod(p, 0o755)
+        for f in dosyalar:
+            p = os.path.join(kok, f)
+            if os.path.islink(p):
+                continue
+            os.chown(p, uid, gid)
+            mod = stat.S_IMODE(os.stat(p).st_mode)
+            os.chmod(p, 0o755 if mod & 0o111 else 0o644)
+
+
+def zip_ac(zip_yol, hedef, kok_onek):
+    """zip-slip korumalı açma; kok_onek verilirse o alt dizin hedefe açılır."""
+    hedef_abs = os.path.realpath(hedef)
+    sayi = 0
+    with zipfile.ZipFile(zip_yol) as z:
+        for bilgi in z.infolist():
+            ad = bilgi.filename
+            if ad.startswith("__MACOSX/") or ad.endswith(".DS_Store"):
+                continue
+            if kok_onek:
+                if not ad.startswith(kok_onek + "/"):
+                    continue
+                ad = ad[len(kok_onek) + 1:]
+            if not ad:
+                continue
+            yol = os.path.realpath(os.path.join(hedef_abs, ad))
+            if not yol.startswith(hedef_abs + os.sep) and yol != hedef_abs:
+                raise ValueError("Zip içinde güvensiz yol: " + bilgi.filename)
+            if bilgi.is_dir():
+                os.makedirs(yol, exist_ok=True)
+                continue
+            os.makedirs(os.path.dirname(yol), exist_ok=True)
+            with z.open(bilgi) as kaynak, open(yol, "wb") as cikti:
+                shutil.copyfileobj(kaynak, cikti)
+            sayi += 1
+    return sayi
+
+
+def db_olustur(user, kod):
+    ek = re.sub(r"[^a-z0-9]", "", kod.lower())[:8] or "app"
+    sonek = ek + secrets.token_hex(2)
+    sifre = secrets.token_urlsafe(18).replace("-", "a").replace("_", "b")[:20]
+    rc, out, err = hestia(["v-add-database", user, sonek, sonek, sifre, "mysql", "localhost", "utf8mb4"])
+    if rc != 0:
+        return None, (err or out or "v-add-database başarısız (kod %d)" % rc)
+    return {"ad": "%s_%s" % (user, sonek), "kullanici": "%s_%s" % (user, sonek), "sifre": sifre, "sunucu": "localhost"}, None
+
+
+def kur(user, domain, kod, secenek):
+    if not KOD_DESENI.match(kod):
+        return hata("Geçersiz uygulama kodu.")
+    m = manifest_oku(kod)
+    if not m:
+        return hata("Uygulama katalogda yok: " + kod)
+    if not m.get("paket_var"):
+        return hata("Bu uygulamanın paket dosyası yüklenmemiş.")
+    bilgi = domain_bilgi(user, domain)
+    if not bilgi:
+        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+    home = ev_dizini(user)
+    if not home:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+    pw = pwd.getpwnam(user)
+
+    alt = str(secenek.get("alt_dizin", "") or "").strip().strip("/")
+    if alt and not ALT_DESENI.match(alt):
+        return hata("Alt dizin adı geçersiz (harf, rakam, nokta, tire).")
+    lisans = str(secenek.get("lisans", "") or "").strip()
+    if m.get("kabuk"):
+        if not LISANS_DESENI.match(lisans):
+            return hata("Bu yazılım lisans anahtarı gerektirir; anahtar eksik ya da biçimi hatalı.")
+    elif lisans and not LISANS_DESENI.match(lisans):
+        return hata("Lisans anahtarı biçimi hatalı.")
+
+    docroot = os.path.join(home, "web", domain, "public_html")
+    hedef = os.path.join(docroot, alt) if alt else docroot
+    if not os.path.isdir(docroot):
+        return hata("Belge kökü yok: " + docroot)
+    if not dizin_bos_mu(hedef):
+        return hata("Hedef dizin boş değil (%s). Önce mevcut dosyaları taşıyın ya da bir alt dizin seçin." % (("/" + alt) if alt else "/"))
+
+    # PHP sürümü kontrolü (şablon adından)
+    php = re.search(r"PHP-(\d)_(\d)", str(bilgi.get("BACKEND", "")))
+    if php:
+        surum = float("%s.%s" % (php.group(1), php.group(2)))
+        try:
+            gerekli = float(m.get("php_min", "8.1"))
+        except ValueError:
+            gerekli = 8.1
+        if surum < gerekli:
+            return hata("Bu yazılım PHP %s ister; alan adı PHP %s kullanıyor. Alan adı ayarlarından PHP sürümünü yükseltin." % (m.get("php_min"), surum))
+
+    os.makedirs(hedef, exist_ok=True)
+    zip_yol = os.path.join(KATALOG, kod, "paket.zip")
+    try:
+        sayi = zip_ac(zip_yol, hedef, m.get("zip_kok", ""))
+    except Exception as e:
+        return hata("Paket açılamadı: %s" % e)
+    if sayi == 0:
+        return hata("Paketten dosya çıkmadı; manifest'teki zip_kok değeri yanlış olabilir.")
+
+    # Hestia iskeletindeki varsayılan index.html uygulamanın index.php'sini gölgeler
+    if not alt:
+        for ad in ("index.html",):
+            p = os.path.join(hedef, ad)
+            if os.path.isfile(p) and not os.path.isfile(os.path.join(hedef, "index.php")):
+                continue
+            if os.path.isfile(p) and os.path.isfile(os.path.join(hedef, "index.php")):
+                os.unlink(p)
+
+    db = None
+    if m.get("db") and secenek.get("db", True):
+        db, h = db_olustur(user, kod)
+        if db is None:
+            return hata("Veritabanı açılamadı: " + h)
+
+    site_url = "https://%s%s" % (domain, ("/" + alt) if alt else "")
+    yer = {
+        "{{DB_AD}}": db["ad"] if db else "",
+        "{{DB_KULLANICI}}": db["kullanici"] if db else "",
+        "{{DB_SIFRE}}": db["sifre"] if db else "",
+        "{{DB_SUNUCU}}": db["sunucu"] if db else "localhost",
+        "{{SITE_URL}}": site_url,
+        "{{ALAN_ADI}}": domain,
+        "{{LISANS}}": lisans,
+    }
+    cfg = m.get("config")
+    if isinstance(cfg, dict) and cfg.get("dosya"):
+        icerik = cfg.get("sablon", "")
+        for k, v in yer.items():
+            icerik = icerik.replace(k, v)
+        cy = os.path.join(hedef, cfg["dosya"])
+        os.makedirs(os.path.dirname(cy), exist_ok=True)
+        with open(cy, "w", encoding="utf-8") as fh:
+            fh.write(icerik)
+        os.chmod(cy, 0o640)
+    if lisans:
+        with open(os.path.join(hedef, "license.key"), "w", encoding="utf-8") as fh:
+            fh.write(lisans + "\n")
+        os.chmod(os.path.join(hedef, "license.key"), 0o640)
+
+    isaret = {"kod": kod, "ad": m.get("ad"), "surum": m.get("surum"), "ts": int(time.time()),
+              "db": db["ad"] if db else None, "kurulum_yolu": m.get("kurulum_yolu", "")}
+    with open(os.path.join(hedef, ".wd-kur.json"), "w", encoding="utf-8") as fh:
+        json.dump(isaret, fh, ensure_ascii=False)
+    os.chmod(os.path.join(hedef, ".wd-kur.json"), 0o600)
+
+    try:
+        chown_agac(hedef, pw.pw_uid, pw.pw_gid)
+    except Exception as e:
+        return hata("Sahiplik ayarlanamadı: %s" % e)
+
+    kurulum_url = site_url + (m.get("kurulum_yolu") or "/")
+    print(json.dumps({"ok": True, "kod": kod, "ad": m.get("ad"), "surum": m.get("surum"),
+                      "dosya": sayi, "hedef": ("/" + alt) if alt else "/",
+                      "db": db, "lisans": bool(lisans), "kurulum_url": kurulum_url,
+                      "site_url": site_url}, ensure_ascii=False))
+    return 0
+
+
+def durum(user, domain):
+    home = ev_dizini(user)
+    if not home or not domain_bilgi(user, domain):
+        return hata("Alan adı bulunamadı.")
+    docroot = os.path.join(home, "web", domain, "public_html")
+    out = []
+    adaylar = [docroot]
+    try:
+        for ad in sorted(os.listdir(docroot))[:80]:
+            p = os.path.join(docroot, ad)
+            if os.path.isdir(p) and not os.path.islink(p) and not ad.startswith("."):
+                adaylar.append(p)
+    except OSError:
+        pass
+    for d in adaylar:
+        y = os.path.join(d, ".wd-kur.json")
+        if os.path.isfile(y):
+            try:
+                with open(y, encoding="utf-8") as fh:
+                    k = json.load(fh)
+                rel = os.path.relpath(d, docroot)
+                k["yol"] = "/" if rel == "." else "/" + rel
+                out.append(k)
+            except Exception:
+                continue
+    # WordPress de sayılsın (Hızlı Kurulum ile gelen)
+    for d in adaylar:
+        if os.path.isfile(os.path.join(d, "wp-config.php")) and os.path.isfile(os.path.join(d, "wp-includes", "version.php")):
+            rel = os.path.relpath(d, docroot)
+            out.append({"kod": "WORDPRESS", "ad": "WordPress", "yol": "/" if rel == "." else "/" + rel, "surum": "", "ts": None})
+    print(json.dumps({"ok": True, "kurulu": out, "bos": dizin_bos_mu(docroot)}, ensure_ascii=False))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    mod = sys.argv[1]
+    if mod == "liste":
+        return liste()
+    if mod == "katalog-ekle":
+        if len(sys.argv) < 4:
+            return hata("Kullanım: katalog-ekle KOD ZIPYOL")
+        return katalog_ekle(sys.argv[2], sys.argv[3])
+    if mod == "katalog-sil":
+        if len(sys.argv) < 3:
+            return hata("Kullanım: katalog-sil KOD")
+        return katalog_sil(sys.argv[2])
+    if mod in ("kur", "durum"):
+        if len(sys.argv) < 4:
+            sys.stderr.write(__doc__)
+            return 2
+        user, domain = sys.argv[2], sys.argv[3]
+        if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
+            return hata("Geçersiz kullanıcı ya da alan adı.")
+        if mod == "durum":
+            return durum(user, domain)
+        if len(sys.argv) < 5:
+            return hata("Kullanım: kur USER DOMAIN KOD [LISANS] [ALTDIZIN]")
+        kod = sys.argv[4]
+        secenek = {}
+        if "--stdin" in sys.argv[5:]:
+            try:
+                secenek = json.loads(sys.stdin.read() or "{}")
+            except ValueError:
+                return hata("JSON çözülemedi.")
+        else:
+            ekler = [a for a in sys.argv[5:] if a != "--stdin"]
+            if len(ekler) > 0:
+                secenek["lisans"] = ekler[0]
+            if len(ekler) > 1:
+                secenek["alt_dizin"] = ekler[1]
+        return kur(user, domain, kod, secenek)
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

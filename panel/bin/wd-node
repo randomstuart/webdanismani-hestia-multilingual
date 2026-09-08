@@ -1,0 +1,427 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Node.js uygulamaları
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-node
+
+NEDEN VAR?
+  cPanel "Application Manager" karşılığı. HestiaCP'de Node.js uygulaması
+  çalıştırmak elle systemd birimi ve nginx şablonu yazmayı gerektirir.
+
+NASIL?
+  * Her uygulama bir systemd birimidir (wd-node-<domain>.service), SİTE
+    SAHİBİ kullanıcısıyla çalışır, çökünce yeniden başlar.
+  * nginx: stok şablondan türetilmiş "wd-node" şablonu, `location /`
+    bloğunu <home>/conf/web/<domain>/nginx.wdnode.conf'a yönlendirir; o
+    dosyada uygulamanın portuna proxy_pass vardır. Şablon YENİ dosyadır,
+    HestiaCP güncellemesinde silinmez.
+  * Port 3000-3999 arası otomatik seçilir; yalnız 127.0.0.1'e bağlanır.
+
+Kullanım:
+  wd-node sablon                        wd-node nginx şablonunu üret (kurulum)
+  wd-node liste USER
+  wd-node ekle USER DOMAIN              STDIN JSON {giris, alt_dizin, npm}
+  wd-node kaldir USER DOMAIN
+  wd-node yeniden USER DOMAIN
+  wd-node gunluk USER DOMAIN [N]
+"""
+
+import json
+import os
+import pwd
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+KAYIT = HESTIA + "/wd/cache/node.json"
+TPL_ADI = "wd-node"
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+DOSYA_DESENI = re.compile(r"^[A-Za-z0-9._/-]{1,120}$")
+ALT_DESENI = re.compile(r"^[A-Za-z0-9._-]{1,60}$")
+
+PROXY_PARCA = """# WebDanismani Node.js - uretilmis; Panel > Node.js Uygulamalari yonetir
+proxy_pass http://127.0.0.1:%d;
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
+proxy_set_header Host $host;
+proxy_set_header X-Real-IP $remote_addr;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_read_timeout 300;
+proxy_buffering off;
+"""
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def kabuk(cmd, timeout=120):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    except subprocess.TimeoutExpired:
+        return 124, "", "zaman aşımı"
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def hestia(cmd, timeout=180):
+    return kabuk([HESTIA + "/bin/" + cmd[0]] + cmd[1:], timeout)
+
+
+def hestia_json(cmd):
+    rc, out, _ = hestia(cmd)
+    try:
+        return json.loads(out) if rc == 0 and out else {}
+    except ValueError:
+        return {}
+
+
+def hestia_conf(anahtar, varsayilan=""):
+    try:
+        with open(HESTIA + "/conf/hestia.conf", encoding="utf-8") as fh:
+            for s in fh:
+                if s.startswith(anahtar + "="):
+                    return s.split("=", 1)[1].strip().strip("'\"")
+    except Exception:
+        pass
+    return varsayilan
+
+
+def ev_dizini(user):
+    try:
+        return pwd.getpwnam(user).pw_dir.rstrip("/")
+    except KeyError:
+        return None
+
+
+def node_yolu():
+    for y in ("/usr/bin/node", "/usr/local/bin/node", "/usr/bin/nodejs"):
+        if os.path.isfile(y) and os.access(y, os.X_OK):
+            return y
+    return ""
+
+
+def kayit_oku():
+    try:
+        with open(KAYIT, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {"uygulamalar": []}
+
+
+def kayit_yaz(d):
+    os.makedirs(os.path.dirname(KAYIT), exist_ok=True)
+    gecici = KAYIT + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False, indent=2)
+    os.chmod(gecici, 0o644)
+    os.replace(gecici, KAYIT)
+
+
+def proxy_modu():
+    """(sablon_dizini, degistirme_komutu) — nginx tek başına mı, Apache önünde mi?"""
+    web = hestia_conf("WEB_SYSTEM", "nginx")
+    proxy = hestia_conf("PROXY_SYSTEM", "")
+    if proxy == "nginx" and web == "apache2":
+        return HESTIA + "/data/templates/web/nginx", "v-change-web-domain-proxy-tpl"
+    return HESTIA + "/data/templates/web/nginx/php-fpm", "v-change-web-domain-tpl"
+
+
+# --------------------------------------------------------------------- şablon
+def blok_degistir(metin, baslik, yeni_icerik):
+    """`location / {` ... `}` bloğunu (küme dengesiyle) yeni içerikle değiştirir."""
+    i = metin.find(baslik)
+    if i < 0:
+        return None
+    j = metin.find("{", i)
+    derinlik = 0
+    k = j
+    while k < len(metin):
+        if metin[k] == "{":
+            derinlik += 1
+        elif metin[k] == "}":
+            derinlik -= 1
+            if derinlik == 0:
+                break
+        k += 1
+    if derinlik != 0:
+        return None
+    return metin[:i] + baslik + " {\n" + yeni_icerik + "\n\t}" + metin[k + 1:]
+
+
+def sablon_uret():
+    dizin, _ = proxy_modu()
+    yazilan = []
+    for uzanti in ("tpl", "stpl"):
+        kaynak = os.path.join(dizin, "default." + uzanti)
+        if not os.path.isfile(kaynak):
+            return hata("Stok şablon yok: " + kaynak)
+        with open(kaynak, encoding="utf-8") as fh:
+            metin = fh.read()
+        yeni = blok_degistir(metin, "location /", "\t\tinclude %home%/%user%/conf/web/%domain%/nginx.wdnode.conf*;")
+        if yeni is None:
+            return hata("Stok şablonda 'location /' bloğu çözümlenemedi: " + kaynak)
+        yeni = "# WebDanismani Node.js sablonu - stok default." + uzanti + " temel alinarak uretildi. Elle duzenlemeyin.\n" + yeni
+        hedef = os.path.join(dizin, TPL_ADI + "." + uzanti)
+        with open(hedef, "w", encoding="utf-8") as fh:
+            fh.write(yeni)
+        os.chmod(hedef, 0o644)
+        yazilan.append(hedef)
+    print(json.dumps({"ok": True, "sablon": yazilan}))
+    return 0
+
+
+def sablon_var():
+    dizin, _ = proxy_modu()
+    return os.path.isfile(os.path.join(dizin, TPL_ADI + ".tpl")) and os.path.isfile(os.path.join(dizin, TPL_ADI + ".stpl"))
+
+
+# ------------------------------------------------------------------- yardımcı
+def bos_port(kayitli):
+    for p in range(3000, 4000):
+        if p in kayitli:
+            continue
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(("127.0.0.1", p))
+            return p
+        except OSError:
+            continue
+        finally:
+            s.close()
+    return None
+
+
+def birim_adi(domain):
+    return "wd-node-%s.service" % re.sub(r"[^a-z0-9.-]", "-", domain.lower())
+
+
+def birim_durum(domain):
+    rc, out, _ = kabuk(["systemctl", "is-active", birim_adi(domain)], 30)
+    return out or "unknown"
+
+
+# --------------------------------------------------------------------- işlem
+def liste(user):
+    d = kayit_oku()
+    out = []
+    for a in d.get("uygulamalar", []):
+        if a.get("user") != user:
+            continue
+        a = dict(a)
+        a["durum"] = birim_durum(a["domain"])
+        out.append(a)
+    print(json.dumps({"ok": True, "uygulamalar": out, "node": node_yolu(), "sablon": sablon_var()}, ensure_ascii=False))
+    return 0
+
+
+def ekle(user, domain, secenek):
+    node = node_yolu()
+    if not node:
+        return hata("Sunucuda Node.js kurulu değil (yönetici: NodeSource deposundan nodejs kurmalı).")
+    if not sablon_var():
+        rc = sablon_uret()
+        if rc != 0:
+            return rc
+    doms = hestia_json(["v-list-web-domains", user, "json"])
+    if domain not in doms:
+        return hata("Alan adı bu hesaba ait değil.")
+    d = kayit_oku()
+    if any(a.get("domain") == domain for a in d.get("uygulamalar", [])):
+        return hata("Bu alan adında zaten bir Node.js uygulaması tanımlı.")
+    giris = str(secenek.get("giris", "app.js") or "app.js").strip().lstrip("/")
+    if not DOSYA_DESENI.match(giris) or ".." in giris:
+        return hata("Giriş dosyası adı geçersiz.")
+    alt = str(secenek.get("alt_dizin", "") or "").strip().strip("/")
+    if alt and (not ALT_DESENI.match(alt)):
+        return hata("Alt dizin geçersiz.")
+    home = ev_dizini(user)
+    calisma = os.path.join(home, "web", domain, "public_html", alt) if alt else os.path.join(home, "web", domain, "public_html")
+    if not os.path.isdir(calisma):
+        return hata("Çalışma dizini yok: " + calisma)
+    if not os.path.isfile(os.path.join(calisma, giris)):
+        return hata("Giriş dosyası bulunamadı: " + giris + " (önce dosyaları yükleyin)")
+    kayitli = {int(a.get("port", 0)) for a in d.get("uygulamalar", [])}
+    port = bos_port(kayitli)
+    if not port:
+        return hata("Boş port bulunamadı.")
+
+    pw = pwd.getpwnam(user)
+    # npm install (isteğe bağlı)
+    npm_not = ""
+    if secenek.get("npm") and os.path.isfile(os.path.join(calisma, "package.json")) and not os.path.isdir(os.path.join(calisma, "node_modules")):
+        npm = shutil.which("npm") or "/usr/bin/npm"
+        rc, out, err = kabuk(["sudo", "-u", user, "-H", "env", "HOME=" + home, npm, "install", "--omit=dev", "--no-audit", "--no-fund", "--prefix", calisma], 900)
+        npm_not = "npm install: " + ("tamam" if rc == 0 else (err or out)[-200:])
+
+    # günlük dosyası
+    ozel = os.path.join(home, "web", domain, "private")
+    os.makedirs(ozel, exist_ok=True)
+    gunluk = os.path.join(ozel, "node.log")
+    with open(gunluk, "a"):
+        pass
+    os.chown(gunluk, pw.pw_uid, pw.pw_gid)
+    os.chmod(gunluk, 0o640)
+
+    birim = "/etc/systemd/system/" + birim_adi(domain)
+    with open(birim, "w", encoding="utf-8") as fh:
+        fh.write("""[Unit]
+Description=WebDanismani Node.js - %(domain)s
+After=network.target
+
+[Service]
+Type=simple
+User=%(user)s
+Group=%(user)s
+WorkingDirectory=%(calisma)s
+Environment=NODE_ENV=production
+Environment=PORT=%(port)d
+Environment=HOST=127.0.0.1
+ExecStart=%(node)s %(giris)s
+Restart=always
+RestartSec=5
+StandardOutput=append:%(gunluk)s
+StandardError=append:%(gunluk)s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+""" % {"domain": domain, "user": user, "calisma": calisma, "port": port, "node": node, "giris": giris, "gunluk": gunluk})
+    os.chmod(birim, 0o644)
+    kabuk(["systemctl", "daemon-reload"], 60)
+    rc, out, err = kabuk(["systemctl", "enable", "--now", birim_adi(domain)], 60)
+    if rc != 0:
+        os.unlink(birim)
+        kabuk(["systemctl", "daemon-reload"], 60)
+        return hata("Servis başlatılamadı: " + (err or out)[-200:])
+
+    # nginx: proxy parçası + şablon
+    conf_dizin = os.path.join(home, "conf", "web", domain)
+    os.makedirs(conf_dizin, exist_ok=True)
+    conf = os.path.join(conf_dizin, "nginx.wdnode.conf")
+    with open(conf, "w", encoding="utf-8") as fh:
+        fh.write(PROXY_PARCA % port)
+    os.chmod(conf, 0o644)
+    _, komut = proxy_modu()
+    rc, out, err = hestia([komut, user, domain, TPL_ADI])
+    if rc != 0:
+        kabuk(["systemctl", "disable", "--now", birim_adi(domain)], 60)
+        os.unlink(birim)
+        os.unlink(conf)
+        kabuk(["systemctl", "daemon-reload"], 60)
+        return hata("nginx şablonu atanamadı: " + (err or out)[-200:])
+
+    d.setdefault("uygulamalar", []).append({"user": user, "domain": domain, "giris": giris, "alt_dizin": alt,
+                                             "port": port, "node": node, "ts": int(time.time())})
+    kayit_yaz(d)
+    time.sleep(1.5)
+    print(json.dumps({"ok": True, "port": port, "durum": birim_durum(domain), "npm": npm_not}, ensure_ascii=False))
+    return 0
+
+
+def kaldir(user, domain):
+    d = kayit_oku()
+    kayit = next((a for a in d.get("uygulamalar", []) if a.get("user") == user and a.get("domain") == domain), None)
+    if not kayit:
+        return hata("Bu alan adında Node.js uygulaması yok.")
+    kabuk(["systemctl", "disable", "--now", birim_adi(domain)], 60)
+    birim = "/etc/systemd/system/" + birim_adi(domain)
+    if os.path.isfile(birim):
+        os.unlink(birim)
+    kabuk(["systemctl", "daemon-reload"], 60)
+    home = ev_dizini(user)
+    conf = os.path.join(home, "conf", "web", domain, "nginx.wdnode.conf")
+    if os.path.isfile(conf):
+        os.unlink(conf)
+    _, komut = proxy_modu()
+    hestia([komut, user, domain, "default"])
+    d["uygulamalar"] = [a for a in d.get("uygulamalar", []) if not (a.get("user") == user and a.get("domain") == domain)]
+    kayit_yaz(d)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def yeniden(user, domain):
+    d = kayit_oku()
+    if not any(a.get("user") == user and a.get("domain") == domain for a in d.get("uygulamalar", [])):
+        return hata("Bu alan adında Node.js uygulaması yok.")
+    rc, out, err = kabuk(["systemctl", "restart", birim_adi(domain)], 60)
+    time.sleep(1.5)
+    print(json.dumps({"ok": rc == 0, "durum": birim_durum(domain), "hata": None if rc == 0 else (err or out)[-200:]}, ensure_ascii=False))
+    return 0 if rc == 0 else 1
+
+
+def gunluk(user, domain, n):
+    d = kayit_oku()
+    if not any(a.get("user") == user and a.get("domain") == domain for a in d.get("uygulamalar", [])):
+        return hata("Bu alan adında Node.js uygulaması yok.")
+    home = ev_dizini(user)
+    yol = os.path.join(home, "web", domain, "private", "node.log")
+    satirlar = []
+    if os.path.isfile(yol):
+        try:
+            with open(yol, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                boyut = fh.tell()
+                fh.seek(max(0, boyut - 128 * 1024))
+                satirlar = fh.read().decode("utf-8", "replace").splitlines()[-max(10, min(400, n)):]
+        except OSError:
+            pass
+    rc, jout, _ = kabuk(["journalctl", "-u", birim_adi(domain), "-n", "20", "--no-pager", "-o", "cat"], 30)
+    print(json.dumps({"ok": True, "satirlar": satirlar, "journal": jout.splitlines()[-20:], "durum": birim_durum(domain)}, ensure_ascii=False))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    mod = sys.argv[1]
+    if mod == "sablon":
+        return sablon_uret()
+    if len(sys.argv) < 3:
+        sys.stderr.write(__doc__)
+        return 2
+    user = sys.argv[2]
+    if not KULLANICI_DESENI.match(user):
+        return hata("Geçersiz kullanıcı.")
+    if mod == "liste":
+        return liste(user)
+    if len(sys.argv) < 4:
+        sys.stderr.write(__doc__)
+        return 2
+    domain = sys.argv[3].lower()
+    if not AD_DESENI.match(domain):
+        return hata("Geçersiz alan adı.")
+    if mod == "ekle":
+        try:
+            secenek = json.loads(sys.stdin.read() or "{}")
+        except ValueError:
+            secenek = {}
+        return ekle(user, domain, secenek)
+    if mod == "kaldir":
+        return kaldir(user, domain)
+    if mod == "yeniden":
+        return yeniden(user, domain)
+    if mod == "gunluk":
+        try:
+            n = int(sys.argv[4]) if len(sys.argv) > 4 else 80
+        except ValueError:
+            n = 80
+        return gunluk(user, domain, n)
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,12 @@
+# Derleme / dağıtım çıktıları
+*.tar.gz
+*.zip
+
+# Yerel analiz ve özel entegrasyon klasörleri (depoya girmez)
+_analiz/
+dagitim/
+entegrasyon/
+
+# İşletim sistemi artıkları
+.DS_Store
+Thumbs.db

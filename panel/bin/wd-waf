@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Uygulama güvenlik duvarı (WAF-lite)
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-waf
+
+NEDEN VAR?
+  HestiaCP'de ModSecurity yoktur. Saldırıların büyük bölümü ise birkaç
+  nginx kuralıyla kesilir: kötü botlar, klasik enjeksiyon kalıpları, yükleme
+  dizinlerinde PHP çalıştırma, xmlrpc ve giriş sayfasına kaba kuvvet.
+
+NEREYE YAZAR?
+  <home>/conf/web/<domain>/nginx.conf_wdwaf   (vhost sonundaki include ile yüklenir)
+  /etc/nginx/conf.d/wd-waf.conf               (http bağlamı: giriş hız sınırı
+                                               bölgesi; kur-modul.sh yazar)
+
+GÜVENLİ YAZMA
+  wd-yonlendirme ile aynı: yedekle -> yaz -> `nginx -t` -> geçersizse geri al.
+
+Kullanım:
+  wd-waf oku USER DOMAIN
+  wd-waf yaz USER DOMAIN          STDIN JSON
+  wd-waf sil USER DOMAIN
+  wd-waf istatistik USER DOMAIN   son 24 saatte engellenen istekler
+  wd-waf http-conf                http bağlamı dosyasını yaz (kurulum)
+"""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+
+HESTIA = "/usr/local/hestia"
+HTTP_CONF = "/etc/nginx/conf.d/wd-waf.conf"
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+IP_DESENI = re.compile(r"^[0-9a-fA-F:.]{3,45}(/\d{1,3})?$")
+
+VARSAYILAN = {
+    "etkin": True,
+    "bot_engel": True,          # SEO/tarama botları
+    "arac_engel": False,        # curl / wget / python istemcileri (API'si olan siteler için kapalı)
+    "sorgu_engel": True,        # enjeksiyon kalıpları
+    "yukleme_php_engel": True,  # uploads/ altında PHP
+    "xmlrpc_kapat": False,
+    "giris_koruma": True,       # wp-login / login hız sınırı
+    "hassas_dosya_engel": True, # .sql .bak .old .orig .sh readme
+    "izinli_ip": [],            # bu IP'lere hiçbir kural uygulanmaz
+}
+
+BOTLAR = ("ahrefsbot", "semrushbot", "mj12bot", "dotbot", "petalbot", "blexbot", "serpstatbot",
+          "dataforseobot", "zoominfobot", "megaindex", "seznambot", "linkdexbot", "sqlmap", "nikto",
+          "masscan", "nmap", "zgrab", "wpscan", "acunetix", "netsparker", "nessus", "openvas",
+          "jorgee", "morfeus", "grabber", "python-httpx")
+ARACLAR = ("curl/", "wget/", "python-requests", "python-urllib", "libwww-perl", "scrapy", "go-http-client",
+           "java/", "okhttp", "httpclient", "node-fetch", "axios/")
+
+SORGU_KALIPLARI = (
+    r"union(\s|\+|%20|/\*.*\*/)+(all(\s|\+|%20)+)?select",
+    r"information_schema",
+    r"concat\s*\(",
+    r"base64_decode\s*\(",
+    r"(<|%3c)script",
+    r"(\.\./|\.\.%2f){2,}",
+    r"/etc/passwd",
+    r"proc/self/environ",
+    r"php://(input|filter)",
+    r"(eval|assert|passthru|shell_exec|system)\s*\(",
+    r"(sleep|benchmark)\s*\(\s*\d",
+)
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def ev_dizini(user):
+    try:
+        with open("/etc/passwd", encoding="utf-8") as fh:
+            for s in fh:
+                p = s.split(":")
+                if p[0] == user and len(p) > 5:
+                    return p[5].rstrip("/")
+    except Exception:
+        pass
+    return None
+
+
+def domain_gecerli(user, domain):
+    try:
+        r = subprocess.run([HESTIA + "/bin/v-list-web-domain", user, domain, "json"],
+                           capture_output=True, text=True, timeout=30)
+        return r.returncode == 0 and domain in json.loads(r.stdout or "{}")
+    except Exception:
+        return False
+
+
+def yollar(user, domain):
+    home = ev_dizini(user)
+    if not home:
+        return None, None
+    kok = os.path.join(home, "conf", "web", domain)
+    return os.path.join(kok, "nginx.conf_wdwaf"), os.path.join(kok, "wd-waf.json")
+
+
+def http_conf_var():
+    return os.path.isfile(HTTP_CONF)
+
+
+# ------------------------------------------------------------------- üretici
+def parca_uret(k):
+    s = ["# WebDanismani WAF - uretilmis kurallar. Elle duzenlemeyin.",
+         "# Panel > Uygulama Guvenlik Duvari sayfasindan yonetilir.", ""]
+    if not k.get("etkin"):
+        s.append("# WAF kapali.")
+        return "\n".join(s) + "\n"
+
+    izinli = k.get("izinli_ip") or []
+    # İzinli IP'ler: geo/map yerine basit degisken; kural blokları bu degiskene bakar.
+    s.append("set $wd_izinli 0;")
+    for ip in izinli:
+        if "/" in ip:
+            # CIDR icin if ile karsilastirma yapilamaz; yalnizca tek IP desteklenir,
+            # CIDR girilirse deny/allow ile yonetilmesi icin not birakilir.
+            s.append("# CIDR (%s) if-blokunda kullanilamaz; tek IP girin." % ip)
+        else:
+            s.append('if ($remote_addr = "%s") { set $wd_izinli 1; }' % ip)
+    s.append("")
+
+    if k.get("bot_engel") or k.get("arac_engel"):
+        desenler = []
+        if k.get("bot_engel"):
+            desenler += list(BOTLAR)
+        if k.get("arac_engel"):
+            desenler += list(ARACLAR)
+        s.append("set $wd_bot 0;")
+        s.append('if ($http_user_agent ~* "(%s)") { set $wd_bot 1; }' % "|".join(re.escape(x) for x in desenler))
+        s.append('if ($wd_izinli = 1) { set $wd_bot 0; }')
+        s.append("if ($wd_bot = 1) { return 403; }")
+        s.append("")
+
+    if k.get("sorgu_engel"):
+        s.append("set $wd_sorgu 0;")
+        s.append('if ($query_string ~* "(%s)") { set $wd_sorgu 1; }' % "|".join(SORGU_KALIPLARI))
+        s.append('if ($request_uri ~* "(%s)") { set $wd_sorgu 1; }' % "|".join(SORGU_KALIPLARI[5:9]))
+        s.append('if ($wd_izinli = 1) { set $wd_sorgu 0; }')
+        s.append("if ($wd_sorgu = 1) { return 403; }")
+        s.append("")
+
+    if k.get("yukleme_php_engel"):
+        s.append("location ~* ^/(wp-content/uploads|wp-content/cache|uploads|upload|files|storage|media|images|img|assets)/.*\\.(php|phtml|phar|php[0-9])$ { return 403; }")
+        s.append("")
+
+    if k.get("hassas_dosya_engel"):
+        s.append("location ~* \\.(sql|sql\\.gz|bak|old|orig|save|swp|sh|inc|log)$ { return 403; }")
+        s.append("location ~* ^/(readme\\.html|license\\.txt|wp-config\\.php|composer\\.(json|lock)|package\\.json|\\.user\\.ini)$ { return 403; }")
+        s.append("")
+
+    if k.get("xmlrpc_kapat"):
+        s.append("location = /xmlrpc.php { return 403; }")
+        s.append("")
+
+    if k.get("giris_koruma") and http_conf_var():
+        s.append("# Giris sayfalari: IP basina dakikada 30 istek, 10'luk patlama payi")
+        s.append("limit_req zone=wdgiris burst=10 nodelay;")
+        s.append("")
+    return "\n".join(s) + "\n"
+
+
+def http_conf_yaz():
+    icerik = """# WebDanismani WAF - http baglami (kur-modul.sh yazar)
+# Giris sayfalarina IP basina hiz siniri. Anahtar yalnizca giris URL'lerinde
+# doludur; diger isteklerde bos anahtar = sinir yok.
+map $request_uri $wd_giris_anahtar {
+    default "";
+    ~*^/(wp-login\\.php|xmlrpc\\.php|administrator/index\\.php|admin/login|admin/giris|giris|login|kullanici-giris|user/login)(/|\\?|$) $binary_remote_addr;
+}
+limit_req_zone $wd_giris_anahtar zone=wdgiris:10m rate=30r/m;
+limit_req_status 429;
+"""
+    vardi = os.path.isfile(HTTP_CONF)
+    yedek = HTTP_CONF + ".wd-yedek"
+    if vardi:
+        shutil.copy2(HTTP_CONF, yedek)
+    with open(HTTP_CONF, "w", encoding="utf-8") as fh:
+        fh.write(icerik)
+    os.chmod(HTTP_CONF, 0o644)
+    ok, cikti = nginx_dogrula()
+    if not ok:
+        if vardi:
+            shutil.move(yedek, HTTP_CONF)
+        else:
+            os.unlink(HTTP_CONF)
+        return hata("nginx http bağlamı yazılamadı: " + cikti[-200:])
+    if os.path.isfile(yedek):
+        os.unlink(yedek)
+    nginx_yenile()
+    print(json.dumps({"ok": True, "dosya": HTTP_CONF}))
+    return 0
+
+
+def nginx_dogrula():
+    r = subprocess.run(["nginx", "-t"], capture_output=True, text=True, timeout=60)
+    return r.returncode == 0, (r.stderr or r.stdout).strip()
+
+
+def nginx_yenile():
+    subprocess.run(["systemctl", "reload", "nginx"], capture_output=True, timeout=60)
+
+
+def dogrula(g):
+    temiz = dict(VARSAYILAN)
+    for k in ("etkin", "bot_engel", "arac_engel", "sorgu_engel", "yukleme_php_engel",
+              "xmlrpc_kapat", "giris_koruma", "hassas_dosya_engel"):
+        if k in g:
+            temiz[k] = bool(g.get(k))
+    ipler = []
+    for ip in (g.get("izinli_ip") or [])[:30]:
+        ip = str(ip).strip()
+        if not ip:
+            continue
+        if not IP_DESENI.match(ip):
+            return None, "Geçersiz IP: %s" % ip[:40]
+        ipler.append(ip)
+    temiz["izinli_ip"] = ipler
+    return temiz, None
+
+
+# --------------------------------------------------------------------- işlem
+def oku(user, domain):
+    _, jyol = yollar(user, domain)
+    k = dict(VARSAYILAN)
+    var = False
+    if jyol and os.path.isfile(jyol):
+        var = True
+        try:
+            with open(jyol, encoding="utf-8") as fh:
+                k.update(json.load(fh))
+        except Exception:
+            pass
+    print(json.dumps({"ok": True, "var": var, "kurallar": k, "giris_koruma_mumkun": http_conf_var()}, ensure_ascii=False))
+    return 0
+
+
+def yaz(user, domain, gelen):
+    conf, jyol = yollar(user, domain)
+    if not conf:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+    temiz, h = dogrula(gelen)
+    if temiz is None:
+        return hata(h)
+    os.makedirs(os.path.dirname(conf), exist_ok=True)
+    yedek = conf + ".wd-yedek"
+    vardi = os.path.isfile(conf)
+    if vardi:
+        shutil.copy2(conf, yedek)
+    with open(conf, "w", encoding="utf-8") as fh:
+        fh.write(parca_uret(temiz))
+    os.chmod(conf, 0o644)
+    ok, cikti = nginx_dogrula()
+    if not ok:
+        if vardi:
+            shutil.move(yedek, conf)
+        else:
+            os.unlink(conf)
+        nginx_dogrula()
+        return hata("nginx yapılandırması geçersiz, değişiklik geri alındı: " + cikti.splitlines()[-1][:200])
+    if os.path.isfile(yedek):
+        os.unlink(yedek)
+    with open(jyol, "w", encoding="utf-8") as fh:
+        json.dump(temiz, fh, ensure_ascii=False, indent=2)
+    os.chmod(jyol, 0o644)
+    nginx_yenile()
+    print(json.dumps({"ok": True, "etkin": temiz["etkin"]}))
+    return 0
+
+
+def sil(user, domain):
+    conf, jyol = yollar(user, domain)
+    if not conf:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+    for y in (conf, jyol):
+        if y and os.path.isfile(y):
+            os.unlink(y)
+    ok, cikti = nginx_dogrula()
+    if ok:
+        nginx_yenile()
+    print(json.dumps({"ok": ok, "hata": None if ok else cikti[-200:]}, ensure_ascii=False))
+    return 0 if ok else 1
+
+
+AY = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6, "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+SATIR = re.compile(r'^(\S+) \S+ \S+ \[(\d{2})/(\w{3})/(\d{4}):(\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})\] "([^"]*)" (\d{3}) ')
+
+
+def istatistik(user, domain):
+    """Son 24 saatte 403/429 alan istekler (nginx erişim günlüğünden)."""
+    yol = "/var/log/nginx/domains/%s.log" % domain
+    if not os.path.isfile(yol):
+        print(json.dumps({"ok": True, "var": False, "engellenen": 0, "hiz": 0, "ipler": [], "yollar": []}))
+        return 0
+    esik = datetime.now(timezone.utc) - timedelta(hours=24)
+    engellenen = hiz = 0
+    ipler = Counter()
+    yollar_c = Counter()
+    try:
+        boyut = os.path.getsize(yol)
+        with open(yol, "rb") as fh:
+            if boyut > 8 * 1024 * 1024:
+                fh.seek(boyut - 8 * 1024 * 1024)
+                fh.readline()
+            for ham in fh:
+                s = ham.decode("utf-8", "replace")
+                m = SATIR.match(s)
+                if not m:
+                    continue
+                kod = m.group(10)
+                if kod not in ("403", "429"):
+                    continue
+                try:
+                    tz = m.group(8)
+                    ofs = int(tz[1:3]) * 3600 + int(tz[3:5]) * 60
+                    if tz[0] == "-":
+                        ofs = -ofs
+                    t = datetime(int(m.group(4)), AY.get(m.group(3), 1), int(m.group(2)), int(m.group(5)),
+                                 int(m.group(6)), int(m.group(7)), tzinfo=timezone(timedelta(seconds=ofs)))
+                except Exception:
+                    continue
+                if t < esik:
+                    continue
+                if kod == "403":
+                    engellenen += 1
+                else:
+                    hiz += 1
+                ipler[m.group(1)] += 1
+                istek = m.group(9).split(" ")
+                if len(istek) >= 2:
+                    yollar_c[istek[1][:80]] += 1
+    except Exception as e:
+        return hata("Günlük okunamadı: %s" % e)
+    print(json.dumps({"ok": True, "var": True, "engellenen": engellenen, "hiz": hiz,
+                      "ipler": [{"ip": a, "adet": b} for a, b in ipler.most_common(8)],
+                      "yollar": [{"yol": a, "adet": b} for a, b in yollar_c.most_common(8)]}, ensure_ascii=False))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    mod = sys.argv[1]
+    if mod == "http-conf":
+        return http_conf_yaz()
+    if len(sys.argv) < 4:
+        sys.stderr.write(__doc__)
+        return 2
+    user, domain = sys.argv[2], sys.argv[3]
+    if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
+        return hata("Geçersiz kullanıcı ya da alan adı.")
+    if not domain_gecerli(user, domain):
+        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+    if mod == "oku":
+        return oku(user, domain)
+    if mod == "sil":
+        return sil(user, domain)
+    if mod == "istatistik":
+        return istatistik(user, domain)
+    if mod == "yaz":
+        try:
+            gelen = json.loads(sys.stdin.read() or "{}")
+        except ValueError:
+            return hata("JSON çözülemedi.")
+        return yaz(user, domain, gelen)
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,1467 @@
+/* =============================================================================
+   WebDanışmanı — Dosya Yöneticisi teması            sürüm 1.0
+
+   Kurulum yeri : /usr/local/hestia/web/fm/dist/css/wd-fm.css
+   Yükleme      : fm/configuration.php içindeki HTML başlığına eklenen
+                  <link> ile, stok hst-custom.css'ten SONRA gelir.
+   Güncelleme   : Bu YENİ bir dosyadır, HestiaCP güncellemesinde silinmez.
+                  Yalnızca configuration.php'deki tek satırlık <link> geri
+                  alınır; onu wd-fm-patch.py + günlük cron yeniden uygular.
+
+   TASARIM KAYNAĞI
+   Dosya yöneticisi tasarım şablonu (hestiacp-dosya-yoneticisi.html).
+   Renk ve ölçüler oradan BİREBİR alınmıştır.
+
+   TASARIMIN CSS İLE KARŞILANAMAYAN KISIMLARI
+   Dosya yöneticisi FileGator 7.15.1 adlı bir Vue uygulamasıdır; tasarımdaki
+   bazı öğelerin DOM'da karşılığı yoktur. Bunlar wd-fm.js tarafından ÜRETİLİR
+   (sol menü, kalıcı klasör ağacı, araç çubuğu, gezinme satırı, durum çubuğu,
+   dosya türü ikonları). Bu dosya yalnızca onları biçimlendirir.
+
+   HÂLÂ YAPILAMAYAN — "Tür" sütunu
+   Browser.vue yalnızca Ad / İzinler / Boyut / Zaman sütunlarını üretir.
+   Buefy tablosuna dışarıdan sütun eklemek, sıralama ve sayfalama her yeniden
+   çizimde hücre sayısını bozacağı için güvenilir değildir. Türü kaybetmemek
+   adına ad hücresine türe göre RENKLİ İKON konur (.wdfm-tur-ico) ve tam tür
+   adı ipucu olarak gösterilir. Gerçek bir sütun ancak Vue paketi yeniden
+   derlenerek eklenebilir; bu da her HestiaCP güncellemesinde bozulacak bir
+   bağımlılık yaratır.
+
+   NOT: Stok hst-custom.css kuralları `!important` ile yazılmıştır; bu dosya
+   sonra yüklense bile onları yenmek için aynı ağırlık gerekir.
+   ========================================================================== */
+
+/* --- Yazı tipleri: panelle aynı origin, /webfonts/ altında barındırılır --- */
+@font-face {
+	font-family: "Inter";
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url("/webfonts/inter-latin.woff2") format("woff2");
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+		U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+		U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: "Inter";
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url("/webfonts/inter-latin-ext.woff2") format("woff2");
+	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+		U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+		U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url("/webfonts/jetbrains-mono-latin.woff2") format("woff2");
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+		U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+		U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+	font-family: "JetBrains Mono";
+	font-style: normal;
+	font-weight: 400 700;
+	font-display: swap;
+	src: url("/webfonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+	unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+		U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+		U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+	--wd-green: #2fa866;
+	--wd-link: #1f8a4c;
+	--wd-page: #f3f5f4;
+	--wd-card: #fff;
+	--wd-line: #e3e8e6;
+	--wd-line-soft: #eef1f0;
+	--wd-row-line: #f0f3f2;
+	--wd-input-line: #dfe5e2;
+	--wd-row-hover: #f5f8f6;
+	--wd-tree-bg: #fafbfb;
+	--wd-ink: #26312e;
+	--wd-text: #3a4744;
+	--wd-text2: #4a5652;
+	--wd-muted: #6b7773;
+	--wd-muted2: #7c8783;
+	--wd-faint: #9aa5a1;
+	--wd-sep: #c4ccc9;
+	--wd-folder: #d9a627;
+	--wd-red: #c2403a;
+	--wd-r: 8px;
+	--wd-r-sm: 6px;
+	--wd-fm-sans: "Inter", system-ui, -apple-system, "Segoe UI", Helvetica, Arial,
+		sans-serif;
+	--wd-fm-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* =============================================================================
+   0. PANEL KABUĞU  (wd-fm.js tarafından eklenir)
+
+   Sol koyu menü ve klasör ağacı, Vue'nun DOM'unun DIŞINDA <body> altında
+   durur (yoksa bir sonraki yeniden çizimde silinirlerdi). Bu yüzden ikisi de
+   `position: fixed`; içerik gövdesi (.wdfm-govde) ise sağa kaydırılır.
+   ========================================================================== */
+:root {
+	--wdfm-side: 222px;
+	--wdfm-tree: 218px;
+	--wd-side-bg: #1e3b34;
+	--wd-side-text: #b7c9c2;
+	--wd-side-dim: #7f9a91;
+	--wd-side-line: rgba(255, 255, 255, 0.07);
+	--wd-light: #5fd68f;
+}
+
+.wdfm-side {
+	position: fixed;
+	inset: 0 auto 0 0;
+	width: var(--wdfm-side);
+	display: flex;
+	flex-direction: column;
+	background: var(--wd-side-bg);
+	z-index: 40;
+	overflow-y: auto;
+}
+
+.wdfm-brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 60px;
+	flex: none;
+	padding: 0 14px;
+	border-bottom: 1px solid var(--wd-side-line);
+	cursor: pointer;
+	user-select: none;
+}
+
+.wdfm-brand:hover {
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.wdfm-brand:focus-visible {
+	outline: 2px solid var(--wd-light);
+	outline-offset: -2px;
+}
+
+.wdfm-mark {
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	background: var(--wd-green);
+	color: #fff;
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.wdfm-brand-text {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.15;
+	min-width: 0;
+}
+
+.wdfm-brand-text b {
+	color: #fff;
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: -0.2px;
+	white-space: nowrap;
+}
+
+.wdfm-brand-text b span {
+	color: var(--wd-light);
+}
+
+.wdfm-brand-text small {
+	font-size: 9.5px;
+	font-weight: 600;
+	letter-spacing: 0.9px;
+	color: var(--wd-side-dim);
+}
+
+.wdfm-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 10px 8px;
+}
+
+.wdfm-nav-item {
+	display: flex !important;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px 8px 12px;
+	border-radius: 6px;
+	border-left: 3px solid transparent;
+	color: var(--wd-side-text) !important;
+	font-size: 12px;
+	font-weight: 400;
+	text-decoration: none !important;
+	white-space: nowrap;
+	overflow: hidden;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.wdfm-nav-item:hover {
+	background: rgba(255, 255, 255, 0.07);
+	color: #fff !important;
+}
+
+.wdfm-nav-item.aktif {
+	background: rgba(47, 168, 102, 0.16);
+	border-left-color: var(--wd-green);
+	color: #fff !important;
+}
+
+.wdfm-nav-ico {
+	flex: none;
+	display: grid;
+	place-items: center;
+	width: 14px;
+	height: 14px;
+	color: var(--wd-side-dim);
+}
+
+.wdfm-nav-item.aktif .wdfm-nav-ico {
+	color: var(--wd-light);
+}
+
+.wdfm-nav-item:hover .wdfm-nav-ico {
+	color: #fff;
+}
+
+.wdfm-nav-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* --- Künye --- */
+.wdfm-credit {
+	margin-top: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	padding: 10px 12px 12px;
+	border-top: 1px solid var(--wd-side-line);
+}
+
+.wdfm-credit a {
+	display: flex !important;
+	flex-direction: column;
+	padding: 4px;
+	border-radius: 5px;
+	line-height: 1.25;
+	text-decoration: none !important;
+}
+
+.wdfm-credit a:hover {
+	background: rgba(255, 255, 255, 0.07);
+}
+
+.wdfm-credit-k {
+	font-size: 9px;
+	letter-spacing: 0.7px;
+	text-transform: uppercase;
+	color: var(--wd-side-dim);
+}
+
+.wdfm-credit-v {
+	font-size: 11px;
+	color: var(--wd-side-text);
+}
+
+.wdfm-credit a:hover .wdfm-credit-v {
+	color: var(--wd-light);
+}
+
+@media (max-width: 1023px) {
+	.wdfm-credit {
+		display: none;
+	}
+}
+
+/* --- Klasör ağacı --- */
+.wdfm-tree {
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	left: var(--wdfm-side);
+	width: var(--wdfm-tree);
+	display: flex;
+	flex-direction: column;
+	background: var(--wd-tree-bg);
+	border-right: 1px solid var(--wd-line);
+	z-index: 39;
+}
+
+.wdfm-tree-head {
+	flex: none;
+	height: 44px;
+	display: flex;
+	align-items: center;
+	padding: 0 14px;
+	border-bottom: 1px solid var(--wd-line);
+	background: var(--wd-card);
+	font-size: 9.5px;
+	font-weight: 600;
+	letter-spacing: 0.9px;
+	color: var(--wd-muted2);
+}
+
+.wdfm-tree-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 8px 6px;
+}
+
+.wdfm-tree-item {
+	display: flex !important;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 8px;
+	border-radius: 5px;
+	color: var(--wd-text) !important;
+	font-size: 12px;
+	text-decoration: none !important;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.wdfm-tree-item:hover {
+	background: var(--wd-line-soft);
+	color: var(--wd-ink) !important;
+}
+
+.wdfm-tree-item.aktif {
+	background: var(--wd-green-soft, rgba(47, 168, 102, 0.14));
+	color: var(--wd-ink) !important;
+	font-weight: 500;
+}
+
+.wdfm-tree-ico {
+	flex: none;
+	display: grid;
+	place-items: center;
+	color: var(--wd-folder);
+}
+
+.wdfm-tree-item.alt .wdfm-tree-ico {
+	color: var(--wd-folder);
+	opacity: 0.75;
+}
+
+.wdfm-tree-ad {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.wdfm-tree-bos {
+	padding: 10px 10px 4px;
+	font-size: 11px;
+	color: var(--wd-faint);
+}
+
+/* --- İçeriğin kayması -----------------------------------------------------
+   Hedef sabit bir kimlik DEĞİL, wd-fm.js'in çalışma anında bulup işaretlediği
+   .wdfm-govde sınıfıdır. Nedeni: FileGator yalnızca <div id="app"> üretir,
+   #wrapper diye bir düğüm yoktur. Kimliğe bağlı bir kural sessizce ölür ve
+   içerik sabit panellerin ALTINDA kalır — araç çubuğunun sol düğmeleri
+   görünmez olurdu. */
+.wdfm-kabuk .wdfm-govde {
+	margin-left: var(--wdfm-side);
+	transition: margin-left 0.15s ease;
+}
+
+.wdfm-kabuk.wdfm-agacli .wdfm-govde {
+	margin-left: calc(var(--wdfm-side) + var(--wdfm-tree));
+}
+
+/* Gövde bulunamadıysa kaydırma imkânsız: paneller akışa girsin ki içeriği
+   örtmesinler. Görünüm ideal olmaz ama hiçbir şey erişilemez hâle gelmez. */
+.wdfm-govdesiz .wdfm-side,
+.wdfm-govdesiz .wdfm-tree {
+	position: static;
+	width: auto;
+	inset: auto;
+}
+
+/* Dar ekran: sabit paneller yerini kaplamasın, sayfanın üstüne akar */
+@media (max-width: 1023px) {
+	.wdfm-side,
+	.wdfm-tree {
+		position: static;
+		width: auto;
+		inset: auto;
+	}
+
+	.wdfm-side {
+		flex-direction: row;
+		align-items: center;
+		overflow-x: auto;
+	}
+
+	.wdfm-brand {
+		height: 44px;
+		border-bottom: 0;
+		border-right: 1px solid var(--wd-side-line);
+	}
+
+	.wdfm-nav {
+		flex-direction: row;
+		padding: 6px 8px;
+		gap: 2px;
+	}
+
+	.wdfm-nav-item {
+		border-left: 0;
+		border-bottom: 3px solid transparent;
+		padding: 6px 10px;
+	}
+
+	.wdfm-nav-item.aktif {
+		border-left-color: transparent;
+		border-bottom-color: var(--wd-green);
+	}
+
+	.wdfm-nav-label {
+		display: none;
+	}
+
+	.wdfm-tree {
+		border-right: 0;
+		border-bottom: 1px solid var(--wd-line);
+		max-height: 220px;
+	}
+
+	.wdfm-kabuk .wdfm-govde,
+	.wdfm-kabuk.wdfm-agacli .wdfm-govde {
+		margin-left: 0;
+	}
+}
+
+/* =============================================================================
+   1. TEMEL
+   ========================================================================== */
+html,
+body,
+.navbar {
+	background: var(--wd-page) !important;
+}
+
+body,
+#app,
+#wrapper,
+#inner,
+button,
+input,
+select,
+textarea {
+	font-family: var(--wd-fm-sans) !important;
+	color: var(--wd-ink);
+	letter-spacing: -0.01em;
+}
+
+body {
+	font-size: 12px !important;
+}
+
+/* Stok hst-custom.css içerigi 1100px'e kilitliyor; tasarımda içerik
+   kenardan kenara. Panel sayfalarındaki düzeltmenin aynısı. */
+@media screen and (min-width: 1024px) {
+	.container {
+		max-width: none !important;
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+	}
+}
+
+#dropzone.container {
+	padding: 0 18px 24px;
+}
+
+/* Üst çubukla yol çubuğu arasındaki boşluk stokta ~60px; tasarımda araç
+   çubuğu üst çubuğun hemen altında başlar. */
+#browser {
+	margin-top: 14px;
+}
+
+#browser > .is-flex.is-justify-between:first-child {
+	margin-bottom: 0;
+}
+
+/* Karanlık mod: panelin teması tek görünümdür, dosya yöneticisi de onunla
+   tutarlı kalmalı — stok dosyanın koyu zemin kuralları geri alınır. */
+@media (prefers-color-scheme: dark) {
+	html,
+	body,
+	.navbar {
+		background: var(--wd-page) !important;
+	}
+
+	.table.is-hoverable tbody tr:nth-child(odd) {
+		background-color: transparent !important;
+	}
+
+	.table.is-hoverable tbody tr:not(.is-selected):hover {
+		background-color: var(--wd-row-hover) !important;
+	}
+}
+
+/* =============================================================================
+   2. ÜST ÇUBUK (Menu.vue → .navbar)
+   ========================================================================== */
+/* FileGator'un app.css'i .navbar'a `padding:16px 0` veriyor ve çubuğu 85px'e
+   çıkarıyor; tasarımdaki üst çubuk 44px. Aynı özgüllükte olduğumuz için
+   burada `!important` şart. */
+.navbar {
+	min-height: 44px !important;
+	height: 44px !important;
+	padding: 0 !important;
+	border-bottom: 1px solid var(--wd-line) !important;
+	background: var(--wd-card) !important;
+	display: flex !important;
+	align-items: center;
+}
+
+.navbar-brand,
+.navbar-menu,
+.navbar-end {
+	min-height: 44px !important;
+	align-items: center !important;
+}
+
+/* Marka artık sol menüde; üst çubuktaki logo tekrar olurdu.
+   Kabuk yüklenmediyse (betik erişilemez) logo görünür kalır. */
+.wdfm-kabuk .navbar-brand .navbar-item.logo {
+	display: none !important;
+}
+
+.navbar-brand .navbar-item.logo img {
+	max-height: 20px;
+}
+
+.navbar-item {
+	padding: 0 10px !important;
+	height: 44px;
+	display: flex !important;
+	align-items: center;
+}
+
+.navbar-item {
+	color: var(--wd-text) !important;
+	font-size: 12px !important;
+	font-weight: 400 !important;
+}
+
+.navbar-item:hover {
+	background: var(--wd-line-soft) !important;
+	color: var(--wd-link) !important;
+	border-radius: var(--wd-r-sm);
+}
+
+.navbar-item.logout {
+	color: var(--wd-muted) !important;
+}
+
+/* =============================================================================
+   3. YOL ÇUBUĞU (breadcrumb)
+
+   Tasarımda yol tek bir çerçeveli kutu içinde, tamamı mono yazı tipiyle ve
+   ayraç `/` karakteri. Stok dosya her parçayı ayrı bir rozet yapıyor.
+   ========================================================================== */
+#browser .breadcrumb {
+	flex: 1;
+	min-width: 0;
+	margin: 0 8px 0 0 !important;
+	height: 28px;
+	/* Bulma .breadcrumb 16px devralır; kutu yüksekliğini o şişiriyordu. */
+	font-size: 11.5px;
+	display: flex;
+	align-items: center;
+	padding: 0 10px;
+	border: 1px solid var(--wd-input-line);
+	border-radius: var(--wd-r-sm);
+	background: var(--wd-card);
+	overflow: hidden;
+}
+
+#browser .breadcrumb ul {
+	display: flex;
+	align-items: center;
+	flex-wrap: nowrap;
+	overflow: hidden;
+	white-space: nowrap;
+	margin: 0;
+}
+
+#browser .breadcrumb a:not([data-v]) {
+	background: none !important;
+	border: 0 !important;
+	padding: 0 !important;
+	border-radius: 0 !important;
+	color: var(--wd-muted) !important;
+	font-family: var(--wd-fm-mono) !important;
+	font-size: 11.5px !important;
+	font-weight: 400 !important;
+}
+
+#browser .breadcrumb li:last-child a:not([data-v]) {
+	color: var(--wd-ink) !important;
+}
+
+#browser .breadcrumb a:not([data-v]):hover {
+	color: var(--wd-link) !important;
+	text-decoration: underline !important;
+	background: none !important;
+}
+
+#browser .breadcrumb li + li::before {
+	content: "/" !important;
+	color: var(--wd-sep) !important;
+	background: none !important;
+	border: 0 !important;
+	padding: 0 5px !important;
+	font-family: var(--wd-fm-mono) !important;
+	font-size: 11.5px !important;
+}
+
+/* Arama ve klasör-seç düğmeleri: yol çubuğuyla aynı yükseklikte kutular */
+#browser .is-flex.is-justify-between > div:last-child {
+	display: flex;
+	gap: 6px;
+	flex: none;
+}
+
+#search.search-btn,
+#sitemap {
+	display: flex !important;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border: 1px solid var(--wd-input-line);
+	border-radius: var(--wd-r-sm);
+	background: var(--wd-card);
+	color: var(--wd-text2) !important;
+	padding: 0 !important;
+}
+
+#search.search-btn:hover,
+#sitemap:hover {
+	background: var(--wd-row-hover);
+	color: var(--wd-link) !important;
+	border-color: var(--wd-sep);
+}
+
+/* =============================================================================
+   4. ARAÇ ÇUBUĞU (#multi-actions)
+   ========================================================================== */
+#multi-actions {
+	margin: 10px 0 0 !important;
+	padding: 0 !important;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+#multi-actions > div:first-child {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+#multi-actions a:not([data-v]),
+#multi-actions .upload a:not([data-v]) {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	padding: 0 10px !important;
+	border: 1px solid var(--wd-input-line) !important;
+	border-radius: var(--wd-r-sm) !important;
+	background: var(--wd-card) !important;
+	color: var(--wd-text2) !important;
+	font-size: 11.5px !important;
+	font-weight: 400 !important;
+}
+
+#multi-actions a:not([data-v]):hover {
+	background: var(--wd-row-hover) !important;
+	border-color: var(--wd-sep) !important;
+	color: var(--wd-link) !important;
+}
+
+/* "Dosya ekle" birincil eylemdir — tasarımdaki yeşil düğme */
+#multi-actions .upload a:not([data-v]) {
+	background: var(--wd-green) !important;
+	border-color: var(--wd-green) !important;
+	color: #fff !important;
+	font-weight: 500 !important;
+}
+
+#multi-actions .upload a:not([data-v]):hover {
+	background: #28955a !important;
+	border-color: #28955a !important;
+	color: #fff !important;
+}
+
+/* Seçim varken çıkan yıkıcı eylem ayırt edilsin */
+#multi-actions a:not([data-v]):last-child:hover {
+	color: var(--wd-red) !important;
+	border-color: var(--wd-red) !important;
+}
+
+#multi-actions a:not([data-v]) .dropdown-item {
+	height: auto;
+	border-radius: 0 !important;
+	padding: 6px 14px !important;
+	font-size: 12px !important;
+	color: var(--wd-text) !important;
+}
+
+#multi-actions a:not([data-v]) .dropdown-item:hover {
+	background: var(--wd-row-hover) !important;
+	color: var(--wd-link) !important;
+}
+
+#pagination .select select {
+	height: 28px;
+	border: 1px solid var(--wd-input-line);
+	border-radius: var(--wd-r-sm);
+	color: var(--wd-text2);
+	font-size: 11.5px;
+}
+
+/* =============================================================================
+   5. DOSYA LİSTESİ
+   ========================================================================== */
+#browser .b-table {
+	margin-top: 10px;
+}
+
+/* Tablo geniş ekranda sığar, dar ekranda KENDİ İÇİNDE kayar. Bu olmadan
+   sayfa yatay taşıyordu (ölçüldü: 1584px görünümde 12px taşma). */
+#browser .b-table .table-wrapper {
+	overflow-x: auto;
+	border-radius: var(--wd-r);
+}
+
+.table,
+.b-table .table {
+	background: var(--wd-card) !important;
+	border: 1px solid var(--wd-line) !important;
+	border-radius: var(--wd-r) !important;
+	overflow: hidden;
+}
+
+/* Başlık: tasarımda 10.5px, harf aralıklı, büyük harf */
+.b-table .table th,
+.table th {
+	padding: 7px 12px !important;
+	border-bottom: 1px solid var(--wd-line) !important;
+	background: var(--wd-card);
+	color: var(--wd-muted2) !important;
+	font-size: 10.5px !important;
+	font-weight: 600 !important;
+	letter-spacing: 0.7px;
+	text-transform: uppercase;
+	vertical-align: middle !important;
+	white-space: nowrap;
+}
+
+.b-table .table th .icon {
+	color: var(--wd-faint) !important;
+}
+
+.b-table .table td,
+.table td {
+	/* Tasarımdaki satır ~30px. Buradaki satır ayrıca bir eylem düğmesi taşıdığı
+	   için tıklama alanını korumak adına 34px'te bırakılıyor. */
+	padding: 6px 12px !important;
+	border-bottom: 1px solid var(--wd-row-line) !important;
+	color: var(--wd-muted) !important;
+	font-size: 12px !important;
+	vertical-align: middle !important;
+}
+
+.b-table .table tbody tr:last-child td {
+	border-bottom: 0 !important;
+}
+
+/* Stok dosya tek/çift satırı boyuyor; tasarımda zebra yok, yalnızca hover */
+.table.is-hoverable tbody tr:nth-child(odd) {
+	background-color: transparent !important;
+}
+
+.table.is-hoverable tbody tr:not(.is-selected):hover {
+	background-color: var(--wd-row-hover) !important;
+}
+
+.b-table .table tr.is-selected {
+	background: rgba(47, 168, 102, 0.1) !important;
+	color: var(--wd-ink) !important;
+}
+
+.b-table .table tr.is-selected td {
+	color: var(--wd-text) !important;
+}
+
+/* Ad sütunu */
+.file-row a.name:not([data-v]) {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 8px;
+	color: var(--wd-ink) !important;
+	font-size: 12px;
+	/* Bulma bağlantıya 1.5 satır yüksekliği veriyor; satır 41px'e çıkıyordu.
+	   Tasarımdaki satır ~30px (7px dolgu + 12px metin). */
+	line-height: 1.25;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.file-row a.name:not([data-v]):hover {
+	color: var(--wd-link) !important;
+}
+
+.file-row.type-dir a.name:not([data-v]) {
+	font-weight: 500;
+}
+
+.file-row.type-dir a.name:not([data-v])::before,
+.file-row.type-file a.name:not([data-v])::before {
+	font-family: "Font Awesome 5 Free" !important;
+	font-weight: 900;
+	flex: none;
+	width: 14px;
+	text-align: center;
+	font-size: 12px;
+}
+
+.file-row.type-dir a.name:not([data-v])::before {
+	content: "\f07b" !important;
+	color: var(--wd-folder) !important;
+}
+
+.file-row.type-file a.name:not([data-v])::before {
+	content: "\f15c" !important;
+	color: var(--wd-muted) !important;
+}
+
+/* Üst dizine çık satırı */
+.file-row.type-back a.name:not([data-v])::before {
+	font-family: "Font Awesome 5 Free" !important;
+	font-weight: 900;
+	content: "\f062" !important;
+	color: var(--wd-faint) !important;
+	flex: none;
+	width: 14px;
+	text-align: center;
+}
+
+/* İzinler: tasarımda mono, 11.5px, nötr gri.
+   Bulma bu hücreye kendi metin rengini veriyor; `!important` gerekiyor. */
+.b-table .table td span[style*="monospace"],
+.b-table .table td span[style*="font-family"] {
+	font-family: var(--wd-fm-mono) !important;
+	font-size: 11.5px !important;
+	color: var(--wd-muted) !important;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Sayısal sütunlar hizalı okunsun */
+.b-table .table td.has-text-right,
+.b-table .table th.has-text-right {
+	font-variant-numeric: tabular-nums;
+}
+
+.b-table .table .checkbox-cell {
+	width: 34px !important;
+	padding-left: 12px !important;
+}
+
+.b-table .table .checkbox-cell .checkbox input {
+	accent-color: var(--wd-green);
+}
+
+/* Satır sonu üç nokta düğmesi */
+#single-actions .button,
+.b-table .table td .button.is-small {
+	height: 22px;
+	width: 24px;
+	border: 1px solid transparent !important;
+	border-radius: var(--wd-r-sm) !important;
+	background: none !important;
+	color: var(--wd-faint) !important;
+	box-shadow: none !important;
+}
+
+#single-actions .button:hover,
+.b-table .table td .button.is-small:hover {
+	background: var(--wd-line-soft) !important;
+	color: var(--wd-ink) !important;
+	border-color: var(--wd-line) !important;
+}
+
+/* Boş dizin / yükleniyor */
+.b-table .table tbody tr.is-empty td {
+	padding: 44px !important;
+	text-align: center;
+	color: var(--wd-faint) !important;
+	font-size: 12px !important;
+}
+
+/* =============================================================================
+   6. AÇILIR MENÜLER
+   ========================================================================== */
+.dropdown-content {
+	border: 1px solid var(--wd-line) !important;
+	border-radius: var(--wd-r-sm) !important;
+	box-shadow: 0 6px 20px rgba(38, 49, 46, 0.12) !important;
+	padding: 4px !important;
+}
+
+.dropdown-item {
+	border-radius: var(--wd-r-sm) !important;
+	padding: 6px 12px !important;
+	color: var(--wd-text) !important;
+	font-size: 12px !important;
+}
+
+.dropdown-item:hover,
+a.dropdown-item:hover {
+	background: var(--wd-row-hover) !important;
+	color: var(--wd-link) !important;
+}
+
+.dropdown-trigger .button {
+	color: var(--wd-text2) !important;
+	font-size: 11.5px !important;
+}
+
+.dropdown-trigger .button:hover {
+	background: var(--wd-row-hover) !important;
+	border-radius: var(--wd-r-sm) !important;
+	color: var(--wd-link) !important;
+}
+
+/* =============================================================================
+   7. KLASÖR AĞACI (modal)
+
+   Tasarımdaki kalıcı sol panel FileGator'da yok; ağaç bir modaldır. En
+   azından RENKLERİ ve ölçüleri tasarımla aynı olur.
+   ========================================================================== */
+.modal-card {
+	border-radius: var(--wd-r) !important;
+	overflow: hidden;
+}
+
+.modal-card-head,
+.modal-card-foot {
+	background: var(--wd-card) !important;
+	border-color: var(--wd-line) !important;
+	padding: 12px 16px !important;
+}
+
+.modal-card-title {
+	color: var(--wd-ink) !important;
+	font-size: 12.5px !important;
+	font-weight: 500 !important;
+}
+
+.modal-card-body {
+	background: var(--wd-tree-bg) !important;
+	padding: 8px 6px !important;
+}
+
+.tree-list a:not([data-v]) {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 8px !important;
+	border-radius: 5px !important;
+	color: var(--wd-text) !important;
+	font-size: 12px !important;
+	font-weight: 400 !important;
+}
+
+.tree-list a:not([data-v]):hover {
+	background: var(--wd-line-soft) !important;
+	color: var(--wd-ink) !important;
+}
+
+.tree-list a:not([data-v])::before {
+	content: "\f07b" !important;
+	font-family: "Font Awesome 5 Free" !important;
+	font-weight: 900;
+	color: var(--wd-folder) !important;
+	padding: 0 !important;
+	font-size: 12px;
+}
+
+.tree-list .button.is-primary {
+	height: 18px !important;
+	min-width: 18px;
+	background: transparent !important;
+	border: 0 !important;
+	color: var(--wd-faint) !important;
+	font-size: 10px !important;
+	box-shadow: none !important;
+}
+
+.tree-list .button.is-primary:hover {
+	background: var(--wd-line-soft) !important;
+	color: var(--wd-ink) !important;
+}
+
+.node-tree ul {
+	margin-left: 14px;
+	border-left: 1px solid var(--wd-line);
+	padding-left: 6px;
+}
+
+/* =============================================================================
+   8. DÜĞMELER / FORM DENETİMLERİ / KİPLER
+   ========================================================================== */
+.button {
+	border-radius: var(--wd-r-sm) !important;
+	font-size: 12px !important;
+	box-shadow: none !important;
+}
+
+.button.is-primary,
+.button.is-success {
+	background: var(--wd-green) !important;
+	border-color: var(--wd-green) !important;
+	color: #fff !important;
+}
+
+.button.is-primary:hover,
+.button.is-success:hover {
+	background: #28955a !important;
+	border-color: #28955a !important;
+}
+
+.button.is-danger {
+	background: var(--wd-red) !important;
+	border-color: var(--wd-red) !important;
+}
+
+.input,
+.textarea,
+.select select {
+	border: 1px solid var(--wd-input-line) !important;
+	border-radius: var(--wd-r-sm) !important;
+	background: #fbfcfb !important;
+	color: var(--wd-ink) !important;
+	font-size: 12px !important;
+	box-shadow: none !important;
+}
+
+.input:focus,
+.textarea:focus,
+.select select:focus {
+	border-color: var(--wd-green) !important;
+	box-shadow: 0 0 0 3px rgba(47, 168, 102, 0.16) !important;
+}
+
+.modal .modal-content,
+.modal-card {
+	box-shadow: 0 18px 50px rgba(38, 49, 46, 0.18) !important;
+}
+
+.notices .toast,
+.notification {
+	border-radius: var(--wd-r-sm) !important;
+	font-size: 12px !important;
+}
+
+.notices .toast.is-success,
+.notification.is-success {
+	background: var(--wd-green) !important;
+}
+
+.notices .toast.is-danger,
+.notification.is-danger {
+	background: var(--wd-red) !important;
+}
+
+/* Yükleme kutusu ve sürükle-bırak alanı */
+.drop-info {
+	color: var(--wd-green) !important;
+	font-size: 14px !important;
+}
+
+/* =============================================================================
+   9. ARAÇ ÇUBUĞU / GEZİNME / DURUM  (wd-fm.js tarafından eklenir)
+
+   FileGator eylemleri satır sonundaki "⋯" menüsüne ve yalnızca seçim varken
+   beliren gizli bir şeride saklar. Tasarım sürekli görünen tek bir çubuk
+   ister; wd-fm.js bunu üretir, burada biçimlendirilir.
+
+   Bu düğümler #browser İÇİNE konur (sabit panel değil), çünkü tasarımda
+   kartın başlığı ve altlığıdırlar — içerikle birlikte akmaları gerekir.
+   ========================================================================== */
+:root {
+	--wd-tur-gorsel: #8a63d2;
+	--wd-tur-kod: #2b7de9;
+}
+
+/* --- Stok satırların devri ------------------------------------------------
+   Gezinme satırının işlevleri (yol, arama, klasör seç) yeni çubuğa taşındı;
+   çoklu-eylem şeridinin düğmeleri de öyle. Sayfalama ("Sayfa başına N")
+   korunur, o yüzden #multi-actions'ın tamamı değil yalnızca sol grubu
+   gizlenir. Not: seçici `div.` ile daraltılmıştır — #multi-actions bir
+   <section>'dır ve aynı sınıfları taşır, yanlışlıkla o da gizlenmesin. */
+#browser > div.is-flex.is-justify-between {
+	display: none !important;
+}
+
+#multi-actions > div:first-child {
+	/* FileGator'ın yükleme <input type="file"> öğesi burada yaşar. DOM'dan
+	   çıkarmıyoruz, yalnızca gizliyoruz: "Yükle" düğmesi onu programla
+	   tıklar (gizli dosya girdisi tarayıcılarda çalışan standart desendir). */
+	display: none !important;
+}
+
+#multi-actions {
+	justify-content: flex-end !important;
+	margin: 0 0 8px !important;
+}
+
+/* --- Çubuk kabı --- */
+.wdfm-bar {
+	background: var(--wd-card);
+	border: 1px solid var(--wd-line);
+	border-radius: var(--wd-r);
+	margin-bottom: 10px;
+	overflow: hidden;
+}
+
+/* --- 1. satır: eylemler --- */
+.wdfm-bar-araclar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--wd-line);
+}
+
+.wdfm-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	padding: 0 10px;
+	border: 1px solid var(--wd-input-line);
+	border-radius: var(--wd-r-sm);
+	background: var(--wd-card);
+	color: var(--wd-text2);
+	font-family: var(--wd-fm-sans);
+	font-size: 11.5px;
+	font-weight: 500;
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.wdfm-btn:hover:not(:disabled) {
+	background: var(--wd-page);
+	color: var(--wd-ink);
+}
+
+.wdfm-btn:focus-visible {
+	outline: 2px solid var(--wd-green);
+	outline-offset: 1px;
+}
+
+.wdfm-btn-ico {
+	display: grid;
+	place-items: center;
+	flex: none;
+}
+
+/* "Yükle" birincil eylemdir: tasarımda dolu yeşil. */
+.wdfm-btn.vurgu {
+	background: var(--wd-green);
+	border-color: var(--wd-green);
+	color: #fff;
+}
+
+.wdfm-btn.vurgu:hover:not(:disabled) {
+	background: #28955a;
+	border-color: #28955a;
+	color: #fff;
+}
+
+/* Seçim gerektiren eylemler seçim yokken pasiftir. Gizlemek yerine
+   soluklaştırıyoruz: düğmenin varlığı ne yapılabileceğini öğretir. */
+.wdfm-btn.pasif,
+.wdfm-btn:disabled {
+	opacity: 0.42;
+	cursor: not-allowed;
+	background: var(--wd-card);
+	color: var(--wd-muted);
+	border-color: var(--wd-input-line);
+}
+
+.wdfm-btn.vurgu.pasif,
+.wdfm-btn.vurgu:disabled {
+	background: var(--wd-green);
+	border-color: var(--wd-green);
+	color: #fff;
+}
+
+/* --- 2. satır: gezinme --- */
+.wdfm-bar-gezinme {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	background: var(--wd-tree-bg);
+}
+
+.wdfm-ico-btn {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 26px;
+	height: 26px;
+	border: 1px solid var(--wd-input-line);
+	border-radius: 5px;
+	background: var(--wd-card);
+	color: var(--wd-muted);
+	cursor: pointer;
+	transition: background 0.12s ease, color 0.12s ease;
+}
+
+.wdfm-ico-btn:hover {
+	background: var(--wd-page);
+	color: var(--wd-ink);
+}
+
+.wdfm-ico-btn:focus-visible {
+	outline: 2px solid var(--wd-green);
+	outline-offset: 1px;
+}
+
+.wdfm-yenile {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 6px;
+	width: auto !important;
+	height: 28px !important;
+	padding: 0 10px;
+	font-family: var(--wd-fm-sans);
+	font-size: 11.5px;
+	color: var(--wd-text2);
+	border-radius: var(--wd-r-sm);
+}
+
+/* --- Yol çubuğu --- */
+.wdfm-yol {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	height: 28px;
+	padding: 0 10px;
+	border: 1px solid var(--wd-input-line);
+	border-radius: var(--wd-r-sm);
+	background: var(--wd-card);
+	font-family: var(--wd-fm-mono);
+	font-size: 11.5px;
+	overflow-x: auto;
+	white-space: nowrap;
+	scrollbar-width: none;
+}
+
+.wdfm-yol::-webkit-scrollbar {
+	display: none;
+}
+
+.wdfm-yol-parca {
+	color: var(--wd-muted);
+	text-decoration: none;
+	flex: none;
+}
+
+.wdfm-yol-parca:hover {
+	color: var(--wd-link);
+	text-decoration: underline;
+}
+
+.wdfm-yol-parca.son {
+	color: var(--wd-ink);
+}
+
+.wdfm-yol-ayrac {
+	color: var(--wd-sep);
+	padding: 0 5px;
+	flex: none;
+}
+
+/* --- Durum çubuğu --- */
+.wdfm-durum {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	margin-top: 10px;
+	padding: 7px 12px;
+	border: 1px solid var(--wd-line);
+	border-radius: var(--wd-r-sm);
+	background: var(--wd-tree-bg);
+	font-size: 11px;
+	color: var(--wd-muted2);
+}
+
+.wdfm-durum-bosluk {
+	flex: 1;
+}
+
+.wdfm-durum-sag {
+	font-family: var(--wd-fm-mono);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 55%;
+}
+
+/* --- Dosya türü ikonları -------------------------------------------------
+   Gerçek bir "Tür" sütunu eklenemiyor (bkz. dosya başlığı); tür bilgisi
+   ad hücresindeki renkli ikonla verilir. */
+.wdfm-tur-ico {
+	display: grid;
+	place-items: center;
+	flex: none;
+	color: var(--wd-muted);
+}
+
+a.name.wdfm-adli {
+	display: flex !important;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.wdfm-tur-ico.klasor {
+	color: var(--wd-folder);
+}
+
+.wdfm-tur-ico.geri {
+	color: var(--wd-faint);
+}
+
+.wdfm-tur-ico.gorsel {
+	color: var(--wd-tur-gorsel);
+}
+
+.wdfm-tur-ico.kod {
+	color: var(--wd-tur-kod);
+}
+
+.wdfm-tur-ico.arsiv {
+	color: var(--wd-red);
+}
+
+.wdfm-tur-ico.gunluk {
+	color: var(--wd-muted2);
+}
+
+/* --- Dar ekran --- */
+@media (max-width: 1023px) {
+	.wdfm-bar-araclar {
+		gap: 5px;
+		padding: 7px 8px;
+	}
+
+	/* Dar ekranda etiketler taşar; ikonlar yeterli, tam ad ipucunda kalır. */
+	.wdfm-btn-ad {
+		display: none;
+	}
+
+	.wdfm-btn {
+		padding: 0 9px;
+	}
+
+	.wdfm-bar-gezinme {
+		flex-wrap: wrap;
+		padding: 7px 8px;
+	}
+
+	.wdfm-yol {
+		order: 3;
+		flex: 1 0 100%;
+	}
+
+	.wdfm-durum {
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.wdfm-durum-sag {
+		max-width: 100%;
+	}
+}
+
+.progress-box .box {
+	border: 1px solid var(--wd-line) !important;
+	border-radius: var(--wd-r) !important;
+	box-shadow: 0 10px 30px rgba(38, 49, 46, 0.14) !important;
+	color: var(--wd-ink) !important;
+}
+
+/* =============================================================================
+   9. KOD DÜZENLEYİCİ
+   ========================================================================== */
+:not(pre) > code[class*="language-"],
+pre[class*="language-"],
+.prism-editor__line-numbers {
+	background: #10201b !important;
+}
+
+code[class*="language-"],
+pre[class*="language-"] {
+	color: #d8e4df !important;
+	font-family: var(--wd-fm-mono) !important;
+	font-size: 12px !important;
+	text-shadow: none !important;
+}
+
+/* =============================================================================
+   10. DAR EKRAN
+   ========================================================================== */
+@media (max-width: 767px) {
+	#dropzone.container {
+		padding: 0 12px 20px;
+	}
+
+	.navbar {
+		padding: 0 12px;
+	}
+
+	#multi-actions {
+		gap: 6px;
+	}
+
+	/* Dosya tablosu dar ekranda kendi içinde kaysın, sayfayı taşırmasın */
+	#browser .b-table .table-wrapper {
+		overflow-x: auto;
+	}
+}

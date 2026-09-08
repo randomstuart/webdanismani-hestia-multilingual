@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Yedek gezgini
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-yedek
+
+NEDEN VAR?
+  HestiaCP yedekten yalnızca alan adı / veritabanı / mail düzeyinde geri
+  yükler. Müşteri ise "dün sildiğim tek dosya"yı ister. Bu betik yedeğin
+  içinde gezdirir ve tek dosya/klasörü geri yükler (JetBackup'ın dosya
+  geri yükleme özelliği).
+
+YEDEK BİÇİMİ
+  /backup/<user>.<tarih>.tar   içinde   web/<domain>/domain_data.tar.zst
+  (eski sürümlerde .tar.gz). İç arşivin üyeleri: public_html/..., private/...
+
+  İç arşivi listelemek tüm akışı açmayı gerektirir (saniyeler); sonuç
+  wd/cache/yedek/ altında önbelleklenir — yedek dosyası değişmez.
+
+GERİ YÜKLEME
+  Varsayılan: <domain>/private/wd-geri/<zaman>/... altına çıkarılır; canlı
+  dosyalara DOKUNULMAZ. "--yerine" ile canlıya yazılır; önce mevcut hâl
+  private/wd-geri/<zaman>-onceki/ altına kopyalanır.
+
+Kullanım:
+  wd-yedek liste USER
+  wd-yedek icerik USER YEDEK DOMAIN [YOL]
+  wd-yedek geri-yukle USER YEDEK DOMAIN YOL [--yerine]
+"""
+
+import json
+import os
+import pwd
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+CACHE_DIZIN = HESTIA + "/wd/cache/yedek"
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+YEDEK_DESENI = re.compile(r"^[a-z0-9._-]{1,32}\.\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.tar$", re.I)
+KOKLER = ("public_html", "public_shtml", "private", "document_errors", "cgi-bin")
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def hestia_conf(anahtar, varsayilan=""):
+    try:
+        with open(HESTIA + "/conf/hestia.conf", encoding="utf-8") as fh:
+            for s in fh:
+                if s.startswith(anahtar + "="):
+                    return s.split("=", 1)[1].strip().strip("'\"")
+    except Exception:
+        pass
+    return varsayilan
+
+
+def yedek_dizini():
+    return hestia_conf("BACKUP", "/backup").rstrip("/") or "/backup"
+
+
+def hestia_json(cmd, timeout=60):
+    try:
+        r = subprocess.run([HESTIA + "/bin/" + cmd[0]] + cmd[1:], capture_output=True, text=True, timeout=timeout)
+        return json.loads(r.stdout) if r.returncode == 0 and r.stdout.strip() else {}
+    except Exception:
+        return {}
+
+
+def ev_dizini(user):
+    try:
+        return pwd.getpwnam(user).pw_dir.rstrip("/")
+    except KeyError:
+        return None
+
+
+def yedek_yolu(user, yedek):
+    if not YEDEK_DESENI.match(yedek) or not yedek.startswith(user + "."):
+        return None
+    y = os.path.join(yedek_dizini(), yedek)
+    return y if os.path.isfile(y) else None
+
+
+def yol_temizle(yol):
+    yol = (yol or "").strip().strip("/")
+    if yol == "":
+        return ""
+    parcalar = yol.split("/")
+    if any(p in ("", ".", "..") for p in parcalar):
+        return None
+    if parcalar[0] not in KOKLER:
+        return None
+    return "/".join(parcalar)
+
+
+# ---------------------------------------------------------------------- liste
+def liste(user):
+    veri = hestia_json(["v-list-user-backups", user, "json"])
+    out = []
+    for ad, v in veri.items():
+        yol = os.path.join(yedek_dizini(), ad)
+        webler = [x for x in str(v.get("WEB", "")).split(",") if x]
+        out.append({
+            "ad": ad,
+            "tarih": v.get("DATE", ""), "saat": v.get("TIME", ""),
+            "boyut_mb": int(v.get("SIZE", 0) or 0),
+            "web": webler, "db": [x for x in str(v.get("DB", "")).split(",") if x],
+            "mail": [x for x in str(v.get("MAIL", "")).split(",") if x],
+            "dosya_var": os.path.isfile(yol),
+        })
+    out.sort(key=lambda b: (b["tarih"], b["saat"]), reverse=True)
+    uzak = hestia_json(["v-list-backup-host", "json"])
+    uzak_bilgi = None
+    if isinstance(uzak, dict) and uzak:
+        k = next(iter(uzak))
+        uzak_bilgi = {"tur": k, "sunucu": uzak[k].get("HOST", ""), "yol": uzak[k].get("BPATH", "")}
+    print(json.dumps({"ok": True, "yedekler": out, "uzak": uzak_bilgi, "dizin": yedek_dizini(),
+                      "mod": hestia_conf("BACKUP_MODE", "zstd")}, ensure_ascii=False))
+    return 0
+
+
+# --------------------------------------------------------------------- içerik
+def ic_arsiv_uyesi(dis_yol, domain):
+    """Dış tar'da alan adının iç arşiv üyesini bulur (zst ya da gz)."""
+    for uzanti in ("domain_data.tar.zst", "domain_data.tar.gz"):
+        uye = "web/%s/%s" % (domain, uzanti)
+        r = subprocess.run(["tar", "-tf", dis_yol, uye], capture_output=True, text=True, timeout=600)
+        if r.returncode == 0 and uye in r.stdout:
+            return uye
+    return None
+
+
+def acici(uye):
+    return ["zstd", "-dc"] if uye.endswith(".zst") else ["gzip", "-dc"]
+
+
+def uye_listesi(user, yedek, domain):
+    """İç arşivin tam üye listesi (önbellekli). [(yol, boyut, dizin_mi, tarih)]"""
+    os.makedirs(CACHE_DIZIN, exist_ok=True)
+    onbellek = os.path.join(CACHE_DIZIN, "%s-%s-%s.json" % (user, yedek, domain))
+    if os.path.isfile(onbellek):
+        try:
+            with open(onbellek, encoding="utf-8") as fh:
+                return json.load(fh), None
+        except Exception:
+            pass
+    dis = yedek_yolu(user, yedek)
+    if not dis:
+        return None, "Yedek dosyası bulunamadı (artımlı/uzak modda dosya gezgini desteklenmez)."
+    uye = ic_arsiv_uyesi(dis, domain)
+    if not uye:
+        return None, "Bu yedekte alan adının dosya arşivi yok."
+    try:
+        p1 = subprocess.Popen(["tar", "-xOf", dis, uye], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        p2 = subprocess.Popen(acici(uye), stdin=p1.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        p1.stdout.close()
+        p3 = subprocess.Popen(["tar", "-tvf", "-"], stdin=p2.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        p2.stdout.close()
+        cikti, _ = p3.communicate(timeout=1800)
+        p2.wait(timeout=60)
+        p1.wait(timeout=60)
+    except Exception as e:
+        return None, "Arşiv okunamadı: %s" % e
+    uyeler = []
+    for s in cikti.decode("utf-8", "replace").splitlines():
+        # -rw-r--r-- user/group  1234 2026-09-01 10:00 public_html/index.php
+        m = re.match(r"^([\-dl])\S+\s+\S+\s+(\d+)\s+(\S+ \S+)\s+(.+?)(?: -> .*)?$", s)
+        if not m:
+            continue
+        yol = m.group(4).lstrip("./").rstrip("/")
+        if not yol:
+            continue
+        uyeler.append([yol, int(m.group(2)), m.group(1) == "d", m.group(3)])
+    try:
+        with open(onbellek, "w", encoding="utf-8") as fh:
+            json.dump(uyeler, fh)
+        os.chmod(onbellek, 0o600)
+    except Exception:
+        pass
+    return uyeler, None
+
+
+def icerik(user, yedek, domain, yol):
+    yol = yol_temizle(yol)
+    if yol is None:
+        return hata("Geçersiz yol.")
+    uyeler, h = uye_listesi(user, yedek, domain)
+    if uyeler is None:
+        return hata(h)
+    if yol == "":
+        # Kök: yalnızca üst dizinler
+        kokler = {}
+        for u in uyeler:
+            ust = u[0].split("/")[0]
+            k = kokler.setdefault(ust, {"ad": ust, "dizin": True, "boyut": 0, "adet": 0, "tarih": ""})
+            if not u[2]:
+                k["boyut"] += u[1]
+                k["adet"] += 1
+        out = sorted(kokler.values(), key=lambda x: x["ad"])
+        print(json.dumps({"ok": True, "yol": "", "ogeler": out, "toplam": len(uyeler)}, ensure_ascii=False))
+        return 0
+    onek = yol + "/"
+    dizinler = {}
+    dosyalar = []
+    for u in uyeler:
+        if not u[0].startswith(onek):
+            continue
+        kalan = u[0][len(onek):]
+        if "/" in kalan:
+            ad = kalan.split("/")[0]
+            k = dizinler.setdefault(ad, {"ad": ad, "dizin": True, "boyut": 0, "adet": 0, "tarih": ""})
+            if not u[2]:
+                k["boyut"] += u[1]
+                k["adet"] += 1
+        elif u[2]:
+            dizinler.setdefault(kalan, {"ad": kalan, "dizin": True, "boyut": 0, "adet": 0, "tarih": u[3]})
+        else:
+            dosyalar.append({"ad": kalan, "dizin": False, "boyut": u[1], "adet": 1, "tarih": u[3]})
+    out = sorted(dizinler.values(), key=lambda x: x["ad"]) + sorted(dosyalar, key=lambda x: x["ad"])
+    print(json.dumps({"ok": True, "yol": yol, "ogeler": out[:2000], "kirpildi": len(out) > 2000}, ensure_ascii=False))
+    return 0
+
+
+# ------------------------------------------------------------------ geri yükle
+def geri_yukle(user, yedek, domain, yol, yerine):
+    yol = yol_temizle(yol)
+    if not yol:
+        return hata("Geri yüklenecek dosya ya da klasör yolu gerekli.")
+    home = ev_dizini(user)
+    if not home or domain not in hestia_json(["v-list-web-domains", user, "json"]):
+        return hata("Alan adı bu hesaba ait değil.")
+    dis = yedek_yolu(user, yedek)
+    if not dis:
+        return hata("Yedek dosyası bulunamadı.")
+    uye = ic_arsiv_uyesi(dis, domain)
+    if not uye:
+        return hata("Bu yedekte alan adının dosya arşivi yok.")
+    uyeler, h = uye_listesi(user, yedek, domain)
+    if uyeler is None:
+        return hata(h)
+    hedefler = [u for u in uyeler if u[0] == yol or u[0].startswith(yol + "/")]
+    if not hedefler:
+        return hata("Yedekte böyle bir yol yok: " + yol)
+    pw = pwd.getpwnam(user)
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    gecici = os.path.join(home, "web", domain, "private", ".wd-geri-tmp-" + ts)
+    os.makedirs(gecici, exist_ok=True)
+    try:
+        p1 = subprocess.Popen(["tar", "-xOf", dis, uye], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        p2 = subprocess.Popen(acici(uye), stdin=p1.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        p1.stdout.close()
+        p3 = subprocess.Popen(["tar", "-xf", "-", "-C", gecici, "--", yol], stdin=p2.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p2.stdout.close()
+        _, e3 = p3.communicate(timeout=3600)
+        p2.wait(timeout=60)
+        p1.wait(timeout=60)
+        if p3.returncode != 0:
+            shutil.rmtree(gecici, ignore_errors=True)
+            return hata("Arşivden çıkarılamadı: " + e3.decode("utf-8", "replace")[-200:])
+    except Exception as e:
+        shutil.rmtree(gecici, ignore_errors=True)
+        return hata("Geri yükleme hatası: %s" % e)
+
+    cikan = os.path.join(gecici, yol)
+    if not os.path.exists(cikan):
+        shutil.rmtree(gecici, ignore_errors=True)
+        return hata("Çıkarılan içerik bulunamadı.")
+
+    if yerine:
+        canli = os.path.join(home, "web", domain, yol)
+        onceki = os.path.join(home, "web", domain, "private", "wd-geri", ts + "-onceki", yol)
+        if os.path.exists(canli):
+            os.makedirs(os.path.dirname(onceki), exist_ok=True)
+            if os.path.isdir(canli) and not os.path.islink(canli):
+                shutil.copytree(canli, onceki, symlinks=True)
+                shutil.rmtree(canli)
+            else:
+                shutil.copy2(canli, onceki)
+                os.unlink(canli)
+        os.makedirs(os.path.dirname(canli), exist_ok=True)
+        shutil.move(cikan, canli)
+        sonuc_yol = canli
+        yedek_yol = os.path.join(home, "web", domain, "private", "wd-geri", ts + "-onceki") if os.path.isdir(os.path.join(home, "web", domain, "private", "wd-geri", ts + "-onceki")) else ""
+    else:
+        hedef = os.path.join(home, "web", domain, "private", "wd-geri", ts, yol)
+        os.makedirs(os.path.dirname(hedef), exist_ok=True)
+        shutil.move(cikan, hedef)
+        sonuc_yol = hedef
+        yedek_yol = ""
+    shutil.rmtree(gecici, ignore_errors=True)
+    for kok in (os.path.join(home, "web", domain, "private"), sonuc_yol):
+        subprocess.run(["chown", "-R", "%d:%d" % (pw.pw_uid, pw.pw_gid), kok], capture_output=True, timeout=600)
+    print(json.dumps({"ok": True, "yol": sonuc_yol.replace(home + "/web/" + domain, "", 1),
+                      "yerine": bool(yerine), "onceki": yedek_yol.replace(home + "/web/" + domain, "", 1) if yedek_yol else "",
+                      "adet": len(hedefler)}, ensure_ascii=False))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 3:
+        sys.stderr.write(__doc__)
+        return 2
+    mod, user = sys.argv[1], sys.argv[2]
+    if not KULLANICI_DESENI.match(user):
+        return hata("Geçersiz kullanıcı.")
+    if mod == "liste":
+        return liste(user)
+    if len(sys.argv) < 5:
+        sys.stderr.write(__doc__)
+        return 2
+    yedek, domain = sys.argv[3], sys.argv[4]
+    if not YEDEK_DESENI.match(yedek) or not AD_DESENI.match(domain):
+        return hata("Geçersiz yedek adı ya da alan adı.")
+    if mod == "icerik":
+        return icerik(user, yedek, domain, sys.argv[5] if len(sys.argv) > 5 else "")
+    if mod == "geri-yukle":
+        if len(sys.argv) < 6:
+            return hata("Yol gerekli.")
+        return geri_yukle(user, yedek, domain, sys.argv[5], "--yerine" in sys.argv[6:])
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

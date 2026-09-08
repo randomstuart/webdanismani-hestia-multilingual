@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Mail teslim raporu
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-mailrapor
+
+NEDEN VAR?
+  Exim ne gönderildiğini, neyin sekmediğini ve kimin reddedildiğini günlüğe
+  yazar; ama panelde bunu gösteren hiçbir yer yoktur. Bir hosting sağlayıcısı
+  için bu günlük, ele geçirilmiş bir müşteri hesabını IP kara listeye
+  düşmeden fark etmenin tek yoludur.
+
+NE OKUR?
+  /var/log/exim4/mainlog (+ döndürülmüş .1 dosyası). Exim satır biçimi:
+    <=  ileti KABUL EDİLDİ (sisteme girdi)   -> gönderen, boyut
+    =>  ileti TESLİM EDİLDİ                  -> alıcı
+    **  teslim KALICI olarak başarısız       -> sekme (bounce)
+    ==  teslim ERTELENDİ
+  Reddedilen bağlantılar /var/log/exim4/rejectlog içindedir.
+
+NE ÇIKARIR?
+  * Gönderen hesap başına ileti sayısı ve toplam boyut
+  * Sekme oranı (yüksek oran = ya liste kötü ya hesap ele geçirilmiş)
+  * En çok yazılan alıcı alan adları
+  * Kuyruk ve donmuş ileti sayısı
+  * Reddedilen bağlantı sayısı
+
+Kullanım:
+  wd-mailrapor refresh [gun]   günlüğü tara, önbelleğe yaz (cron)
+  wd-mailrapor json [gun]
+  wd-mailrapor plain
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from collections import defaultdict
+
+HESTIA = "/usr/local/hestia"
+CACHE = HESTIA + "/wd/cache/mailrapor.json"
+LOGLAR = ["/var/log/exim4/mainlog", "/var/log/exim4/mainlog.1"]
+REJECTLOG = "/var/log/exim4/rejectlog"
+
+# Şüphe eşiği: bu kadar iletiden sonra sekme oranı anlamlı sayılır.
+ASGARI_ILETI = 20
+SEKME_UYARI = 0.15   # %15
+SEKME_KRITIK = 0.35  # %35
+
+
+def kabuk(cmd, timeout=30):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=timeout, check=False)
+        return r.returncode, r.stdout
+    except Exception:
+        return 1, ""
+
+
+def satirlar(gun):
+    """Son `gun` gün içindeki günlük satırları."""
+    sinir = time.time() - gun * 86400
+    for yol in LOGLAR:
+        if not os.path.isfile(yol):
+            continue
+        try:
+            with open(yol, encoding="utf-8", errors="replace") as fh:
+                for s in fh:
+                    if len(s) < 20:
+                        continue
+                    try:
+                        ts = time.mktime(time.strptime(s[:19], "%Y-%m-%d %H:%M:%S"))
+                    except ValueError:
+                        continue
+                    if ts >= sinir:
+                        yield ts, s
+        except Exception:
+            continue
+
+
+GONDEREN = re.compile(r"\s<=\s(\S+)")
+BOYUT = re.compile(r"\sS=(\d+)")
+TESLIM = re.compile(r"\s=>\s(\S+)")
+BASARISIZ = re.compile(r"\s\*\*\s(\S+)")
+ERTELENEN = re.compile(r"\s==\s(\S+)")
+
+
+def topla(gun=7):
+    gonderenler = defaultdict(lambda: {"ileti": 0, "bayt": 0, "sekme": 0,
+                                       "ertelenen": 0, "teslim": 0})
+    alici_alan = defaultdict(int)
+    # Exim ileti kimliği ile gönderen eşlenir; sekme satırında gönderen yazmaz.
+    kimlik_gonderen = {}
+    toplam = {"kabul": 0, "teslim": 0, "sekme": 0, "ertelenen": 0}
+
+    for ts, s in satirlar(gun):
+        m = GONDEREN.search(s)
+        if m:
+            gonderen = m.group(1).strip("<>").lower()
+            if gonderen in ("", "<>"):
+                gonderen = "(sistem)"
+            # Exim satırı: [0]tarih [1]saat [2]ileti-kimliği [3]işaret [4]adres
+            parcalar = s.split()
+            kimlik = parcalar[2] if len(parcalar) > 2 else ""
+            kimlik_gonderen[kimlik] = gonderen
+            g = gonderenler[gonderen]
+            g["ileti"] += 1
+            toplam["kabul"] += 1
+            b = BOYUT.search(s)
+            if b:
+                g["bayt"] += int(b.group(1))
+            continue
+
+        parcalar = s.split()
+        kimlik = parcalar[2] if len(parcalar) > 2 else ""
+        gonderen = kimlik_gonderen.get(kimlik)
+
+        m = TESLIM.search(s)
+        if m:
+            toplam["teslim"] += 1
+            if gonderen:
+                gonderenler[gonderen]["teslim"] += 1
+            alici = m.group(1).strip("<>")
+            if "@" in alici:
+                alici_alan[alici.split("@")[-1].lower()] += 1
+            continue
+
+        if BASARISIZ.search(s):
+            toplam["sekme"] += 1
+            if gonderen:
+                gonderenler[gonderen]["sekme"] += 1
+            continue
+
+        if ERTELENEN.search(s):
+            toplam["ertelenen"] += 1
+            if gonderen:
+                gonderenler[gonderen]["ertelenen"] += 1
+
+    # --- Gönderen listesi + şüphe değerlendirmesi ---
+    liste = []
+    for ad, g in gonderenler.items():
+        oran = g["sekme"] / g["ileti"] if g["ileti"] else 0.0
+        if g["ileti"] >= ASGARI_ILETI and oran >= SEKME_KRITIK:
+            durum = "fail"
+        elif g["ileti"] >= ASGARI_ILETI and oran >= SEKME_UYARI:
+            durum = "warn"
+        else:
+            durum = "ok"
+        liste.append({
+            "gonderen": ad, "ileti": g["ileti"], "bayt": g["bayt"],
+            "teslim": g["teslim"], "sekme": g["sekme"],
+            "ertelenen": g["ertelenen"],
+            "sekme_orani": round(oran * 100, 1), "durum": durum,
+        })
+    liste.sort(key=lambda x: -x["ileti"])
+
+    # --- Kuyruk ---
+    _, bekleyen = kabuk(["exim4", "-bpc"])
+    try:
+        bekleyen = int(bekleyen.strip() or 0)
+    except ValueError:
+        bekleyen = 0
+    donmus = 0
+    if bekleyen:
+        _, out = kabuk(["bash", "-c", "exim4 -bp | grep -c frozen"])
+        try:
+            donmus = int(out.strip() or 0)
+        except ValueError:
+            donmus = 0
+
+    # --- Reddedilenler ---
+    red = 0
+    if os.path.isfile(REJECTLOG):
+        sinir = time.time() - gun * 86400
+        try:
+            with open(REJECTLOG, encoding="utf-8", errors="replace") as fh:
+                for s in fh:
+                    try:
+                        ts = time.mktime(time.strptime(s[:19], "%Y-%m-%d %H:%M:%S"))
+                    except (ValueError, IndexError):
+                        continue
+                    if ts >= sinir:
+                        red += 1
+        except Exception:
+            pass
+
+    return {
+        "ts": int(time.time()),
+        "gun": gun,
+        "toplam": toplam,
+        "gonderenler": liste[:60],
+        "alici_alanlar": sorted(
+            [{"alan": k, "adet": v} for k, v in alici_alan.items()],
+            key=lambda x: -x["adet"])[:15],
+        "kuyruk": {"bekleyen": bekleyen, "donmus": donmus},
+        "reddedilen": red,
+    }
+
+
+def yaz(d):
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    gecici = CACHE + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False)
+    os.replace(gecici, CACHE)
+    os.chmod(CACHE, 0o644)
+
+
+def main():
+    mod = sys.argv[1] if len(sys.argv) > 1 else "json"
+    try:
+        gun = int(sys.argv[2]) if len(sys.argv) > 2 else 7
+    except ValueError:
+        gun = 7
+    gun = max(1, min(gun, 30))
+
+    if mod == "refresh":
+        d = topla(gun)
+        yaz(d)
+        print(json.dumps({"ok": True, "gonderen": len(d["gonderenler"]),
+                          "kabul": d["toplam"]["kabul"]}, ensure_ascii=False))
+        return 0
+
+    if mod == "plain":
+        try:
+            with open(CACHE, encoding="utf-8") as fh:
+                d = json.load(fh)
+        except Exception:
+            d = topla(gun)
+        t = d["toplam"]
+        print("son %d gun: %d kabul, %d teslim, %d sekme, %d ertelenen"
+              % (d["gun"], t["kabul"], t["teslim"], t["sekme"], t["ertelenen"]))
+        print("kuyruk: %d bekleyen, %d donmus | reddedilen baglanti: %d"
+              % (d["kuyruk"]["bekleyen"], d["kuyruk"]["donmus"], d["reddedilen"]))
+        for g in d["gonderenler"][:10]:
+            print("  [%-4s] %-38s %5d ileti  %%%.1f sekme"
+                  % (g["durum"], g["gonderen"][:38], g["ileti"], g["sekme_orani"]))
+        return 0
+
+    print(json.dumps(topla(gun), ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

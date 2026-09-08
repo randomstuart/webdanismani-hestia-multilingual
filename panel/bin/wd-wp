@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — WordPress araçları
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-wp
+Gereksinim:   /usr/local/bin/wp (wp-cli; kur-modul.sh indirir)
+
+NEDEN VAR?
+  cPanel'deki WP Toolkit karşılığı: güncellemeleri tek yerden gör ve uygula,
+  otomatik güncellemeyi aç, çekirdek bütünlüğünü doğrula (bozulmuş dosya =
+  olası webshell), bakım modu, tek tıkla yönetici girişi, önbellek temizle.
+
+GÜVENLİK
+  wp-cli daima SİTE SAHİBİ kullanıcısıyla çalıştırılır (sudo -u); root ile
+  asla değil — eklenti kodu wp-cli içinde çalışır.
+
+  Tek tıklık giriş: wp-content/mu-plugins/wd-giris.php + 120 sn geçerli, tek
+  kullanımlık, sha256'sı saklanan bir jeton dosyası. Jeton dosyası yokken
+  eklenti hiçbir şey yapmaz.
+
+Kullanım:
+  wd-wp tara [USER]                     tüm siteleri tara, önbelleğe yaz (cron gecelik)
+  wd-wp json [USER]                     önbellek
+  wd-wp guncelle USER DOMAIN YOL cekirdek|eklentiler|temalar|hepsi
+  wd-wp eklenti USER DOMAIN YOL AD activate|deactivate|update
+  wd-wp otomatik USER DOMAIN YOL on|off
+  wd-wp bakim USER DOMAIN YOL on|off
+  wd-wp dogrula USER DOMAIN YOL
+  wd-wp giris USER DOMAIN YOL           tek kullanımlık giriş bağlantısı
+  wd-wp onbellek USER DOMAIN YOL
+"""
+
+import hashlib
+import json
+import os
+import pwd
+import re
+import secrets
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+CACHE = HESTIA + "/wd/cache/wp.json"
+WP = "/usr/local/bin/wp"
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+YOL_DESENI = re.compile(r"^/([A-Za-z0-9._-]{1,60}(/[A-Za-z0-9._-]{1,60})?)?$")
+EKLENTI_DESENI = re.compile(r"^[a-z0-9._-]{1,80}$", re.I)
+
+MU_EKLENTI = r"""<?php
+/**
+ * WebDanismani - tek kullanimlik yonetici girisi
+ * Panel > WordPress Araclari > "Yonetici olarak gir" tarafindan kullanilir.
+ * wp-content/wd-giris.token yokken hicbir sey yapmaz.
+ */
+add_action('init', function () {
+    if (empty($_GET['wd_giris'])) { return; }
+    $dosya = WP_CONTENT_DIR . '/wd-giris.token';
+    if (!is_file($dosya)) { return; }
+    $veri = json_decode((string) file_get_contents($dosya), true);
+    @unlink($dosya);
+    if (!is_array($veri) || empty($veri['hash']) || empty($veri['exp']) || empty($veri['uid'])) { return; }
+    if (time() > (int) $veri['exp']) { return; }
+    if (!hash_equals((string) $veri['hash'], hash('sha256', (string) $_GET['wd_giris']))) { return; }
+    $u = get_user_by('id', (int) $veri['uid']);
+    if (!$u || !user_can($u, 'manage_options')) { return; }
+    wp_set_current_user($u->ID);
+    wp_set_auth_cookie($u->ID, false, is_ssl());
+    do_action('wp_login', $u->user_login, $u);
+    wp_safe_redirect(admin_url());
+    exit;
+}, 1);
+"""
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def ev_dizini(user):
+    try:
+        return pwd.getpwnam(user).pw_dir.rstrip("/")
+    except KeyError:
+        return None
+
+
+def hestia_json(cmd):
+    try:
+        r = subprocess.run([HESTIA + "/bin/" + cmd[0]] + cmd[1:], capture_output=True, text=True, timeout=60)
+        return json.loads(r.stdout) if r.returncode == 0 and r.stdout.strip() else {}
+    except Exception:
+        return {}
+
+
+def domain_gecerli(user, domain):
+    return domain in hestia_json(["v-list-web-domains", user, "json"])
+
+
+def wp_var():
+    return os.path.isfile(WP) and os.access(WP, os.X_OK)
+
+
+def wp_calistir(user, yol, args, timeout=180, json_cikti=True, ek=None):
+    """wp-cli'yi site kullanıcısı olarak çalıştırır. (rc, stdout, stderr)"""
+    home = ev_dizini(user)
+    cmd = ["sudo", "-u", user, "-H", "env", "HOME=" + (home or "/tmp"), "WP_CLI_CACHE_DIR=/tmp/wd-wpcli-" + user,
+           WP, "--path=" + yol, "--no-color"] + list(ek or []) + list(args)
+    if json_cikti:
+        cmd.append("--format=json")
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    except subprocess.TimeoutExpired:
+        return 124, "", "zaman aşımı"
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def wp_json(user, yol, args, timeout=120, ek=None):
+    rc, out, err = wp_calistir(user, yol, args, timeout, True, ek)
+    if rc != 0 or not out:
+        return None
+    try:
+        return json.loads(out)
+    except ValueError:
+        # Uyarı satırları JSON'un önüne düşebilir; son satırı dene
+        try:
+            return json.loads(out.splitlines()[-1])
+        except Exception:
+            return None
+
+
+def wp_mi(dizin):
+    return os.path.isfile(os.path.join(dizin, "wp-config.php")) and os.path.isfile(os.path.join(dizin, "wp-includes", "version.php"))
+
+
+def wp_surum_dosyadan(dizin):
+    try:
+        with open(os.path.join(dizin, "wp-includes", "version.php"), encoding="utf-8", errors="replace") as fh:
+            m = re.search(r"\$wp_version\s*=\s*'([^']+)'", fh.read())
+            return m.group(1) if m else ""
+    except OSError:
+        return ""
+
+
+def siteleri_bul(user):
+    """Kullanıcının alan adlarında (kök + bir alt dizin) WordPress kurulumları."""
+    home = ev_dizini(user)
+    if not home:
+        return []
+    out = []
+    for domain in hestia_json(["v-list-web-domains", user, "json"]).keys():
+        docroot = os.path.join(home, "web", domain, "public_html")
+        if not os.path.isdir(docroot):
+            continue
+        adaylar = [("/", docroot)]
+        try:
+            for ad in sorted(os.listdir(docroot))[:60]:
+                p = os.path.join(docroot, ad)
+                if os.path.isdir(p) and not os.path.islink(p) and not ad.startswith(".") and ad not in ("wp-admin", "wp-content", "wp-includes"):
+                    adaylar.append(("/" + ad, p))
+        except OSError:
+            pass
+        for yol, dizin in adaylar:
+            if wp_mi(dizin):
+                out.append({"domain": domain, "user": user, "yol": yol, "dizin": dizin})
+    return out
+
+
+def site_dizini(user, domain, yol):
+    home = ev_dizini(user)
+    if not home or not domain_gecerli(user, domain) or not YOL_DESENI.match(yol):
+        return None
+    dizin = os.path.realpath(os.path.join(home, "web", domain, "public_html", yol.strip("/")))
+    kok = os.path.realpath(os.path.join(home, "web", domain, "public_html"))
+    if not (dizin == kok or dizin.startswith(kok + os.sep)) or not wp_mi(dizin):
+        return None
+    return dizin
+
+
+# ----------------------------------------------------------------------- tara
+def site_tara(s, ek_ozet_yok=False):
+    dizin = s["dizin"]
+    user = s["user"]
+    kayit = {"domain": s["domain"], "user": user, "yol": s["yol"], "ts": int(time.time()),
+             "surum": wp_surum_dosyadan(dizin), "hata": ""}
+    if not wp_var():
+        kayit["hata"] = "wp-cli kurulu değil"
+        return kayit
+    ek = ["--skip-plugins", "--skip-themes"]
+    ad = wp_json(user, dizin, ["option", "get", "blogname"], 60, ek)
+    kayit["ad"] = ad if isinstance(ad, str) else ""
+    url = wp_json(user, dizin, ["option", "get", "siteurl"], 60, ek)
+    kayit["url"] = url if isinstance(url, str) else ""
+    cu = wp_json(user, dizin, ["core", "check-update"], 90, ek)
+    kayit["cekirdek_guncelleme"] = ""
+    if isinstance(cu, list) and cu:
+        kayit["cekirdek_guncelleme"] = str(cu[0].get("version", ""))
+    eklentiler = wp_json(user, dizin, ["plugin", "list", "--fields=name,title,status,version,update,update_version,auto_update"], 120, ek)
+    kayit["eklentiler"] = eklentiler if isinstance(eklentiler, list) else []
+    temalar = wp_json(user, dizin, ["theme", "list", "--fields=name,title,status,version,update,update_version,auto_update"], 120, ek)
+    kayit["temalar"] = temalar if isinstance(temalar, list) else []
+    kayit["eklenti_guncelleme"] = sum(1 for e in kayit["eklentiler"] if str(e.get("update", "")) == "available")
+    kayit["tema_guncelleme"] = sum(1 for t in kayit["temalar"] if str(t.get("update", "")) == "available")
+    kayit["guncelleme_sayisi"] = kayit["eklenti_guncelleme"] + kayit["tema_guncelleme"] + (1 if kayit["cekirdek_guncelleme"] else 0)
+    kayit["bakim"] = os.path.isfile(os.path.join(dizin, ".maintenance"))
+    # Otomatik güncelleme: WP_AUTO_UPDATE_CORE sabiti
+    rc, out, _ = wp_calistir(user, dizin, ["config", "get", "WP_AUTO_UPDATE_CORE"], 60, False, ek)
+    kayit["otomatik_cekirdek"] = rc == 0 and out.strip().lower() in ("1", "true", "minor")
+    kayit["otomatik_eklenti"] = sum(1 for e in kayit["eklentiler"] if str(e.get("auto_update", "")) in ("on", "1", "true"))
+    if not ek_ozet_yok:
+        kayit["dogrulama"] = dogrula_ic(user, dizin)
+    kayit["giris_eklentisi"] = os.path.isfile(os.path.join(dizin, "wp-content", "mu-plugins", "wd-giris.php"))
+    return kayit
+
+
+def dogrula_ic(user, dizin):
+    rc, out, err = wp_calistir(user, dizin, ["core", "verify-checksums"], 180, False, ["--skip-plugins", "--skip-themes"])
+    metin = (out + "\n" + err)
+    sorunlu = []
+    for s in metin.splitlines():
+        m = re.search(r"File (?:doesn't verify against checksum|should not exist|is missing): (.+)$", s.strip())
+        if m:
+            sorunlu.append(m.group(1).strip()[:160])
+    return {"ok": rc == 0 and not sorunlu, "sorunlu": sorunlu[:60], "ts": int(time.time())}
+
+
+def tara(tek_user=""):
+    kullanicilar = [tek_user] if tek_user else list(hestia_json(["v-list-users", "json"]).keys())
+    eski = []
+    try:
+        with open(CACHE, encoding="utf-8") as fh:
+            eski = json.load(fh).get("siteler", [])
+    except Exception:
+        pass
+    siteler = []
+    for u in kullanicilar:
+        for s in siteleri_bul(u):
+            siteler.append(site_tara(s))
+    if tek_user:
+        siteler += [s for s in eski if s.get("user") != tek_user]
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    gecici = CACHE + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump({"ts": int(time.time()), "wp_cli": wp_var(), "siteler": siteler}, fh, ensure_ascii=False)
+    os.chmod(gecici, 0o644)
+    os.replace(gecici, CACHE)
+    print(json.dumps({"ok": True, "site": len([s for s in siteler if not tek_user or s.get("user") == tek_user])}))
+    return 0
+
+
+def tek_site_tazele(user, domain, yol):
+    """Bir işlemden sonra yalnızca o sitenin önbellek kaydını yeniler."""
+    try:
+        with open(CACHE, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except Exception:
+        d = {"ts": 0, "siteler": []}
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return
+    yeni = site_tara({"domain": domain, "user": user, "yol": yol, "dizin": dizin}, ek_ozet_yok=True)
+    # Doğrulama sonucu pahalı; eskisini koru
+    for s in d.get("siteler", []):
+        if s.get("domain") == domain and s.get("yol") == yol and s.get("dogrulama"):
+            yeni["dogrulama"] = s["dogrulama"]
+    d["siteler"] = [s for s in d.get("siteler", []) if not (s.get("domain") == domain and s.get("yol") == yol)] + [yeni]
+    d["ts"] = int(time.time())
+    d["wp_cli"] = wp_var()
+    gecici = CACHE + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False)
+    os.chmod(gecici, 0o644)
+    os.replace(gecici, CACHE)
+
+
+def json_cikti(user=""):
+    try:
+        with open(CACHE, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except Exception:
+        d = {"ts": 0, "wp_cli": wp_var(), "siteler": []}
+    if user:
+        d["siteler"] = [s for s in d.get("siteler", []) if s.get("user") == user]
+    d["siteler"].sort(key=lambda s: (s.get("domain", ""), s.get("yol", "")))
+    print(json.dumps(d, ensure_ascii=False))
+    return 0
+
+
+# -------------------------------------------------------------------- işlemler
+def guncelle(user, domain, yol, ne):
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return hata("WordPress kurulumu bulunamadı.")
+    if not wp_var():
+        return hata("wp-cli kurulu değil.")
+    ciktilar = []
+    if ne in ("cekirdek", "hepsi"):
+        rc, out, err = wp_calistir(user, dizin, ["core", "update"], 600, False)
+        ciktilar.append("Çekirdek: " + (out or err)[-300:])
+        if rc == 0:
+            wp_calistir(user, dizin, ["core", "update-db"], 300, False)
+    if ne in ("eklentiler", "hepsi"):
+        rc, out, err = wp_calistir(user, dizin, ["plugin", "update", "--all"], 900, False)
+        ciktilar.append("Eklentiler: " + (out or err)[-600:])
+    if ne in ("temalar", "hepsi"):
+        rc, out, err = wp_calistir(user, dizin, ["theme", "update", "--all"], 600, False)
+        ciktilar.append("Temalar: " + (out or err)[-400:])
+    if ne not in ("cekirdek", "eklentiler", "temalar", "hepsi"):
+        return hata("Geçersiz hedef.")
+    tek_site_tazele(user, domain, yol)
+    print(json.dumps({"ok": True, "cikti": ciktilar}, ensure_ascii=False))
+    return 0
+
+
+def eklenti(user, domain, yol, ad, islem):
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return hata("WordPress kurulumu bulunamadı.")
+    if not EKLENTI_DESENI.match(ad) or islem not in ("activate", "deactivate", "update"):
+        return hata("Geçersiz eklenti ya da işlem.")
+    rc, out, err = wp_calistir(user, dizin, ["plugin", islem, ad], 300, False)
+    tek_site_tazele(user, domain, yol)
+    if rc != 0:
+        return hata((err or out)[-300:] or "İşlem başarısız.")
+    print(json.dumps({"ok": True, "cikti": (out or "")[-300:]}, ensure_ascii=False))
+    return 0
+
+
+def otomatik(user, domain, yol, deger):
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return hata("WordPress kurulumu bulunamadı.")
+    ac = deger == "on"
+    rc1, o1, e1 = wp_calistir(user, dizin, ["config", "set", "WP_AUTO_UPDATE_CORE", "true" if ac else "minor", "--raw"], 60, False)
+    rc2, o2, e2 = wp_calistir(user, dizin, ["plugin", "auto-updates", "enable" if ac else "disable", "--all"], 120, False)
+    rc3, o3, e3 = wp_calistir(user, dizin, ["theme", "auto-updates", "enable" if ac else "disable", "--all"], 120, False)
+    tek_site_tazele(user, domain, yol)
+    if rc1 != 0:
+        return hata("wp-config.php güncellenemedi: " + (e1 or o1)[-200:])
+    print(json.dumps({"ok": True, "otomatik": ac}))
+    return 0
+
+
+def bakim(user, domain, yol, deger):
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return hata("WordPress kurulumu bulunamadı.")
+    rc, out, err = wp_calistir(user, dizin, ["maintenance-mode", "activate" if deger == "on" else "deactivate"], 60, False)
+    tek_site_tazele(user, domain, yol)
+    if rc != 0 and "already" not in (out + err):
+        return hata((err or out)[-200:] or "Bakım modu değiştirilemedi.")
+    print(json.dumps({"ok": True, "bakim": deger == "on"}))
+    return 0
+
+
+def dogrula(user, domain, yol):
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return hata("WordPress kurulumu bulunamadı.")
+    sonuc = dogrula_ic(user, dizin)
+    try:
+        with open(CACHE, encoding="utf-8") as fh:
+            d = json.load(fh)
+        for s in d.get("siteler", []):
+            if s.get("domain") == domain and s.get("yol") == yol:
+                s["dogrulama"] = sonuc
+        gecici = CACHE + ".tmp"
+        with open(gecici, "w", encoding="utf-8") as fh:
+            json.dump(d, fh, ensure_ascii=False)
+        os.chmod(gecici, 0o644)
+        os.replace(gecici, CACHE)
+    except Exception:
+        pass
+    print(json.dumps({"ok": True, "dogrulama": sonuc}, ensure_ascii=False))
+    return 0
+
+
+def giris(user, domain, yol):
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return hata("WordPress kurulumu bulunamadı.")
+    pw = pwd.getpwnam(user)
+    mu = os.path.join(dizin, "wp-content", "mu-plugins")
+    os.makedirs(mu, exist_ok=True)
+    os.chown(mu, pw.pw_uid, pw.pw_gid)
+    ek_yol = os.path.join(mu, "wd-giris.php")
+    if not os.path.isfile(ek_yol) or open(ek_yol, encoding="utf-8", errors="replace").read() != MU_EKLENTI:
+        with open(ek_yol, "w", encoding="utf-8") as fh:
+            fh.write(MU_EKLENTI)
+        os.chown(ek_yol, pw.pw_uid, pw.pw_gid)
+        os.chmod(ek_yol, 0o644)
+    uid = wp_json(user, dizin, ["user", "list", "--role=administrator", "--field=ID", "--orderby=ID", "--order=ASC"], 60, ["--skip-plugins", "--skip-themes"])
+    if isinstance(uid, list) and uid:
+        uid = uid[0]
+    if not uid or not str(uid).isdigit():
+        rc, out, _ = wp_calistir(user, dizin, ["user", "list", "--role=administrator", "--field=ID"], 60, False, ["--skip-plugins", "--skip-themes"])
+        satir = [s for s in out.splitlines() if s.strip().isdigit()]
+        uid = satir[0] if satir else ""
+    if not str(uid).isdigit():
+        return hata("Yönetici kullanıcı bulunamadı.")
+    jeton = secrets.token_urlsafe(32)
+    veri = {"hash": hashlib.sha256(jeton.encode("utf-8")).hexdigest(), "exp": int(time.time()) + 120, "uid": int(uid)}
+    tyol = os.path.join(dizin, "wp-content", "wd-giris.token")
+    with open(tyol, "w", encoding="utf-8") as fh:
+        json.dump(veri, fh)
+    os.chown(tyol, pw.pw_uid, pw.pw_gid)
+    os.chmod(tyol, 0o600)
+    url = wp_json(user, dizin, ["option", "get", "siteurl"], 60, ["--skip-plugins", "--skip-themes"])
+    if not isinstance(url, str) or not url:
+        url = "https://" + domain + ("" if yol == "/" else yol)
+    print(json.dumps({"ok": True, "url": url.rstrip("/") + "/?wd_giris=" + jeton}, ensure_ascii=False))
+    return 0
+
+
+def onbellek(user, domain, yol):
+    dizin = site_dizini(user, domain, yol)
+    if not dizin:
+        return hata("WordPress kurulumu bulunamadı.")
+    notlar = []
+    rc, out, err = wp_calistir(user, dizin, ["cache", "flush"], 60, False)
+    notlar.append("WP nesne önbelleği: " + ("temizlendi" if rc == 0 else (err or out)[-120:]))
+    purge = HESTIA + "/bin/v-purge-nginx-cache"
+    if os.path.isfile(purge):
+        r = subprocess.run([purge, user, domain], capture_output=True, text=True, timeout=60)
+        notlar.append("nginx önbelleği: " + ("temizlendi" if r.returncode == 0 else "etkin değil"))
+    # Yaygın önbellek eklentileri
+    for ekl, cmd in (("litespeed-cache", ["litespeed-purge", "all"]), ("w3-total-cache", ["w3-total-cache", "flush", "all"]),
+                     ("wp-super-cache", ["super-cache", "flush"]), ("wp-rocket", ["rocket", "clean", "--confirm"])):
+        if os.path.isdir(os.path.join(dizin, "wp-content", "plugins", ekl)):
+            r2, o2, e2 = wp_calistir(user, dizin, cmd, 120, False)
+            notlar.append(ekl + ": " + ("temizlendi" if r2 == 0 else "komut yok"))
+    print(json.dumps({"ok": True, "notlar": notlar}, ensure_ascii=False))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    mod = sys.argv[1]
+    if mod == "tara":
+        u = sys.argv[2] if len(sys.argv) > 2 else ""
+        if u and not KULLANICI_DESENI.match(u):
+            return hata("Geçersiz kullanıcı.")
+        return tara(u)
+    if mod == "json":
+        u = sys.argv[2] if len(sys.argv) > 2 else ""
+        if u and not KULLANICI_DESENI.match(u):
+            return hata("Geçersiz kullanıcı.")
+        return json_cikti(u)
+    if len(sys.argv) < 5:
+        sys.stderr.write(__doc__)
+        return 2
+    user, domain, yol = sys.argv[2], sys.argv[3], sys.argv[4]
+    if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain) or not YOL_DESENI.match(yol):
+        return hata("Geçersiz kullanıcı, alan adı ya da yol.")
+    if mod == "guncelle":
+        return guncelle(user, domain, yol, sys.argv[5] if len(sys.argv) > 5 else "hepsi")
+    if mod == "eklenti":
+        if len(sys.argv) < 7:
+            return hata("Kullanım: eklenti USER DOMAIN YOL AD islem")
+        return eklenti(user, domain, yol, sys.argv[5], sys.argv[6])
+    if mod == "otomatik":
+        return otomatik(user, domain, yol, sys.argv[5] if len(sys.argv) > 5 else "on")
+    if mod == "bakim":
+        return bakim(user, domain, yol, sys.argv[5] if len(sys.argv) > 5 else "on")
+    if mod == "dogrula":
+        return dogrula(user, domain, yol)
+    if mod == "giris":
+        return giris(user, domain, yol)
+    if mod == "onbellek":
+        return onbellek(user, domain, yol)
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

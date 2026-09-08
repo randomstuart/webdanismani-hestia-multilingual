@@ -1,0 +1,150 @@
+/* =============================================================================
+   WebDanışmanı — ek modüller stil parçası
+   Kurulum yeri: /usr/local/hestia/web/css/themes/custom/wd-modul.css
+
+   Tema derlemesine (derle.ps1) DOKUNMAZ; ayrı dosyadır ve her modül sayfası
+   kendi başında wd_modul_css() ile yükler. Renkler temanın --wd-* tokenlarını
+   kullanır; koyu/açık tema kendiliğinden uyar.
+   ========================================================================== */
+
+/* ---- tablo ---------------------------------------------------------------- */
+.wdm-tablo-sar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.wdm-tablo { width: 100%; border-collapse: collapse; font-size: 12px; }
+.wdm-tablo th {
+	text-align: left; padding: 8px 12px; font-size: 10px; font-weight: 600;
+	letter-spacing: 0.6px; text-transform: uppercase; color: var(--wd-muted2);
+	border-bottom: 1px solid var(--wd-line); white-space: nowrap;
+}
+.wdm-tablo td { padding: 9px 12px; border-bottom: 1px solid var(--wd-line-soft); vertical-align: middle; color: var(--wd-ink); }
+.wdm-tablo tr:last-child td { border-bottom: 0; }
+.wdm-tablo tr:hover td { background: var(--wd-tool-hover); }
+.wdm-tablo .daralt { width: 1%; white-space: nowrap; }
+.wdm-tablo .sag { text-align: right; }
+.wdm-tablo .mono, .wdm-mono { font-family: "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace; font-size: 11.5px; }
+
+/* ---- rozet / nokta -------------------------------------------------------- */
+.wdm-rozet {
+	display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px;
+	border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.4px;
+	text-transform: uppercase; white-space: nowrap; line-height: 16px;
+	background: var(--wd-line-soft); color: var(--wd-muted);
+}
+.wdm-rozet-ok { background: rgba(47, 168, 102, 0.14); color: #1f7a48; }
+.wdm-rozet-warn { background: rgba(224, 165, 42, 0.16); color: #8a6412; }
+.wdm-rozet-err { background: rgba(194, 64, 58, 0.14); color: #9b2f2a; }
+.wdm-rozet-info { background: rgba(47, 111, 176, 0.14); color: #2a5d94; }
+.wdm-nokta { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--wd-sep); vertical-align: middle; }
+.wdm-nokta-ok { background: var(--wd-green); }
+.wdm-nokta-warn { background: var(--wd-amber); }
+.wdm-nokta-err { background: var(--wd-red); animation: wdm-nabiz 1.4s ease-in-out infinite; }
+@keyframes wdm-nabiz { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ---- form ----------------------------------------------------------------- */
+.wdm-form { display: flex; flex-direction: column; gap: 12px; }
+.wdm-satir { display: flex; flex-wrap: wrap; gap: 12px; }
+/* DİKKAT: .wdm-form sütun yönlüdür; burada flex-basis YÜKSEKLİK olur. Bu yüzden
+   alan varsayılan olarak içeriği kadar (0 0 auto), yalnız .wdm-satir içinde esner. */
+.wdm-alan { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; min-width: 0; }
+.wdm-satir > .wdm-alan { flex: 1 1 200px; }
+.wdm-satir > .wdm-alan-genis { flex: 1 1 100%; }
+.wdm-alan .form-label { font-size: 11.5px; font-weight: 500; color: var(--wd-ink); margin: 0; }
+.wdm-alan .form-control, .wdm-alan .form-select, .wdm-alan textarea.form-control {
+	height: 32px; font-size: 12px; border-radius: var(--wd-r-sm); border: 1px solid var(--wd-input-line);
+	background: var(--wd-card); color: var(--wd-ink); padding: 0 10px; width: 100%;
+}
+.wdm-alan textarea.form-control { height: auto; min-height: 84px; padding: 8px 10px; line-height: 1.5; resize: vertical; }
+.wdm-alan .form-control:focus, .wdm-alan .form-select:focus { outline: none; border-color: var(--wd-green); box-shadow: 0 0 0 3px rgba(47, 168, 102, 0.14); }
+.wdm-ipucu { font-size: 10.5px; color: var(--wd-faint); line-height: 1.45; }
+.wdm-ipucu b { color: var(--wd-muted); font-weight: 500; }
+.wdm-dugmeler { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.wdm-dugmeler .button { height: 30px; padding: 0 14px; font-size: 12px; border-radius: var(--wd-r-sm); }
+.wdm-dugmeler .wdm-sag { margin-left: auto; }
+.wdm-tehlike { color: var(--wd-red) !important; border-color: rgba(194, 64, 58, 0.4) !important; }
+.wdm-tehlike:hover { background: rgba(194, 64, 58, 0.08) !important; }
+
+/* ---- satır listesi (site kartları) ---------------------------------------- */
+.wdm-liste { display: flex; flex-direction: column; }
+.wdm-oge { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 11px 16px; border-bottom: 1px solid var(--wd-line-soft); }
+.wdm-oge:last-child { border-bottom: 0; }
+.wdm-oge-bas { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.wdm-oge-ad { font-size: 12.5px; font-weight: 500; color: var(--wd-ink); overflow-wrap: anywhere; }
+.wdm-oge-alt { font-size: 11px; color: var(--wd-muted); overflow-wrap: anywhere; }
+.wdm-oge-orta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; flex: 1 1 200px; font-size: 11.5px; color: var(--wd-muted); }
+.wdm-oge-eylem { display: flex; flex-wrap: nowrap; gap: 6px; flex: none; margin-left: auto; }
+.wdm-oge-eylem form { margin: 0; }
+
+/* ---- metrik kutuları ------------------------------------------------------ */
+.wdm-metrik { display: inline-flex; align-items: baseline; gap: 4px; }
+.wdm-metrik b { font-size: 13px; font-weight: 500; color: var(--wd-ink); }
+.wdm-metrik span { font-size: 10.5px; color: var(--wd-faint); }
+
+/* ---- uptime çubukları ------------------------------------------------------ */
+.wdm-uptime { display: flex; gap: 2px; height: 22px; align-items: stretch; margin-top: 6px; }
+.wdm-uptime span { flex: 1 1 0; min-width: 3px; border-radius: 2px; background: var(--wd-line-soft); }
+.wdm-uptime .up { background: var(--wd-green); }
+.wdm-uptime .down { background: var(--wd-red); }
+.wdm-uptime .yavas { background: var(--wd-amber); }
+
+/* ---- kod / günlük kutusu -------------------------------------------------- */
+.wdm-kod {
+	margin: 0; padding: 10px 12px; max-height: 360px; overflow: auto;
+	font-family: "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace; font-size: 11px; line-height: 1.55;
+	color: var(--wd-ink); background: var(--wd-page); border: 1px solid var(--wd-line); border-radius: var(--wd-r-sm);
+	white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.wdm-kod-kucuk { max-height: 200px; }
+
+/* ---- dosya ağacı (yedek gezgini) ----------------------------------------- */
+.wdm-agac { display: flex; flex-direction: column; }
+.wdm-agac-satir { display: flex; align-items: center; gap: 10px; padding: 7px 16px; border-bottom: 1px solid var(--wd-line-soft); font-size: 12px; }
+.wdm-agac-satir:hover { background: var(--wd-tool-hover); }
+.wdm-agac-satir .fas { width: 14px; text-align: center; color: var(--wd-muted2); }
+.wdm-agac-satir .fa-folder { color: var(--wd-amber); }
+.wdm-agac-ad { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.wdm-agac-ad a { color: var(--wd-ink); text-decoration: none; }
+.wdm-agac-ad a:hover { color: var(--wd-green); }
+.wdm-agac-boyut { font-size: 11px; color: var(--wd-faint); white-space: nowrap; }
+.wdm-kirinti { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11.5px; color: var(--wd-muted); }
+.wdm-kirinti a { color: var(--wd-ink); text-decoration: none; }
+.wdm-kirinti a:hover { color: var(--wd-green); }
+.wdm-kirinti .ayrac { color: var(--wd-faint); }
+
+/* ---- anahtar/değer sıkı liste ------------------------------------------- */
+.wdm-kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; padding: 10px 16px; font-size: 12px; }
+.wdm-kv dt { color: var(--wd-muted); font-weight: 400; margin: 0; }
+.wdm-kv dd { color: var(--wd-ink); margin: 0; overflow-wrap: anywhere; }
+
+/* ---- sekme benzeri filtre ------------------------------------------------- */
+.wdm-sekmeler { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 16px 0; }
+.wdm-sekme { padding: 4px 10px; border: 1px solid var(--wd-line); border-radius: 999px; font-size: 11px; color: var(--wd-muted); text-decoration: none; background: var(--wd-card); }
+.wdm-sekme.etkin, .wdm-sekme:hover { border-color: var(--wd-green); color: var(--wd-green); }
+
+/* ---- kopyalanabilir değer -------------------------------------------------- */
+.wdm-kopya { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.wdm-kopya code { font-family: "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace; font-size: 11.5px; padding: 2px 6px; border-radius: 4px; background: var(--wd-page); border: 1px solid var(--wd-line); overflow-wrap: anywhere; }
+.wdm-kopya button { border: 0; background: none; color: var(--wd-muted2); cursor: pointer; padding: 2px; }
+.wdm-kopya button:hover { color: var(--wd-green); }
+
+/* ---- ilerleme / boş durum ------------------------------------------------- */
+.wdm-bos { padding: 22px 16px; text-align: center; color: var(--wd-faint); font-size: 12px; }
+.wdm-bos .fas { display: block; font-size: 22px; margin-bottom: 8px; color: var(--wd-sep); }
+.wdm-eskime { font-size: 10.5px; color: var(--wd-faint); }
+
+/* ---- iki sütun ------------------------------------------------------------ */
+.wdm-grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+
+/* ---- anahtar seçim kartları (uygulama kurucu) ---------------------------- */
+.wdm-kartlar { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; padding: 12px 16px; }
+.wdm-kart { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid var(--wd-line); border-radius: var(--wd-r); background: var(--wd-card); cursor: pointer; }
+.wdm-kart:hover { border-color: var(--wd-green); }
+.wdm-kart input { position: absolute; top: 10px; right: 10px; }
+.wdm-kart b { font-size: 12.5px; font-weight: 500; color: var(--wd-ink); padding-right: 22px; }
+.wdm-kart span { font-size: 11px; color: var(--wd-muted); line-height: 1.45; }
+.wdm-kart small { font-size: 10px; color: var(--wd-faint); }
+.wdm-kart.secili { border-color: var(--wd-green); box-shadow: 0 0 0 3px rgba(47, 168, 102, 0.14); }
+
+@media (max-width: 640px) {
+	.wdm-oge-eylem { margin-left: 0; width: 100%; flex-wrap: wrap; }
+	.wdm-kv { grid-template-columns: 1fr; gap: 2px 0; }
+	.wdm-kv dt { margin-top: 6px; }
+}

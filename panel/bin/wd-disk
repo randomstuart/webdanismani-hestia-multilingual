@@ -1,0 +1,282 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Disk Kullanım Analizi toplayıcısı
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-disk
+
+NEDEN VAR?
+  HestiaCP disk kullanımını yalnızca TOPLAM olarak tutar (U_DISK, U_DISK_WEB,
+  U_DISK_MAIL, U_DISK_DB). "Kotam neden doldu?" sorusunun cevabı yoktur:
+  hangi alan adı, hangi dizin, hangi dosya yer kaplıyor görünmez.
+
+  cPanel'de "Disk Usage", Plesk'te "Disk Space Usage" bu işi yapar; HestiaCP'de
+  karşılığı yoktur. Bu toplayıcı o kırılımı üretir.
+
+TASARIM
+  * Sayfa açılışında ÇALIŞMAZ. `du` ve `find` büyük hesaplarda saniyeler
+    sürer; sonuç önbelleğe yazılır ve cron tazeler.
+  * `du -x` ile dosya sistemi sınırı aşılmaz (bağlı diskler sayılmaz).
+  * Süre sınırı vardır: bir kullanıcı için tarama SURE_SINIRI saniyeyi
+    aşarsa o kullanıcı "eksik" işaretlenir. Yarım veriyi tam gibi göstermek,
+    hiç göstermemekten kötüdür.
+  * Yalnızca OKUR. Hiçbir dosyayı silmez veya değiştirmez.
+
+Kullanım:
+  wd-disk refresh            taramayı yap, önbelleği yaz (cron)
+  wd-disk json [azami_yas]   önbellekten oku, bayatsa tazele
+  wd-disk plain              kısa metin özet
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+CACHE = HESTIA + "/wd/cache/disk.json"
+
+SURE_SINIRI = 120       # kullanıcı başına azami tarama süresi (sn)
+EN_BUYUK_DOSYA = 20     # listelenecek en büyük dosya sayısı
+EN_BUYUK_DIZIN = 15
+
+
+def kabuk(cmd, timeout=60):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=timeout, check=False)
+        return r.returncode, r.stdout, r.stderr
+    except subprocess.TimeoutExpired:
+        return 124, "", "zaman asimi"
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def v_json(*args):
+    rc, out, _ = kabuk([HESTIA + "/bin/" + args[0]] + list(args[1:]) + ["json"])
+    if rc != 0 or not out.strip():
+        return {}
+    try:
+        return json.loads(out)
+    except ValueError:
+        return {}
+
+
+def du_bytes(yol, derinlik=None, timeout=60):
+    """
+    Dizin boyutlarını BAYT olarak döner: {yol: bayt}
+
+    `-x` dosya sistemi sınırında durur; `--apparent-size` KULLANILMAZ çünkü
+    kota gerçek blok kullanımına göre işler.
+    """
+    cmd = ["du", "-x", "-B1"]
+    if derinlik is not None:
+        cmd.append("--max-depth=%d" % derinlik)
+    cmd.append(yol)
+    rc, out, _ = kabuk(cmd, timeout=timeout)
+    sonuc = {}
+    for satir in out.splitlines():
+        p = satir.split("\t", 1)
+        if len(p) == 2:
+            try:
+                sonuc[p[1]] = int(p[0])
+            except ValueError:
+                pass
+    return sonuc, (rc == 124)
+
+
+def en_buyuk_dosyalar(yol, adet, timeout=90):
+    """En büyük N dosya. `find -xdev` ile tek dosya sisteminde kalınır."""
+    rc, out, _ = kabuk([
+        "bash", "-c",
+        "find %s -xdev -type f -printf '%%s\\t%%p\\n' 2>/dev/null "
+        "| sort -rn | head -n %d" % (yol.replace("'", ""), adet),
+    ], timeout=timeout)
+    liste = []
+    for satir in out.splitlines():
+        p = satir.split("\t", 1)
+        if len(p) == 2:
+            try:
+                liste.append({"bayt": int(p[0]), "yol": p[1]})
+            except ValueError:
+                pass
+    return liste, (rc == 124)
+
+
+def kullanici_tara(user, home):
+    basla = time.time()
+    eksik = False
+
+    toplam_d, t1 = du_bytes(home, derinlik=0, timeout=SURE_SINIRI)
+    eksik = eksik or t1
+    toplam = toplam_d.get(home, 0)
+
+    # --- Kategoriler ---
+    # Sıra ÖNEMLİ: "diğer" en sonda hesaplanır, üst üste sayım olmaz.
+    kategoriler = []
+    sayilan = 0
+
+    def ekle(etiket, altyol, ipucu=""):
+        nonlocal sayilan, eksik
+        tam = os.path.join(home, altyol)
+        if not os.path.isdir(tam):
+            return
+        d, t = du_bytes(tam, derinlik=0, timeout=SURE_SINIRI)
+        eksik = eksik or t
+        b = d.get(tam, 0)
+        sayilan += b
+        kategoriler.append({"etiket": etiket, "yol": altyol, "bayt": b, "ipucu": ipucu})
+
+    ekle("Web siteleri", "web", "public_html, günlükler ve istatistikler dahil")
+    ekle("E-posta", "mail", "posta kutularındaki iletiler")
+    ekle("Yedekler", "backup", "hesap yedek arşivleri")
+    ekle("Geçici dosyalar", "tmp", "oturum ve yükleme geçici dosyaları")
+
+    diger = max(0, toplam - sayilan)
+    if diger > 0:
+        kategoriler.append({
+            "etiket": "Diğer",
+            "yol": "",
+            "bayt": diger,
+            "ipucu": "ana dizindeki diğer dosyalar (gizli dizinler, betikler)",
+        })
+
+    # --- Alan adı kırılımı ---
+    alanlar = []
+    webdir = os.path.join(home, "web")
+    if os.path.isdir(webdir):
+        d, t = du_bytes(webdir, derinlik=1, timeout=SURE_SINIRI)
+        eksik = eksik or t
+        for yol, b in d.items():
+            if yol == webdir:
+                continue
+            ad = os.path.basename(yol)
+            parca = {"domain": ad, "bayt": b, "bolumler": []}
+            # Alan adı içindeki alt dizinler: müşteriye "neyi silebilirim"
+            # sorusunun cevabını verir (günlükler ve istatistikler silinebilir).
+            alt, t2 = du_bytes(yol, derinlik=1, timeout=60)
+            eksik = eksik or t2
+            for ayol, ab in sorted(alt.items(), key=lambda x: -x[1]):
+                if ayol == yol:
+                    continue
+                parca["bolumler"].append({"ad": os.path.basename(ayol), "bayt": ab})
+            alanlar.append(parca)
+        alanlar.sort(key=lambda x: -x["bayt"])
+
+    # --- Posta kutuları ---
+    postalar = []
+    maildir = os.path.join(home, "mail")
+    if os.path.isdir(maildir):
+        d, t = du_bytes(maildir, derinlik=1, timeout=SURE_SINIRI)
+        eksik = eksik or t
+        for yol, b in sorted(d.items(), key=lambda x: -x[1]):
+            if yol == maildir:
+                continue
+            postalar.append({"domain": os.path.basename(yol), "bayt": b})
+
+    # --- En büyük dosyalar / dizinler ---
+    dosyalar, t3 = en_buyuk_dosyalar(home, EN_BUYUK_DOSYA)
+    eksik = eksik or t3
+
+    dizin_d, t4 = du_bytes(home, derinlik=3, timeout=SURE_SINIRI)
+    eksik = eksik or t4
+    dizinler = [
+        {"yol": y.replace(home, "~", 1), "bayt": b}
+        for y, b in sorted(dizin_d.items(), key=lambda x: -x[1])
+        if y != home
+    ][:EN_BUYUK_DIZIN]
+
+    return {
+        "user": user,
+        "home": home,
+        "toplam": toplam,
+        "kategoriler": sorted(kategoriler, key=lambda x: -x["bayt"]),
+        "alanlar": alanlar,
+        "postalar": postalar,
+        "dosyalar": dosyalar,
+        "dizinler": dizinler,
+        "eksik": eksik,
+        "sure": round(time.time() - basla, 1),
+    }
+
+
+def topla():
+    kullanicilar = v_json("v-list-users")
+    if not isinstance(kullanicilar, dict):
+        kullanicilar = {}
+
+    sonuc = []
+    for user, u in kullanicilar.items():
+        home = u.get("HOME") or ("/home/" + user)
+        if not os.path.isdir(home):
+            continue
+        veri = kullanici_tara(user, home)
+        kota = u.get("DISK_QUOTA", "unlimited")
+        veri["kota_mb"] = None if kota in ("unlimited", "", None) else int(kota)
+        veri["paket"] = u.get("PACKAGE", "")
+        sonuc.append(veri)
+
+    sonuc.sort(key=lambda x: -x["toplam"])
+    return {"ts": int(time.time()), "kullanicilar": sonuc}
+
+
+def yaz(veri):
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    gecici = CACHE + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(veri, fh, ensure_ascii=False)
+    os.replace(gecici, CACHE)
+    os.chmod(CACHE, 0o644)
+
+
+def oku():
+    try:
+        with open(CACHE, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def insan(b):
+    for birim in ("B", "KB", "MB", "GB", "TB"):
+        if b < 1024 or birim == "TB":
+            return "%.1f %s" % (b, birim) if birim != "B" else "%d B" % b
+        b /= 1024.0
+
+
+def main():
+    mod = sys.argv[1] if len(sys.argv) > 1 else "json"
+
+    if mod == "refresh":
+        veri = topla()
+        yaz(veri)
+        print(json.dumps({"ok": True, "ts": veri["ts"],
+                          "kullanici": len(veri["kullanicilar"])}))
+        return 0
+
+    try:
+        azami = int(sys.argv[2]) if len(sys.argv) > 2 else 21600
+    except ValueError:
+        azami = 21600
+
+    veri = oku()
+    if veri is None or (time.time() - veri.get("ts", 0)) > azami:
+        veri = topla()
+        yaz(veri)
+
+    if mod == "plain":
+        print("son tarama %s" % time.strftime("%d.%m.%Y %H:%M",
+                                              time.localtime(veri["ts"])))
+        for k in veri["kullanicilar"]:
+            print("  %-12s %10s%s" % (k["user"], insan(k["toplam"]),
+                                      "  (EKSIK)" if k["eksik"] else ""))
+            for c in k["kategoriler"][:5]:
+                print("      %-18s %10s" % (c["etiket"], insan(c["bayt"])))
+        return 0
+
+    print(json.dumps(veri, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,7 @@
+# Kabuk betikleri ve panel dosyaları sunucuda LF ister; Windows'ta da LF kalsın.
+* text=auto eol=lf
+*.ps1 text eol=lf
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.gif binary

@@ -1,0 +1,486 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Cloudflare modülü
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-cloudflare
+
+İKİ AYRI İŞ YAPAR
+
+1) GERÇEK ZİYARETÇİ IP'Sİ  (jeton GEREKTİRMEZ)
+   Site Cloudflare arkasındayken sunucuya gelen bağlantı Cloudflare'den gelir;
+   `set_real_ip_from` tanımlı değilse tüm ziyaretçiler Cloudflare IP'si olarak
+   görünür. Sonuç: günlükler işe yaramaz, fail2ban yanlış adresi engeller
+   (hatta Cloudflare'i engelleyip siteyi komple kapatabilir).
+
+   HestiaCP kurulumda bir `cloudflare.inc` yazar ama onu TAZELEYEN bir şey
+   yoktur. Cloudflare aralık ekledikçe liste eskir. Bu modül listeyi
+   Cloudflare'den çeker, nginx ve Apache tarafını birlikte günceller.
+
+2) API İŞLEMLERİ  (jeton gerektirir)
+   Bölge listesi, önbellek temizleme, geliştirme modu ve Hestia DNS bölgesini
+   Cloudflare'e gönderme.
+
+JETON GÜVENLİĞİ
+   Cloudflare jetonu DNS kaydı değiştirebilen gerçek bir kimlik bilgisidir.
+   /usr/local/hestia/wd/cloudflare.json dosyası 0600 root'tur; panel bu dosyayı
+   OKUMAZ, yalnızca bu betiği sudo ile çağırır. Jeton komut satırından değil
+   STDIN'den alınır — aksi hâlde `ps` çıktısında görünürdü.
+
+Kullanım:
+  wd-cloudflare ip-guncelle          Cloudflare IP aralıklarını tazele
+  wd-cloudflare jeton-kaydet         jetonu STDIN'den oku ve doğrula
+  wd-cloudflare jeton-sil
+  wd-cloudflare zonlar               hesaptaki bölgeler
+  wd-cloudflare durum                özet (panel için de kullanılır)
+  wd-cloudflare onbellek-temizle DOMAIN
+  wd-cloudflare gelistirme DOMAIN on|off
+  wd-cloudflare dns-gonder USER DOMAIN [--kuru]
+  wd-cloudflare json                 makine okunur durum
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+HESTIA = "/usr/local/hestia"
+AYAR = HESTIA + "/wd/cloudflare.json"
+CACHE = HESTIA + "/wd/cache/cloudflare.json"
+NGINX_INC = "/etc/nginx/conf.d/cloudflare.inc"
+APACHE_INC = "/etc/apache2/conf-available/wd-cloudflare.conf"
+CF_API = "https://api.cloudflare.com/client/v4"
+CF_V4 = "https://www.cloudflare.com/ips-v4"
+CF_V6 = "https://www.cloudflare.com/ips-v6"
+
+
+# ------------------------------------------------------------------ yardımcı
+def kabuk(cmd, timeout=60):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=timeout, check=False)
+        return r.returncode, r.stdout, r.stderr
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def http_get(url, timeout=20):
+    req = urllib.request.Request(url, headers={"User-Agent": "wd-cloudflare/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def ayar_oku():
+    try:
+        with open(AYAR, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def ayar_yaz(d):
+    os.makedirs(os.path.dirname(AYAR), exist_ok=True)
+    gecici = AYAR + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False, indent=2)
+    os.replace(gecici, AYAR)
+    # Jeton yalnızca root tarafından okunabilir.
+    os.chmod(AYAR, 0o600)
+
+
+def jeton():
+    return (ayar_oku().get("token") or "").strip()
+
+
+def cf(yol, yontem="GET", govde=None, timeout=25):
+    """Cloudflare API çağrısı. (ok, veri veya hata metni)"""
+    t = jeton()
+    if not t:
+        return False, "Cloudflare jetonu tanımlı değil."
+    url = CF_API + yol
+    veri = json.dumps(govde).encode("utf-8") if govde is not None else None
+    req = urllib.request.Request(url, data=veri, method=yontem)
+    req.add_header("Authorization", "Bearer " + t)
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            d = json.loads(r.read().decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        try:
+            d = json.loads(e.read().decode("utf-8", "replace"))
+            hatalar = "; ".join(x.get("message", "") for x in d.get("errors", []))
+            return False, hatalar or ("HTTP %s" % e.code)
+        except Exception:
+            return False, "HTTP %s" % e.code
+    except Exception as e:
+        return False, str(e)
+
+    if not d.get("success"):
+        hatalar = "; ".join(x.get("message", "") for x in d.get("errors", []))
+        return False, hatalar or "bilinmeyen API hatası"
+    return True, d.get("result")
+
+
+# ------------------------------------------------------- 1) gerçek ziyaretçi IP
+def ip_guncelle(sessiz=False):
+    """
+    Cloudflare IP aralıklarını çeker; nginx ve Apache tarafını günceller.
+
+    Güvenlik: liste boş ya da şüpheli kısa gelirse DOSYA YAZILMAZ. Yarım bir
+    liste, eksik aralıklardan gelen ziyaretçilerin IP'sini bozar.
+    """
+    try:
+        v4 = [s.strip() for s in http_get(CF_V4).splitlines() if s.strip()]
+        v6 = [s.strip() for s in http_get(CF_V6).splitlines() if s.strip()]
+    except Exception as e:
+        sys.stderr.write("Cloudflare IP listesi alinamadi: %s\n" % e)
+        return 1
+
+    cidr = re.compile(r"^[0-9a-fA-F:.]+/\d{1,3}$")
+    v4 = [x for x in v4 if cidr.match(x)]
+    v6 = [x for x in v6 if cidr.match(x)]
+
+    if len(v4) < 5 or len(v6) < 2:
+        sys.stderr.write(
+            "Liste beklenenden kisa (v4=%d v6=%d); dosya DEGISTIRILMEDI.\n"
+            % (len(v4), len(v6)))
+        return 1
+
+    baslik = ("# Cloudflare IP araliklari - wd-cloudflare tarafindan uretildi\n"
+              "# Guncelleme: %s\n# Elle duzenlemeyin.\n\n"
+              % time.strftime("%Y-%m-%d %H:%M:%S"))
+
+    # --- nginx ---
+    satirlar = [baslik, "# IPv4\n"]
+    satirlar += ["set_real_ip_from %s;\n" % x for x in v4]
+    satirlar += ["\n# IPv6\n"]
+    satirlar += ["set_real_ip_from %s;\n" % x for x in v6]
+    satirlar += ["\nreal_ip_header CF-Connecting-IP;\n"]
+
+    eski = ""
+    if os.path.isfile(NGINX_INC):
+        with open(NGINX_INC, encoding="utf-8") as fh:
+            eski = fh.read()
+
+    yeni = "".join(satirlar)
+    gecici = NGINX_INC + ".wd-tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        fh.write(yeni)
+
+    os.replace(gecici, NGINX_INC)
+    os.chmod(NGINX_INC, 0o644)
+
+    rc, _, err = kabuk(["nginx", "-t"])
+    if rc != 0:
+        # Geri al: bozuk bir include nginx'i komple durdurur.
+        with open(NGINX_INC, "w", encoding="utf-8") as fh:
+            fh.write(eski)
+        sys.stderr.write("nginx dogrulamasi basarisiz, geri alindi:\n%s\n" % err)
+        return 1
+
+    # --- Apache (nginx'in arkasinda; gercek IP'yi ondan devralir) ---
+    if os.path.isdir(os.path.dirname(APACHE_INC)):
+        ap = [baslik, "<IfModule remoteip_module>\n",
+              "\tRemoteIPHeader CF-Connecting-IP\n"]
+        ap += ["\tRemoteIPTrustedProxy %s\n" % x for x in v4 + v6]
+        # nginx yerelde onde durdugu icin o da guvenilir kabul edilir.
+        ap += ["\tRemoteIPTrustedProxy 127.0.0.1\n", "</IfModule>\n"]
+        with open(APACHE_INC, "w", encoding="utf-8") as fh:
+            fh.write("".join(ap))
+        os.chmod(APACHE_INC, 0o644)
+        kabuk(["a2enconf", "wd-cloudflare"])
+        rc2, _, err2 = kabuk(["apache2ctl", "-t"])
+        if rc2 != 0:
+            kabuk(["a2disconf", "wd-cloudflare"])
+            sys.stderr.write("apache dogrulamasi basarisiz, devre disi:\n%s\n" % err2)
+        else:
+            kabuk(["systemctl", "reload", "apache2"])
+
+    kabuk(["systemctl", "reload", "nginx"])
+
+    if not sessiz:
+        print(json.dumps({"ok": True, "v4": len(v4), "v6": len(v6),
+                          "degisti": eski != yeni}, ensure_ascii=False))
+    return 0
+
+
+# ------------------------------------------------------------------ 2) API
+def jeton_kaydet():
+    """Jetonu STDIN'den okur (argv'de gecerse `ps` ciktisinda gorunurdu)."""
+    t = sys.stdin.read().strip()
+    if not t or len(t) < 20:
+        sys.stderr.write("Gecersiz jeton.\n")
+        return 1
+
+    d = ayar_oku()
+    d["token"] = t
+    ayar_yaz(d)
+
+    ok, sonuc = cf("/user/tokens/verify")
+    if not ok:
+        # Jetonu tutuyoruz ama kullaniciya durumu bildiriyoruz; yanlis
+        # yapistirilmis bir jetonu sessizce kabul etmek daha kotu olurdu.
+        d.pop("token", None)
+        ayar_yaz(d)
+        print(json.dumps({"ok": False, "hata": sonuc}, ensure_ascii=False))
+        return 1
+
+    d["dogrulandi"] = int(time.time())
+    ayar_yaz(d)
+    print(json.dumps({"ok": True, "durum": sonuc.get("status")}, ensure_ascii=False))
+    return 0
+
+
+def jeton_sil():
+    d = ayar_oku()
+    d.pop("token", None)
+    d.pop("dogrulandi", None)
+    ayar_yaz(d)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def zonlar():
+    ok, sonuc = cf("/zones?per_page=100")
+    if not ok:
+        return False, sonuc
+    return True, [{
+        "id": z["id"],
+        "ad": z["name"],
+        "durum": z.get("status"),
+        "plan": (z.get("plan") or {}).get("name", ""),
+        "ns": z.get("name_servers", []),
+        "duraklatildi": z.get("paused", False),
+    } for z in sonuc]
+
+
+def zon_bul(domain):
+    ok, liste = zonlar()
+    if not ok:
+        return None, liste
+    for z in liste:
+        if z["ad"] == domain:
+            return z, None
+    # Alt alan adı: üst bölgeye düşülür.
+    parca = domain.split(".")
+    for i in range(1, len(parca) - 1):
+        ust = ".".join(parca[i:])
+        for z in liste:
+            if z["ad"] == ust:
+                return z, None
+    return None, "Cloudflare hesabinda '%s' icin bolge bulunamadi." % domain
+
+
+def onbellek_temizle(domain):
+    z, hata = zon_bul(domain)
+    if not z:
+        print(json.dumps({"ok": False, "hata": hata}, ensure_ascii=False))
+        return 1
+    ok, sonuc = cf("/zones/%s/purge_cache" % z["id"], "POST",
+                   {"purge_everything": True})
+    print(json.dumps({"ok": ok, "bolge": z["ad"],
+                      "hata": None if ok else sonuc}, ensure_ascii=False))
+    return 0 if ok else 1
+
+
+def gelistirme(domain, deger):
+    z, hata = zon_bul(domain)
+    if not z:
+        print(json.dumps({"ok": False, "hata": hata}, ensure_ascii=False))
+        return 1
+    ok, sonuc = cf("/zones/%s/settings/development_mode" % z["id"], "PATCH",
+                   {"value": "on" if deger == "on" else "off"})
+    print(json.dumps({"ok": ok, "bolge": z["ad"], "deger": deger,
+                      "hata": None if ok else sonuc}, ensure_ascii=False))
+    return 0 if ok else 1
+
+
+# ------------------------------------------------------------- DNS gönderimi
+GONDERILEN_TURLER = ("A", "AAAA", "CNAME", "MX", "TXT", "SRV", "NS", "CAA")
+
+
+def dns_gonder(user, domain, kuru=False):
+    """
+    Hestia DNS bölgesindeki kayıtları Cloudflare'e gönderir.
+
+    DİKKAT: Cloudflare'deki kayıtlar SİLİNMEZ. Yalnızca eksik olanlar eklenir,
+    farklı olanlar güncellenir. Silme işlemi bilinçli bir karardır ve burada
+    yapılmaz — yanlış bir eşleşme yüzünden çalışan bir kaydı yok etmek,
+    fazladan bir kayıt bırakmaktan çok daha kötüdür.
+    """
+    z, hata = zon_bul(domain)
+    if not z:
+        print(json.dumps({"ok": False, "hata": hata}, ensure_ascii=False))
+        return 1
+
+    rc, out, _ = kabuk([HESTIA + "/bin/v-list-dns-records", user, domain, "json"])
+    if rc != 0:
+        print(json.dumps({"ok": False, "hata": "Hestia bolgesi okunamadi"},
+                         ensure_ascii=False))
+        return 1
+    try:
+        yerel = json.loads(out)
+    except ValueError:
+        print(json.dumps({"ok": False, "hata": "Bolge JSON'u cozulemedi"},
+                         ensure_ascii=False))
+        return 1
+
+    ok, mevcut = cf("/zones/%s/dns_records?per_page=500" % z["id"])
+    if not ok:
+        print(json.dumps({"ok": False, "hata": mevcut}, ensure_ascii=False))
+        return 1
+    uzak = {(r["type"], r["name"]): r for r in mevcut}
+
+    eklendi, guncellendi, atlandi, hatalar = 0, 0, 0, []
+
+    for _, r in sorted(yerel.items()):
+        tur = r.get("TYPE", "")
+        if tur not in GONDERILEN_TURLER:
+            atlandi += 1
+            continue
+        ad = r.get("RECORD", "")
+        tam = domain if ad in ("@", "") else "%s.%s" % (ad, domain)
+        deger = (r.get("VALUE") or "").strip().rstrip(".")
+        if not deger:
+            atlandi += 1
+            continue
+
+        govde = {"type": tur, "name": tam, "content": deger,
+                 "ttl": int(r.get("TTL") or 3600)}
+        if tur == "MX":
+            govde["priority"] = int(r.get("PRIORITY") or 10)
+
+        anahtar = (tur, tam)
+        if anahtar in uzak:
+            u = uzak[anahtar]
+            if (u.get("content") or "").rstrip(".") == deger:
+                atlandi += 1
+                continue
+            if kuru:
+                print("  [guncellenecek] %-6s %-32s %s -> %s"
+                      % (tur, tam, u.get("content"), deger))
+                guncellendi += 1
+                continue
+            o, s = cf("/zones/%s/dns_records/%s" % (z["id"], u["id"]), "PUT", govde)
+            if o:
+                guncellendi += 1
+            else:
+                hatalar.append("%s %s: %s" % (tur, tam, s))
+        else:
+            if kuru:
+                print("  [eklenecek]     %-6s %-32s %s" % (tur, tam, deger))
+                eklendi += 1
+                continue
+            o, s = cf("/zones/%s/dns_records" % z["id"], "POST", govde)
+            if o:
+                eklendi += 1
+            else:
+                hatalar.append("%s %s: %s" % (tur, tam, s))
+
+    print(json.dumps({
+        "ok": not hatalar, "bolge": z["ad"], "kuru": kuru,
+        "eklendi": eklendi, "guncellendi": guncellendi, "atlandi": atlandi,
+        "hatalar": hatalar[:8],
+    }, ensure_ascii=False))
+    return 0 if not hatalar else 1
+
+
+# ------------------------------------------------------------------- durum
+def durum_topla():
+    d = ayar_oku()
+    v4 = v6 = 0
+    guncelleme = None
+    if os.path.isfile(NGINX_INC):
+        with open(NGINX_INC, encoding="utf-8") as fh:
+            icerik = fh.read()
+        v4 = len(re.findall(r"set_real_ip_from \d+\.", icerik))
+        v6 = len(re.findall(r"set_real_ip_from [0-9a-fA-F]*:", icerik))
+        m = re.search(r"# Guncelleme: (.+)", icerik)
+        guncelleme = m.group(1).strip() if m else None
+        if guncelleme is None:
+            guncelleme = time.strftime("%Y-%m-%d %H:%M:%S",
+                                       time.localtime(os.path.getmtime(NGINX_INC)))
+
+    bilgi = {
+        "ts": int(time.time()),
+        "jeton_var": bool(d.get("token")),
+        "dogrulandi": d.get("dogrulandi"),
+        "ip_v4": v4, "ip_v6": v6,
+        "ip_guncelleme": guncelleme,
+        "gercek_ip_aktif": bool(v4 and "real_ip_header" in
+                                (open(NGINX_INC, encoding="utf-8").read()
+                                 if os.path.isfile(NGINX_INC) else "")),
+        "zonlar": [],
+        "hata": None,
+    }
+    if bilgi["jeton_var"]:
+        ok, sonuc = zonlar()
+        if ok:
+            bilgi["zonlar"] = sonuc
+        else:
+            bilgi["hata"] = sonuc
+    return bilgi
+
+
+def onbellege_yaz(bilgi):
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    gecici = CACHE + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(bilgi, fh, ensure_ascii=False)
+    os.replace(gecici, CACHE)
+    # Panel bunu okur; jeton İÇERMEZ.
+    os.chmod(CACHE, 0o644)
+
+
+def main():
+    mod = sys.argv[1] if len(sys.argv) > 1 else "durum"
+    arg = sys.argv[2:]
+
+    if mod == "ip-guncelle":
+        return ip_guncelle("--sessiz" in arg)
+    if mod == "jeton-kaydet":
+        r = jeton_kaydet()
+        onbellege_yaz(durum_topla())
+        return r
+    if mod == "jeton-sil":
+        r = jeton_sil()
+        onbellege_yaz(durum_topla())
+        return r
+    if mod == "zonlar":
+        ok, sonuc = zonlar()
+        print(json.dumps({"ok": ok, "zonlar": sonuc if ok else [],
+                          "hata": None if ok else sonuc}, ensure_ascii=False))
+        return 0 if ok else 1
+    if mod == "onbellek-temizle" and arg:
+        return onbellek_temizle(arg[0])
+    if mod == "gelistirme" and len(arg) >= 2:
+        return gelistirme(arg[0], arg[1])
+    if mod == "dns-gonder" and len(arg) >= 2:
+        return dns_gonder(arg[0], arg[1], "--kuru" in arg)
+    if mod in ("durum", "json", "onbellek"):
+        bilgi = durum_topla()
+        onbellege_yaz(bilgi)
+        if mod == "durum":
+            print("  Jeton        : %s" % ("var" if bilgi["jeton_var"] else "yok"))
+            print("  Gercek IP    : %s (v4 %d, v6 %d)"
+                  % ("etkin" if bilgi["gercek_ip_aktif"] else "PASIF",
+                     bilgi["ip_v4"], bilgi["ip_v6"]))
+            print("  IP guncelleme: %s" % (bilgi["ip_guncelleme"] or "-"))
+            if bilgi["hata"]:
+                print("  API hatasi   : %s" % bilgi["hata"])
+            for z in bilgi["zonlar"]:
+                print("  bolge: %-28s %s %s" % (z["ad"], z["durum"],
+                                                "(duraklatildi)" if z["duraklatildi"] else ""))
+        else:
+            print(json.dumps(bilgi, ensure_ascii=False))
+        return 0
+
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

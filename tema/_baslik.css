@@ -1,0 +1,39 @@
+@charset "UTF-8";
+/* =============================================================================
+   WebDanışmanı — HestiaCP teması            sürüm 2.1
+   -----------------------------------------------------------------------------
+   Kurulum yeri : /usr/local/hestia/web/css/themes/custom/webdanismani.css
+   Yükleme      : default.min.css HER ZAMAN önce yüklenir, bu dosya SONRA gelir.
+                  Eşit özgüllükteki kurallarda bu dosya kazanır; !important
+                  yalnızca stok dosyanın !important kullandığı yerlerde gerekir.
+   Aktifleştirme: v-change-sys-config-value THEME webdanismani
+   Güncelleme   : custom/ dizini HestiaCP güncellemelerinde SİLİNMEZ.
+
+   TASARIM KAYNAĞI
+   Bu dosyadaki renk, ölçü ve tipografi değerleri hestiacp-tema.html
+   tasarımından BİREBİR alınmıştır. Değiştirmeden önce oradaki değerle
+   karşılaştırın.
+
+   SÜRÜM 2.1 — TİPOGRAFİ REVİZYONU
+   Tasarımın ikinci sürümü yazı tipini ve tüm tipografi ölçeğini değiştirdi:
+     IBM Plex Sans -> Inter          IBM Plex Mono -> JetBrains Mono
+     taban 13px -> 12px              gövde: font-weight 400, letter-spacing -.01em
+     başlık 21/600 -> 20/500         istatistik 19/600 -> 18/500
+     menü 12.5/500 -> 12/400         grup & kart başlığı 13/600 -> 12.5/500
+     menü metni #c3d3cd -> #b7c9c2   menü ikonu #8fa9a0 -> #7f9a91
+     araç ikonu #7c8783 -> #5f6d69   ikon kutusu 15px -> 14px
+   Inter aynı puntoda IBM Plex'ten daha dolgun göründüğü için ağırlıklar bir
+   kademe düşürüldü; bu bilinçli bir incelmedir, eksik uygulama değildir.
+
+   YERLEŞİM
+   Koyu sidebar (#1e3b34, 222px) + beyaz üst çubuk (44px) düzeni SADECE
+   >=1024px'te devreye girer. Sebebi HestiaCP mobil menüsünün Alpine.js
+   `x-show` ile inline style yazması: masaüstünde stok CSS zaten
+   `display:flex!important` uyguladığı için davranış değişmez, mobilde ise
+   hamburger toggle çalışır kalır.
+
+   YAZI TİPİ
+   Inter + JetBrains Mono panelin kendi /webfonts/ dizininde barındırılır
+   (dış istek yok, çevrimdışı çalışır). Kurulumu tema/kur.sh yapar. İkisi de
+   değişken fonttur; altküme başına tek dosya, ağırlık aralıkla bildirilir.
+   ========================================================================== */

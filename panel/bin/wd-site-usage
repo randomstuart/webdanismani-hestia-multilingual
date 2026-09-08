@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — site başına CPU / RAM ölçümü
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-site-usage
+Panelden sudo ile çağrılır (/etc/sudoers.d/wd-panel).
+
+NEDEN AYRI BİR TOPLAYICI GEREKİYOR?
+  /proc `hidepid=invisible` ile bağlı; paneli çalıştıran `hestiaweb` kullanıcısı
+  yalnızca kendi süreçlerini görebiliyor. Bu betik root olarak çalışıp veriyi
+  JSON olarak veriyor.
+
+NASIL ÖLÇÜYOR?
+  Her web sitesinin kendi PHP-FPM havuzu var ve işçi süreçler
+  `php-fpm: pool <alanadi>` olarak görünüyor, site sahibinin kullanıcısıyla
+  koşuyor. Süreçler iki kez örnekleniyor; CPU farkı ve RSS toplamı
+  havuz (= site) bazında toplanıyor.
+
+SINIRLAR (bilerek uydurmuyoruz):
+  * Yalnızca PHP tüketimini ölçer. nginx/apache/MariaDB paylaşımlı süreçlerdir,
+    site başına ayrıştırılamaz.
+  * `pm = ondemand` olduğu için boştaki sitenin işçisi yoktur -> 0 görünür.
+    Bu "kullanmıyor" demektir, "ölçemedik" demek değil.
+
+Kullanım:
+  wd-site-usage [json|plain] [ornekleme_ms] [kullanici]
+"""
+
+import json
+import os
+import re
+import sys
+import time
+
+CLK = os.sysconf("SC_CLK_TCK") or 100
+POOL_RE = re.compile(r"^php-fpm: pool (.+)$")
+
+
+def cores():
+    try:
+        return os.cpu_count() or 1
+    except Exception:
+        return 1
+
+
+def uid_to_name(uid, _cache={}):
+    if uid in _cache:
+        return _cache[uid]
+    name = str(uid)
+    try:
+        import pwd
+
+        name = pwd.getpwuid(uid).pw_name
+    except Exception:
+        pass
+    _cache[uid] = name
+    return name
+
+
+def scan():
+    """Çalışan php-fpm işçi süreçlerini havuz adına göre toplar."""
+    out = {}
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        pid = entry
+        try:
+            with open("/proc/%s/cmdline" % pid, "rb") as fh:
+                cmd = fh.read().replace(b"\x00", b" ").decode("utf-8", "replace").strip()
+        except (OSError, IOError):
+            continue
+
+        m = POOL_RE.match(cmd)
+        if not m:
+            continue
+        pool = m.group(1).strip()
+
+        # Site olmayan havuzları ele: panelin kendi "www" havuzu ve HestiaCP'nin
+        # her PHP sürümü için açtığı "dummy" havuzu. Gerçek alan adları nokta içerir.
+        if "." not in pool or pool in ("www", "dummy"):
+            continue
+
+        # CPU tikleri
+        try:
+            with open("/proc/%s/stat" % pid, "r") as fh:
+                raw = fh.read()
+        except (OSError, IOError):
+            continue
+        # comm alanı parantez içinde ve boşluk içerebilir
+        close = raw.rfind(")")
+        if close == -1:
+            continue
+        fields = raw[close + 2 :].split()
+        if len(fields) < 15:
+            continue
+        try:
+            ticks = int(fields[11]) + int(fields[12])  # utime + stime
+        except (ValueError, IndexError):
+            continue
+
+        # RSS ve sahip
+        rss_kb = 0
+        owner_uid = None
+        try:
+            with open("/proc/%s/status" % pid, "r") as fh:
+                for line in fh:
+                    if line.startswith("VmRSS:"):
+                        rss_kb = int(line.split()[1])
+                    elif line.startswith("Uid:"):
+                        owner_uid = int(line.split()[1])  # effective uid
+                    if rss_kb and owner_uid is not None:
+                        break
+        except (OSError, IOError, ValueError, IndexError):
+            pass
+
+        rec = out.setdefault(pool, {"ticks": 0, "rss_kb": 0, "procs": 0, "uid": owner_uid})
+        rec["ticks"] += ticks
+        rec["rss_kb"] += rss_kb
+        rec["procs"] += 1
+        if rec["uid"] is None:
+            rec["uid"] = owner_uid
+    return out
+
+
+def main():
+    fmt = sys.argv[1] if len(sys.argv) > 1 else "json"
+    try:
+        sample_ms = int(sys.argv[2]) if len(sys.argv) > 2 else 250
+    except ValueError:
+        sample_ms = 250
+    sample_ms = max(80, min(2000, sample_ms))
+    only_user = sys.argv[3] if len(sys.argv) > 3 else ""
+
+    t0 = time.time()
+    a = scan()
+    time.sleep(sample_ms / 1000.0)
+    b = scan()
+    elapsed = time.time() - t0
+
+    ncores = cores()
+    sites = {}
+    for pool, rec in b.items():
+        prev = a.get(pool)
+        # Süreç bu aralıkta doğduysa geçmiş tik yoktur; CPU'yu 0 sayıyoruz
+        # (uydurma yüksek değer üretmemek için).
+        dticks = rec["ticks"] - prev["ticks"] if prev else 0
+        if dticks < 0:
+            dticks = 0
+        core_pct = (dticks / CLK) / elapsed * 100 if elapsed > 0 else 0.0
+        user = uid_to_name(rec["uid"]) if rec["uid"] is not None else ""
+        if only_user and user != only_user:
+            continue
+        sites[pool] = {
+            "user": user,
+            "cpu_core_pct": round(min(core_pct, 100.0 * ncores), 1),
+            "cpu_pct": round(min(core_pct / ncores, 100.0), 1),
+            "mem_kb": rec["rss_kb"],
+            "procs": rec["procs"],
+        }
+
+    users = {}
+    for site, s in sites.items():
+        u = users.setdefault(s["user"], {"cpu_pct": 0.0, "mem_kb": 0, "procs": 0, "sites": 0})
+        u["cpu_pct"] = round(u["cpu_pct"] + s["cpu_pct"], 1)
+        u["mem_kb"] += s["mem_kb"]
+        u["procs"] += s["procs"]
+        u["sites"] += 1
+
+    data = {
+        "cores": ncores,
+        "sample_ms": int(elapsed * 1000),
+        "sites": sites,
+        "users": users,
+    }
+
+    if fmt == "plain":
+        for site in sorted(sites, key=lambda k: -sites[k]["mem_kb"]):
+            s = sites[site]
+            print(
+                "%s\t%s\t%s\t%s\t%s"
+                % (site, s["user"], s["cpu_pct"], s["mem_kb"], s["procs"])
+            )
+    else:
+        print(json.dumps(data, indent=1))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Kaynak kullanım geçmişi
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-gecmis
+
+NEDEN VAR?
+  Site başına CPU/RAM ANLIK olarak ölçülüyor (wd-site-usage) ama hiçbir yere
+  yazılmıyordu. "Sunucu gece 3'te neden yavaşladı?" sorusunun cevabı yoktu.
+  Bu betik 5 dakikada bir örnek alır ve 30 günlük geçmiş tutar.
+
+DEPOLAMA
+  Günde bir dosya: wd/cache/gecmis/YYYY-MM-DD.jsonl
+  Her satır bir örnek. Satır tabanlı olması önemli: dosyanın sonuna eklemek
+  tüm veriyi okuyup yeniden yazmayı gerektirmez, ve yarım kalan bir yazma
+  yalnızca son satırı bozar.
+
+  Örnek başına yaklaşık 60 bayt/site. 10 site × 288 örnek/gün ≈ 170 KB/gün,
+  30 günde ~5 MB. Eski dosyalar otomatik silinir.
+
+Kullanım:
+  wd-gecmis ornekle            bir örnek al ve kaydet (cron, 5 dakikada bir)
+  wd-gecmis json [gun] [site]  saatlik özet (panel için)
+  wd-gecmis plain [gun]
+  wd-gecmis temizle            saklama süresini aşan dosyaları sil
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timedelta
+
+HESTIA = "/usr/local/hestia"
+DIZIN = HESTIA + "/wd/cache/gecmis"
+OLCUM = HESTIA + "/wd/bin/wd-site-usage"
+SAKLAMA_GUN = 30
+
+
+def ornek_al(sample_ms=250):
+    """wd-site-usage'dan tek bir ölçüm alır."""
+    try:
+        r = subprocess.run([OLCUM, "json", str(sample_ms)],
+                           capture_output=True, text=True, timeout=60)
+        if r.returncode != 0 or not r.stdout.strip():
+            return None
+        return json.loads(r.stdout)
+    except Exception:
+        return None
+
+
+def ornekle():
+    veri = ornek_al()
+    if veri is None:
+        sys.stderr.write("olcum alinamadi\n")
+        return 1
+
+    siteler = veri.get("sites") or {}
+    # Boş örnek de YAZILIR: "o saatte hiçbir site çalışmıyordu" bilgisi,
+    # veri olmamasından farklıdır ve grafikte boşluk yerine sıfır gösterir.
+    satir = {
+        "t": int(time.time()),
+        "cores": veri.get("cores", 1),
+        "s": {ad: [round(float(s.get("cpu_pct", 0)), 1),
+                   int(s.get("mem_kb", 0)),
+                   int(s.get("procs", 0))]
+              for ad, s in siteler.items()},
+    }
+
+    os.makedirs(DIZIN, exist_ok=True)
+    yol = os.path.join(DIZIN, time.strftime("%Y-%m-%d") + ".jsonl")
+    with open(yol, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(satir, ensure_ascii=False) + "\n")
+    os.chmod(yol, 0o644)
+
+    temizle(sessiz=True)
+    print(json.dumps({"ok": True, "site": len(siteler)}, ensure_ascii=False))
+    return 0
+
+
+def temizle(sessiz=False):
+    if not os.path.isdir(DIZIN):
+        return 0
+    sinir = (datetime.now() - timedelta(days=SAKLAMA_GUN)).strftime("%Y-%m-%d")
+    silinen = 0
+    for ad in os.listdir(DIZIN):
+        if not ad.endswith(".jsonl"):
+            continue
+        if ad[:-6] < sinir:
+            try:
+                os.unlink(os.path.join(DIZIN, ad))
+                silinen += 1
+            except Exception:
+                pass
+    if not sessiz:
+        print(json.dumps({"ok": True, "silinen": silinen}))
+    return 0
+
+
+def oku(gun):
+    """Son `gun` gündeki tüm örnekler."""
+    if not os.path.isdir(DIZIN):
+        return []
+    sinir = time.time() - gun * 86400
+    satirlar = []
+    for ad in sorted(os.listdir(DIZIN)):
+        if not ad.endswith(".jsonl"):
+            continue
+        try:
+            with open(os.path.join(DIZIN, ad), encoding="utf-8") as fh:
+                for s in fh:
+                    s = s.strip()
+                    if not s:
+                        continue
+                    try:
+                        d = json.loads(s)
+                    except ValueError:
+                        continue  # yarım kalmış son satır
+                    if d.get("t", 0) >= sinir:
+                        satirlar.append(d)
+        except Exception:
+            continue
+    return satirlar
+
+
+def ozetle(gun=7, site=None):
+    """
+    Saatlik kovalara böler. Her kova için ORTALAMA ve TEPE değeri tutulur.
+
+    Tepe değer önemli: ortalama, kısa süreli ama sunucuyu kilitleyen bir
+    yüklenmeyi gizler. Sorunu ortalama değil tepe gösterir.
+    """
+    satirlar = oku(gun)
+    kovalar = {}
+    site_toplam = {}
+
+    for d in satirlar:
+        kova = int(d["t"] // 3600 * 3600)
+        for ad, v in (d.get("s") or {}).items():
+            if site and ad != site:
+                continue
+            cpu, mem, procs = (v + [0, 0, 0])[:3]
+            k = kovalar.setdefault(kova, {})
+            e = k.setdefault(ad, {"cpu_top": 0.0, "cpu_max": 0.0,
+                                  "mem_top": 0, "mem_max": 0, "n": 0})
+            e["cpu_top"] += cpu
+            e["cpu_max"] = max(e["cpu_max"], cpu)
+            e["mem_top"] += mem
+            e["mem_max"] = max(e["mem_max"], mem)
+            e["n"] += 1
+
+            t = site_toplam.setdefault(ad, {"cpu_max": 0.0, "mem_max": 0,
+                                            "cpu_top": 0.0, "n": 0})
+            t["cpu_max"] = max(t["cpu_max"], cpu)
+            t["mem_max"] = max(t["mem_max"], mem)
+            t["cpu_top"] += cpu
+            t["n"] += 1
+
+    seri = []
+    for kova in sorted(kovalar):
+        for ad, e in kovalar[kova].items():
+            seri.append({
+                "t": kova, "site": ad,
+                "cpu_ort": round(e["cpu_top"] / e["n"], 1) if e["n"] else 0,
+                "cpu_max": round(e["cpu_max"], 1),
+                "mem_ort": int(e["mem_top"] / e["n"]) if e["n"] else 0,
+                "mem_max": e["mem_max"],
+            })
+
+    siteler = sorted(
+        [{"site": ad,
+          "cpu_ort": round(t["cpu_top"] / t["n"], 1) if t["n"] else 0,
+          "cpu_max": round(t["cpu_max"], 1),
+          "mem_max": t["mem_max"], "ornek": t["n"]}
+         for ad, t in site_toplam.items()],
+        key=lambda x: -x["cpu_max"])
+
+    return {
+        "ts": int(time.time()), "gun": gun,
+        "ornek": len(satirlar),
+        "ilk": satirlar[0]["t"] if satirlar else None,
+        "seri": seri, "siteler": siteler,
+    }
+
+
+def main():
+    mod = sys.argv[1] if len(sys.argv) > 1 else "json"
+
+    if mod == "ornekle":
+        return ornekle()
+    if mod == "temizle":
+        return temizle()
+
+    try:
+        gun = int(sys.argv[2]) if len(sys.argv) > 2 else 7
+    except ValueError:
+        gun = 7
+    gun = max(1, min(gun, SAKLAMA_GUN))
+    site = sys.argv[3] if len(sys.argv) > 3 else None
+
+    d = ozetle(gun, site)
+
+    if mod == "plain":
+        print("gecmis: %d ornek, son %d gun" % (d["ornek"], d["gun"]))
+        if d["ilk"]:
+            print("  en eski kayit: %s"
+                  % time.strftime("%d.%m.%Y %H:%M", time.localtime(d["ilk"])))
+        for s in d["siteler"][:12]:
+            print("  %-32s cpu ort %%%-5.1f tepe %%%-5.1f  bellek tepe %d MB"
+                  % (s["site"][:32], s["cpu_ort"], s["cpu_max"],
+                     s["mem_max"] // 1024))
+        return 0
+
+    print(json.dumps(d, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Site erişim izleme (uptime)
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-erisim
+
+NEDEN VAR?
+  Sunucu ayakta olsa da tek bir site 500 verebilir, sertifikası bitebilir ya
+  da PHP havuzu kilitlenebilir. Bunu ilk fark eden müşteri olmamalı.
+
+NASIL?
+  Cron 5 dakikada bir tüm web alan adlarını DIŞARIDAN (HTTP) dener. İki
+  ardışık başarısızlık "çöktü" sayılır (tek seferlik ağ dalgalanması alarm
+  üretmesin); sahibine ve yöneticiye HestiaCP bildirimi gider, düzelince
+  "yeniden erişilebilir" bildirimi gönderilir.
+
+  HTTP 5xx, bağlantı hatası, zaman aşımı ve SSL hatası = DOWN.
+  401/403/404 gibi yanıtlar = UP (sunucu yanıt veriyor).
+  Yanıt süresi eşiği aşarsa = YAVAŞ (uyarı, bildirim yok).
+
+DEPOLAMA
+  wd/cache/erisim/YYYY-MM-DD.jsonl   her örnek bir satır (30 gün saklanır)
+  wd/cache/erisim-ozet.json          site başına günlük sayaçlar + son 288 örnek
+  wd/cache/erisim-durum.json         bildirim durumu (tekrar korumalı)
+  wd/cache/erisim.json               panelin okuduğu özet (0644)
+
+Kullanım:
+  wd-erisim kontrol            tüm siteleri dene, kaydet, gerekirse bildir (cron)
+  wd-erisim simdi DOMAIN       tek siteyi hemen dene (panel düğmesi)
+  wd-erisim json [USER]        özet (panel)
+  wd-erisim temizle            eski günlük dosyalarını sil
+"""
+
+import concurrent.futures
+import json
+import os
+import socket
+import ssl
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta
+
+HESTIA = "/usr/local/hestia"
+CACHE = HESTIA + "/wd/cache"
+DIZIN = CACHE + "/erisim"
+OZET = CACHE + "/erisim-ozet.json"
+DURUM = CACHE + "/erisim-durum.json"
+CIKTI = CACHE + "/erisim.json"
+AYAR = HESTIA + "/wd/erisim.json"
+
+VARSAYILAN = {
+    "zaman_asimi": 12,        # saniye
+    "yavas_ms": 3000,         # bu süreyi aşan yanıt "yavaş"
+    "ardisik_bildir": 2,      # kaç ardışık hata sonrası bildirim
+    "saklama_gun": 30,
+    "es_zamanli": 8,
+    "haric": [],              # izlenmeyecek alan adları
+}
+
+
+def ayar():
+    d = dict(VARSAYILAN)
+    try:
+        with open(AYAR, encoding="utf-8") as fh:
+            d.update(json.load(fh))
+    except Exception:
+        pass
+    return d
+
+
+def json_oku(yol, varsayilan):
+    try:
+        with open(yol, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return varsayilan
+
+
+def json_yaz(yol, veri, mod=0o600):
+    os.makedirs(os.path.dirname(yol), exist_ok=True)
+    gecici = yol + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(veri, fh, ensure_ascii=False)
+    os.chmod(gecici, mod)
+    os.replace(gecici, yol)
+
+
+def hestia_json(cmd, timeout=60):
+    try:
+        r = subprocess.run([HESTIA + "/bin/" + cmd[0]] + cmd[1:], capture_output=True,
+                           text=True, timeout=timeout)
+        return json.loads(r.stdout) if r.returncode == 0 and r.stdout.strip() else {}
+    except Exception:
+        return {}
+
+
+def bildir(user, baslik, metin, tur="info"):
+    try:
+        subprocess.run([HESTIA + "/bin/v-add-user-notification", user, baslik, metin, tur],
+                       capture_output=True, text=True, timeout=30)
+    except Exception:
+        pass
+
+
+def yonetici_adi():
+    try:
+        with open(HESTIA + "/conf/hestia.conf", encoding="utf-8") as fh:
+            for s in fh:
+                if s.startswith("ROOT_USER="):
+                    return s.split("=", 1)[1].strip().strip("'\"") or "admin"
+    except Exception:
+        pass
+    return "admin"
+
+
+# ------------------------------------------------------------------- siteler
+def siteler(cfg):
+    haric = set(cfg.get("haric") or [])
+    out = []
+    for user in hestia_json(["v-list-users", "json"]).keys():
+        doms = hestia_json(["v-list-web-domains", user, "json"])
+        for d, v in doms.items():
+            if d in haric or str(v.get("SUSPENDED", "no")) == "yes":
+                continue
+            out.append({"domain": d, "user": user, "ssl": str(v.get("SSL", "no")) == "yes"})
+    return out
+
+
+# -------------------------------------------------------------------- kontrol
+class _Yonlendirme(urllib.request.HTTPRedirectHandler):
+    """En çok 5 yönlendirme izlenir; sonrası döngü sayılır."""
+    max_redirections = 5
+
+
+def dene(site, cfg):
+    zaman = int(cfg.get("zaman_asimi", 12))
+    semalar = ["https", "http"] if site["ssl"] else ["http", "https"]
+    son = None
+    for sema in semalar:
+        url = "%s://%s/" % (sema, site["domain"])
+        bas = time.time()
+        try:
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (compatible; wd-erisim/1.0; uptime)",
+                "Accept": "text/html,*/*;q=0.8",
+            })
+            opener = urllib.request.build_opener(_Yonlendirme)
+            with opener.open(req, timeout=zaman) as r:
+                r.read(4096)
+                kod = r.getcode()
+            ms = int((time.time() - bas) * 1000)
+            return {"ok": kod < 500, "kod": kod, "ms": ms, "neden": "" if kod < 500 else "HTTP %d" % kod, "sema": sema}
+        except urllib.error.HTTPError as e:
+            ms = int((time.time() - bas) * 1000)
+            # 4xx: sunucu yanıt veriyor -> ayakta. 5xx: çökük.
+            ok = e.code < 500
+            return {"ok": ok, "kod": e.code, "ms": ms, "neden": "" if ok else "HTTP %d" % e.code, "sema": sema}
+        except ssl.SSLError as e:
+            son = {"ok": False, "kod": 0, "ms": int((time.time() - bas) * 1000), "neden": "SSL hatası", "sema": sema}
+            continue  # http ile de dene; ikisi de düşerse DOWN
+        except (urllib.error.URLError, socket.timeout, ConnectionError, OSError) as e:
+            neden = str(getattr(e, "reason", e))
+            if "timed out" in neden or isinstance(e, socket.timeout):
+                neden = "zaman aşımı"
+            elif "Name or service not known" in neden or "nodename" in neden:
+                neden = "DNS çözülemedi"
+            elif "Connection refused" in neden:
+                neden = "bağlantı reddedildi"
+            else:
+                neden = neden[:60]
+            son = {"ok": False, "kod": 0, "ms": int((time.time() - bas) * 1000), "neden": neden, "sema": sema}
+            continue
+        except Exception as e:
+            son = {"ok": False, "kod": 0, "ms": int((time.time() - bas) * 1000), "neden": str(e)[:60], "sema": sema}
+            continue
+    return son or {"ok": False, "kod": 0, "ms": 0, "neden": "bilinmeyen", "sema": semalar[0]}
+
+
+def gunluk_yaz(kayitlar):
+    os.makedirs(DIZIN, exist_ok=True)
+    yol = os.path.join(DIZIN, datetime.now().strftime("%Y-%m-%d") + ".jsonl")
+    with open(yol, "a", encoding="utf-8") as fh:
+        for k in kayitlar:
+            fh.write(json.dumps(k, ensure_ascii=False) + "\n")
+    os.chmod(yol, 0o600)
+
+
+def ozet_guncelle(ozet, site, sonuc, ts, cfg):
+    """Günlük sayaçlar + son 288 örnek + kesinti listesi."""
+    d = site["domain"]
+    o = ozet.setdefault(d, {"gun": {}, "son": [], "kesinti": [], "user": site["user"]})
+    o["user"] = site["user"]
+    gun = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
+    g = o["gun"].setdefault(gun, [0, 0, 0])   # ok, toplam, ms toplamı (ok olanlar)
+    g[1] += 1
+    if sonuc["ok"]:
+        g[0] += 1
+        g[2] += sonuc["ms"]
+    # durum: 1 up, 0 down, 2 yavaş
+    durum = 0 if not sonuc["ok"] else (2 if sonuc["ms"] > int(cfg.get("yavas_ms", 3000)) else 1)
+    o["son"].append([ts, durum, sonuc["ms"]])
+    o["son"] = o["son"][-288:]
+    # 35 günden eski gün sayaçlarını at
+    esik = (datetime.now() - timedelta(days=35)).strftime("%Y-%m-%d")
+    for k in list(o["gun"].keys()):
+        if k < esik:
+            del o["gun"][k]
+    return durum
+
+
+def uptime_hesapla(o, gun_sayisi):
+    bas = (datetime.now() - timedelta(days=gun_sayisi - 1)).strftime("%Y-%m-%d")
+    ok = top = 0
+    for k, v in o.get("gun", {}).items():
+        if k >= bas:
+            ok += v[0]
+            top += v[1]
+    return round(ok / top * 100, 2) if top else None
+
+
+def son24(o):
+    esik = time.time() - 86400
+    ok = top = ms = 0
+    for ts, durum, sure in o.get("son", []):
+        if ts < esik:
+            continue
+        top += 1
+        if durum != 0:
+            ok += 1
+            ms += sure
+    return (round(ok / top * 100, 2) if top else None), (int(ms / ok) if ok else None)
+
+
+def kontrol(tek_domain=None):
+    cfg = ayar()
+    liste = siteler(cfg)
+    if tek_domain:
+        liste = [s for s in liste if s["domain"] == tek_domain]
+        if not liste:
+            print(json.dumps({"ok": False, "hata": "Alan adı izleme listesinde yok."}, ensure_ascii=False))
+            return 1
+    if not liste:
+        json_yaz(CIKTI, {"ts": int(time.time()), "siteler": []}, 0o644)
+        print(json.dumps({"ok": True, "site": 0}))
+        return 0
+
+    ts = int(time.time())
+    sonuclar = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=int(cfg.get("es_zamanli", 8))) as ex:
+        isler = {ex.submit(dene, s, cfg): s for s in liste}
+        for f in concurrent.futures.as_completed(isler):
+            s = isler[f]
+            try:
+                sonuclar[s["domain"]] = f.result()
+            except Exception as e:
+                sonuclar[s["domain"]] = {"ok": False, "kod": 0, "ms": 0, "neden": str(e)[:60], "sema": "https"}
+
+    ozet = json_oku(OZET, {})
+    durum = json_oku(DURUM, {})
+    yonetici = yonetici_adi()
+    esik = int(cfg.get("ardisik_bildir", 2))
+    kayitlar = []
+
+    for s in liste:
+        r = sonuclar[s["domain"]]
+        kayitlar.append({"t": ts, "d": s["domain"], "u": s["user"], "ok": r["ok"], "kod": r["kod"], "ms": r["ms"], "n": r["neden"]})
+        ozet_guncelle(ozet, s, r, ts, cfg)
+
+        st = durum.setdefault(s["domain"], {"ardisik": 0, "down_since": None, "bildirildi": False})
+        if r["ok"]:
+            if st.get("bildirildi") and st.get("down_since"):
+                sure = ts - int(st["down_since"])
+                dk = max(1, sure // 60)
+                metin = ("<b>%s</b> yeniden erişilebilir. Kesinti süresi yaklaşık %d dakika." % (s["domain"], dk))
+                bildir(s["user"], "Site yeniden erişilebilir", metin, "success")
+                if s["user"] != yonetici:
+                    bildir(yonetici, "Site düzeldi: " + s["domain"], metin, "success")
+                o = ozet.get(s["domain"])
+                if o is not None:
+                    o.setdefault("kesinti", []).append([int(st["down_since"]), ts])
+                    o["kesinti"] = o["kesinti"][-20:]
+            st.update({"ardisik": 0, "down_since": None, "bildirildi": False})
+        else:
+            st["ardisik"] = int(st.get("ardisik", 0)) + 1
+            if not st.get("down_since"):
+                st["down_since"] = ts
+            if st["ardisik"] >= esik and not st.get("bildirildi"):
+                metin = ("<b>%s</b> yanıt vermiyor: %s. %d ardışık kontrol başarısız. "
+                         "Panel > Erişim İzleme sayfasından ayrıntılara bakın."
+                         % (s["domain"], r["neden"] or "bilinmeyen hata", st["ardisik"]))
+                bildir(s["user"], "Site erişilemiyor", metin, "error")
+                if s["user"] != yonetici:
+                    bildir(yonetici, "Site çöktü: " + s["domain"], metin, "error")
+                st["bildirildi"] = True
+
+    gunluk_yaz(kayitlar)
+    # İzleme listesinden çıkan siteleri temizle
+    mevcut = {s["domain"] for s in liste} if not tek_domain else set(durum.keys())
+    for d in list(durum.keys()):
+        if d not in mevcut and not tek_domain:
+            del durum[d]
+    json_yaz(OZET, ozet)
+    json_yaz(DURUM, durum)
+    cikti_uret(ozet, durum, cfg, ts)
+    print(json.dumps({"ok": True, "site": len(liste),
+                      "down": sum(1 for r in sonuclar.values() if not r["ok"])}))
+    return 0
+
+
+def cikti_uret(ozet, durum, cfg, ts):
+    siteler_out = []
+    yavas = int(cfg.get("yavas_ms", 3000))
+    for d, o in ozet.items():
+        son = o.get("son") or []
+        if not son:
+            continue
+        son_ts, son_durum, son_ms = son[-1]
+        # 10 dakikadan eski örnek: site artık izlenmiyor olabilir; yine de göster
+        st = durum.get(d, {})
+        u24, ort24 = son24(o)
+        siteler_out.append({
+            "domain": d,
+            "user": o.get("user", ""),
+            "durum": "down" if son_durum == 0 else ("yavas" if son_durum == 2 else "up"),
+            "ms": son_ms,
+            "son_kontrol": son_ts,
+            "down_since": st.get("down_since"),
+            "ardisik": st.get("ardisik", 0),
+            "uptime_24s": u24,
+            "uptime_7g": uptime_hesapla(o, 7),
+            "uptime_30g": uptime_hesapla(o, 30),
+            "ortalama_ms_24s": ort24,
+            "gecmis": [x[1] for x in son[-96:]],       # son 8 saat, 5 dk aralıkla
+            "kesinti": [{"bas": k[0], "bit": k[1], "sure": k[1] - k[0]} for k in (o.get("kesinti") or [])[-10:]][::-1],
+        })
+    siteler_out.sort(key=lambda s: (0 if s["durum"] == "down" else (1 if s["durum"] == "yavas" else 2), s["domain"]))
+    json_yaz(CIKTI, {"ts": ts, "yavas_ms": yavas, "siteler": siteler_out}, 0o644)
+
+
+def temizle():
+    cfg = ayar()
+    esik = (datetime.now() - timedelta(days=int(cfg.get("saklama_gun", 30)))).strftime("%Y-%m-%d")
+    n = 0
+    if os.path.isdir(DIZIN):
+        for f in os.listdir(DIZIN):
+            if f.endswith(".jsonl") and f[:10] < esik:
+                try:
+                    os.unlink(os.path.join(DIZIN, f))
+                    n += 1
+                except OSError:
+                    pass
+    print(json.dumps({"ok": True, "silinen": n}))
+    return 0
+
+
+def json_cikti(user=""):
+    d = json_oku(CIKTI, {"ts": 0, "siteler": []})
+    if user:
+        d["siteler"] = [s for s in d.get("siteler", []) if s.get("user") == user]
+    print(json.dumps(d, ensure_ascii=False))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    mod = sys.argv[1]
+    if mod == "kontrol":
+        return kontrol()
+    if mod == "simdi":
+        if len(sys.argv) < 3:
+            return 2
+        return kontrol(sys.argv[2])
+    if mod == "json":
+        return json_cikti(sys.argv[2] if len(sys.argv) > 2 else "")
+    if mod == "temizle":
+        return temizle()
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

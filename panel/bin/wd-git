@@ -1,0 +1,341 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Git dağıtım
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-git
+
+NEDEN VAR?
+  cPanel "Git Version Control" karşılığı: depoyu belge köküne klonla, tek
+  tıkla ya da otomatik (5 dk) çek. FTP ile dosya sürüklemeye son.
+
+GÜVENLİK
+  * git daima SİTE SAHİBİ kullanıcısıyla çalışır.
+  * Özel depolar için hesap başına bir ed25519 "deploy key" üretilir
+    (~/.ssh/wd-git); müşteri açık anahtarı GitHub/GitLab'a ekler. Parola ya
+    da token panelde saklanmaz.
+  * Depo adresi yalnızca https://, git@host:yol veya ssh:// biçiminde olabilir.
+
+KAYIT
+  /usr/local/hestia/wd/cache/git.json (0600 root)
+
+Kullanım:
+  wd-git anahtar USER                        deploy key (yoksa üretir)
+  wd-git liste USER
+  wd-git klonla USER DOMAIN                  STDIN JSON {repo, dal, alt_dizin}
+  wd-git cek USER DOMAIN [ALT]
+  wd-git otomatik USER DOMAIN [ALT] on|off
+  wd-git kaldir USER DOMAIN [ALT]            kaydı siler (dosyalar kalır)
+  wd-git otomatik-cek                        cron: otomatik işaretli depoları çek
+"""
+
+import json
+import os
+import pwd
+import re
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+KAYIT = HESTIA + "/wd/cache/git.json"
+AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
+KULLANICI_DESENI = re.compile(r"^[a-z0-9._-]{1,32}$", re.I)
+ALT_DESENI = re.compile(r"^[A-Za-z0-9._-]{1,60}$")
+DAL_DESENI = re.compile(r"^[A-Za-z0-9._/-]{1,80}$")
+REPO_DESENI = re.compile(r"^(https://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]{5,300}|git@[A-Za-z0-9.-]+:[A-Za-z0-9._/-]+(\.git)?|ssh://[A-Za-z0-9._@:/-]{5,300})$")
+ISKELET = {"index.html", "robots.txt", ".htaccess", "favicon.ico", ".well-known", "cgi-bin", ".user.ini"}
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def ev_dizini(user):
+    try:
+        return pwd.getpwnam(user).pw_dir.rstrip("/")
+    except KeyError:
+        return None
+
+
+def hestia_json(cmd):
+    try:
+        r = subprocess.run([HESTIA + "/bin/" + cmd[0]] + cmd[1:], capture_output=True, text=True, timeout=60)
+        return json.loads(r.stdout) if r.returncode == 0 and r.stdout.strip() else {}
+    except Exception:
+        return {}
+
+
+def kayit_oku():
+    try:
+        with open(KAYIT, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {"depolar": []}
+
+
+def kayit_yaz(d):
+    os.makedirs(os.path.dirname(KAYIT), exist_ok=True)
+    gecici = KAYIT + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False, indent=2)
+    os.chmod(gecici, 0o600)
+    os.replace(gecici, KAYIT)
+
+
+def kullanici_olarak(user, cmd, cwd=None, timeout=600, ek_env=None):
+    home = ev_dizini(user) or "/tmp"
+    env = ["HOME=" + home, "GIT_TERMINAL_PROMPT=0",
+           "GIT_SSH_COMMAND=ssh -i %s/.ssh/wd-git -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o BatchMode=yes" % home]
+    if ek_env:
+        env += ek_env
+    tam = ["sudo", "-u", user, "-H", "env"] + env + cmd
+    try:
+        r = subprocess.run(tam, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    except subprocess.TimeoutExpired:
+        return 124, "", "zaman aşımı"
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def anahtar(user):
+    home = ev_dizini(user)
+    if not home:
+        return hata("Kullanıcı yok.")
+    pw = pwd.getpwnam(user)
+    ssh = os.path.join(home, ".ssh")
+    if not os.path.isdir(ssh):
+        os.makedirs(ssh, mode=0o700)
+        os.chown(ssh, pw.pw_uid, pw.pw_gid)
+    ozel = os.path.join(ssh, "wd-git")
+    if not os.path.isfile(ozel):
+        rc, out, err = kullanici_olarak(user, ["ssh-keygen", "-t", "ed25519", "-N", "", "-C", "wd-git@" + user, "-f", ozel, "-q"], None, 60)
+        if rc != 0:
+            return hata("Anahtar üretilemedi: " + (err or out)[-200:])
+    try:
+        with open(ozel + ".pub", encoding="utf-8") as fh:
+            acik = fh.read().strip()
+    except OSError:
+        return hata("Açık anahtar okunamadı.")
+    print(json.dumps({"ok": True, "acik_anahtar": acik}))
+    return 0
+
+
+def hedef_dizin(user, domain, alt):
+    home = ev_dizini(user)
+    if not home:
+        return None
+    kok = os.path.join(home, "web", domain, "public_html")
+    return os.path.join(kok, alt) if alt else kok
+
+
+def bos_mu(yol):
+    try:
+        return all(ad in ISKELET for ad in os.listdir(yol))
+    except FileNotFoundError:
+        return True
+
+
+def depo_durumu(user, dizin):
+    if not os.path.isdir(os.path.join(dizin, ".git")):
+        return {"var": False}
+    rc, out, _ = kullanici_olarak(user, ["git", "-C", dizin, "log", "-1", "--format=%h|%s|%ci|%an"], None, 30)
+    p = out.split("|", 3) if rc == 0 and out else []
+    rc2, dal, _ = kullanici_olarak(user, ["git", "-C", dizin, "rev-parse", "--abbrev-ref", "HEAD"], None, 30)
+    rc3, kirli, _ = kullanici_olarak(user, ["git", "-C", dizin, "status", "--porcelain"], None, 60)
+    return {"var": True, "commit": p[0] if p else "", "mesaj": p[1] if len(p) > 1 else "", "tarih": p[2] if len(p) > 2 else "",
+            "yazar": p[3] if len(p) > 3 else "", "dal": dal if rc2 == 0 else "", "degisen": len(kirli.splitlines()) if rc3 == 0 and kirli else 0}
+
+
+def liste(user):
+    d = kayit_oku()
+    out = []
+    for r in d.get("depolar", []):
+        if r.get("user") != user:
+            continue
+        r = dict(r)
+        r["repo_goster"] = re.sub(r"://[^@/]+@", "://", r.get("repo", ""))  # https token gizle
+        dizin = hedef_dizin(user, r["domain"], r.get("alt_dizin", ""))
+        r["git"] = depo_durumu(user, dizin) if dizin else {"var": False}
+        out.append(r)
+    print(json.dumps({"ok": True, "depolar": out}, ensure_ascii=False))
+    return 0
+
+
+def klonla(user, domain, secenek):
+    if domain not in hestia_json(["v-list-web-domains", user, "json"]):
+        return hata("Alan adı bu hesaba ait değil.")
+    repo = str(secenek.get("repo", "")).strip()
+    if not REPO_DESENI.match(repo):
+        return hata("Depo adresi https://, git@host:yol ya da ssh:// biçiminde olmalı.")
+    dal = str(secenek.get("dal", "") or "").strip()
+    if dal and not DAL_DESENI.match(dal):
+        return hata("Dal adı geçersiz.")
+    alt = str(secenek.get("alt_dizin", "") or "").strip().strip("/")
+    if alt and not ALT_DESENI.match(alt):
+        return hata("Alt dizin geçersiz.")
+    dizin = hedef_dizin(user, domain, alt)
+    if not dizin:
+        return hata("Kullanıcı ev dizini bulunamadı.")
+    d = kayit_oku()
+    if any(r.get("user") == user and r.get("domain") == domain and r.get("alt_dizin", "") == alt for r in d.get("depolar", [])):
+        return hata("Bu hedef için zaten bir depo kaydı var.")
+    if os.path.isdir(dizin) and not bos_mu(dizin):
+        return hata("Hedef dizin boş değil: " + ("/" + alt if alt else "/"))
+    pw = pwd.getpwnam(user)
+    os.makedirs(dizin, exist_ok=True)
+    os.chown(dizin, pw.pw_uid, pw.pw_gid)
+    # Hestia iskelet dosyaları klonu engellemesin
+    for ad in list(ISKELET):
+        p = os.path.join(dizin, ad)
+        if os.path.isfile(p) and ad in ("index.html", "robots.txt"):
+            os.unlink(p)
+    if repo.startswith("git@") or repo.startswith("ssh://"):
+        # deploy key hazır olsun
+        r = anahtar_ic(user)
+        if r is not None:
+            return hata(r)
+    cmd = ["git", "clone", "--depth", "1"]
+    if dal:
+        cmd += ["--branch", dal]
+    cmd += [repo, dizin]
+    rc, out, err = kullanici_olarak(user, cmd, None, 900)
+    if rc != 0:
+        m = (err or out)[-400:]
+        if "Permission denied (publickey)" in m or "Could not read from remote" in m:
+            m += " — Özel depo için panelde gösterilen deploy anahtarını depoya ekleyin."
+        return hata("Klonlanamadı: " + m)
+    d.setdefault("depolar", []).append({"user": user, "domain": domain, "alt_dizin": alt, "repo": repo, "dal": dal,
+                                         "ts": int(time.time()), "otomatik": False, "son_cekim": None, "son_sonuc": "klonlandı"})
+    kayit_yaz(d)
+    print(json.dumps({"ok": True, "hedef": "/" + alt if alt else "/", "durum": depo_durumu(user, dizin)}, ensure_ascii=False))
+    return 0
+
+
+def anahtar_ic(user):
+    """Deploy key yoksa üretir; hata metni ya da None döner."""
+    home = ev_dizini(user)
+    pw = pwd.getpwnam(user)
+    ssh = os.path.join(home, ".ssh")
+    if not os.path.isdir(ssh):
+        os.makedirs(ssh, mode=0o700)
+        os.chown(ssh, pw.pw_uid, pw.pw_gid)
+    ozel = os.path.join(ssh, "wd-git")
+    if not os.path.isfile(ozel):
+        rc, out, err = kullanici_olarak(user, ["ssh-keygen", "-t", "ed25519", "-N", "", "-C", "wd-git@" + user, "-f", ozel, "-q"], None, 60)
+        if rc != 0:
+            return "Deploy anahtarı üretilemedi: " + (err or out)[-200:]
+    return None
+
+
+def cek_ic(user, domain, alt, d=None):
+    d = d or kayit_oku()
+    kayit = next((r for r in d.get("depolar", []) if r.get("user") == user and r.get("domain") == domain and r.get("alt_dizin", "") == alt), None)
+    if not kayit:
+        return False, "Kayıt yok.", d
+    dizin = hedef_dizin(user, domain, alt)
+    if not dizin or not os.path.isdir(os.path.join(dizin, ".git")):
+        return False, "Dizin artık bir git deposu değil.", d
+    rc, out, err = kullanici_olarak(user, ["git", "-C", dizin, "pull", "--ff-only"], None, 600)
+    kayit["son_cekim"] = int(time.time())
+    kayit["son_sonuc"] = ("tamam: " + out[-160:]) if rc == 0 else ("HATA: " + (err or out)[-200:])
+    kayit_yaz(d)
+    return rc == 0, kayit["son_sonuc"], d
+
+
+def cek(user, domain, alt):
+    ok, mesaj, _ = cek_ic(user, domain, alt)
+    if not ok:
+        return hata(mesaj)
+    print(json.dumps({"ok": True, "mesaj": mesaj, "durum": depo_durumu(user, hedef_dizin(user, domain, alt))}, ensure_ascii=False))
+    return 0
+
+
+def otomatik(user, domain, alt, deger):
+    d = kayit_oku()
+    kayit = next((r for r in d.get("depolar", []) if r.get("user") == user and r.get("domain") == domain and r.get("alt_dizin", "") == alt), None)
+    if not kayit:
+        return hata("Kayıt yok.")
+    kayit["otomatik"] = deger == "on"
+    kayit_yaz(d)
+    print(json.dumps({"ok": True, "otomatik": kayit["otomatik"]}))
+    return 0
+
+
+def kaldir(user, domain, alt):
+    d = kayit_oku()
+    onceki = len(d.get("depolar", []))
+    d["depolar"] = [r for r in d.get("depolar", []) if not (r.get("user") == user and r.get("domain") == domain and r.get("alt_dizin", "") == alt)]
+    if len(d["depolar"]) == onceki:
+        return hata("Kayıt yok.")
+    kayit_yaz(d)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def otomatik_cek():
+    d = kayit_oku()
+    n = 0
+    for r in list(d.get("depolar", [])):
+        if r.get("otomatik"):
+            cek_ic(r["user"], r["domain"], r.get("alt_dizin", ""), d)
+            n += 1
+    print(json.dumps({"ok": True, "cekilen": n}))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    mod = sys.argv[1]
+    if mod == "otomatik-cek":
+        return otomatik_cek()
+    if len(sys.argv) < 3:
+        sys.stderr.write(__doc__)
+        return 2
+    user = sys.argv[2]
+    if not KULLANICI_DESENI.match(user):
+        return hata("Geçersiz kullanıcı.")
+    if mod == "anahtar":
+        return anahtar(user)
+    if mod == "liste":
+        return liste(user)
+    if len(sys.argv) < 4:
+        sys.stderr.write(__doc__)
+        return 2
+    domain = sys.argv[3].lower()
+    if not AD_DESENI.match(domain):
+        return hata("Geçersiz alan adı.")
+    ekler = sys.argv[4:]
+    if mod == "klonla":
+        try:
+            secenek = json.loads(sys.stdin.read() or "{}")
+        except ValueError:
+            secenek = {}
+        return klonla(user, domain, secenek)
+    if mod == "cek":
+        alt = ekler[0] if ekler else ""
+        if alt and not ALT_DESENI.match(alt):
+            return hata("Alt dizin geçersiz.")
+        return cek(user, domain, alt)
+    if mod == "otomatik":
+        if not ekler:
+            return hata("on|off gerekli.")
+        deger = ekler[-1]
+        alt = ekler[0] if len(ekler) > 1 else ""
+        if alt and not ALT_DESENI.match(alt):
+            return hata("Alt dizin geçersiz.")
+        return otomatik(user, domain, alt, deger)
+    if mod == "kaldir":
+        alt = ekler[0] if ekler else ""
+        if alt and not ALT_DESENI.match(alt):
+            return hata("Alt dizin geçersiz.")
+        return kaldir(user, domain, alt)
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

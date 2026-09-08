@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Uyarı katmanı
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-uyari
+
+NEDEN VAR?
+  Sağlık, disk, kaynak ve yedek modülleri sorunları BULUYOR ama kimse panele
+  girmedikçe görmüyor. Bu betik bulguları HestiaCP'nin kendi bildirim
+  sistemine (üst çubuktaki zil) ve isteğe bağlı olarak e-postaya taşır.
+
+TASARIM KARARLARI
+  * Kendi kontrolünü YAPMAZ. Yalnızca toplayıcıların yazdığı önbellekleri
+    okur. Böylece tek doğruluk kaynağı korunur ve aynı DNS sorgusu iki kez
+    yapılmaz.
+  * TEKRAR ETMEZ. Her uyarının bir anahtarı vardır; aynı anahtar için
+    yeniden bildirim ancak `tekrar_saat` geçtikten sonra gönderilir. Aksi
+    hâlde 15 dakikada bir aynı uyarı panelin zilini doldururdu.
+  * DÜZELDİĞİNDE HABER VERİR. Bir uyarı kaybolduğunda "düzeldi" bildirimi
+    gönderilir; kullanıcı sorunu kapattığını bilmelidir.
+  * KİME GİDER: alan adı/disk uyarıları o kaynağın SAHİBİNE, sunucu düzeyi
+    uyarılar (PTR, kara liste, mail kuyruğu) yalnızca yöneticiye.
+
+Kullanım:
+  wd-uyari calistir        önbellekleri oku, gerekirse bildir (cron)
+  wd-uyari calistir --kuru ne gönderileceğini yaz, gönderme
+  wd-uyari durum           etkin uyarılar ve son bildirim zamanları
+  wd-uyari sifirla         durum dosyasını temizle (her şey yeniden bildirilir)
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+CACHE = HESTIA + "/wd/cache"
+DURUM = CACHE + "/uyari-durum.json"
+AYAR = HESTIA + "/wd/uyari.json"
+
+VARSAYILAN = {
+    # Aynı uyarı için iki bildirim arasındaki en az süre (saat).
+    "tekrar_saat": 24,
+    # Bu seviyeler bildirilir. "warn" kapatılırsa yalnızca gerçek hatalar gider.
+    "seviyeler": ["fail", "warn"],
+    # Disk kotası yüzdesi eşikleri
+    "disk_uyari": 80,
+    "disk_kritik": 92,
+    # SSL bitişine kaç gün kala uyarılsın
+    "ssl_gun": 14,
+    # E-posta gönderilsin mi ve kime (boş ise yalnızca panel bildirimi)
+    "eposta": False,
+    "eposta_adres": "",
+    # Sunucu düzeyi uyarıların gideceği yönetici hesabı
+    "yonetici": "admin",
+}
+
+
+def ayar_yukle():
+    d = json.loads(json.dumps(VARSAYILAN))
+    if os.path.isfile(AYAR):
+        try:
+            with open(AYAR, encoding="utf-8") as fh:
+                d.update(json.load(fh))
+            return d
+        except Exception as e:
+            sys.stderr.write("uyari.json okunamadi (%s)\n" % e)
+            return d
+    try:
+        os.makedirs(os.path.dirname(AYAR), exist_ok=True)
+        with open(AYAR, "w", encoding="utf-8") as fh:
+            json.dump(d, fh, ensure_ascii=False, indent=2)
+        os.chmod(AYAR, 0o644)
+    except Exception:
+        pass
+    return d
+
+
+def json_oku(ad):
+    yol = os.path.join(CACHE, ad)
+    try:
+        with open(yol, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def durum_oku():
+    try:
+        with open(DURUM, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def durum_yaz(d):
+    os.makedirs(os.path.dirname(DURUM), exist_ok=True)
+    gecici = DURUM + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False)
+    os.replace(gecici, DURUM)
+    os.chmod(DURUM, 0o600)
+
+
+def kullanicilar():
+    try:
+        r = subprocess.run([HESTIA + "/bin/v-list-users", "json"],
+                           capture_output=True, text=True, timeout=30)
+        return json.loads(r.stdout) if r.returncode == 0 and r.stdout else {}
+    except Exception:
+        return {}
+
+
+# ------------------------------------------------------------------ bildirim
+def bildir(user, baslik, metin, tur="info"):
+    """
+    HestiaCP'nin kendi bildirim sistemine yazar (üst çubuktaki zil).
+    NOTICE alanı HTML kabul eder.
+    """
+    try:
+        r = subprocess.run(
+            [HESTIA + "/bin/v-add-user-notification", user, baslik, metin, tur],
+            capture_output=True, text=True, timeout=30)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def eposta_gonder(adres, konu, govde):
+    """
+    Basit düz metin e-posta. Sunucunun kendi exim'i kullanılır; harici bir
+    servise bağımlılık YOKTUR.
+    """
+    ileti = "To: %s\nSubject: %s\nContent-Type: text/plain; charset=UTF-8\n\n%s\n" % (
+        adres, konu, govde)
+    try:
+        r = subprocess.run(["/usr/sbin/sendmail", "-t", "-i"],
+                           input=ileti, capture_output=True, text=True, timeout=30)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+# -------------------------------------------------------------------- toplama
+def uyarilari_topla(ayar):
+    """
+    Önbelleklerden uyarı listesi üretir.
+    Her uyarı: {anahtar, user, seviye, baslik, metin}
+    `anahtar` tekrar denetimi için kullanılır ve KARARLI olmalıdır.
+    """
+    uyarilar = []
+    yonetici = ayar.get("yonetici", "admin")
+    seviyeler = set(ayar.get("seviyeler", ["fail", "warn"]))
+
+    # --- Sağlık ---
+    h = json_oku("health.json")
+    if h:
+        for c in h.get("sunucu", []):
+            if c.get("durum") in seviyeler:
+                uyarilar.append({
+                    "anahtar": "saglik:sunucu:%s" % c.get("id"),
+                    "user": yonetici,
+                    "seviye": c["durum"],
+                    "baslik": "Sunucu: %s" % c.get("label", ""),
+                    "metin": "%s %s %s" % (c.get("deger", ""), c.get("not", ""),
+                                           c.get("cozum", "")),
+                })
+        for grup in ("mail", "web"):
+            for d in h.get(grup, []):
+                for c in d.get("checks", []):
+                    if c.get("durum") in seviyeler:
+                        uyarilar.append({
+                            "anahtar": "saglik:%s:%s:%s" % (grup, d["domain"], c.get("id")),
+                            "user": d.get("user", yonetici),
+                            "seviye": c["durum"],
+                            "baslik": "%s — %s" % (d["domain"], c.get("label", "")),
+                            "metin": "%s %s %s" % (c.get("deger", ""), c.get("not", ""),
+                                                   c.get("cozum", "")),
+                        })
+        for y in h.get("yedek", []):
+            for c in y.get("checks", []):
+                if c.get("durum") in seviyeler:
+                    uyarilar.append({
+                        "anahtar": "yedek:%s:%s" % (y["user"], c.get("id")),
+                        "user": y["user"],
+                        "seviye": c["durum"],
+                        "baslik": "Yedek: %s" % c.get("label", ""),
+                        "metin": "%s %s %s" % (c.get("deger", ""), c.get("not", ""),
+                                               c.get("cozum", "")),
+                    })
+
+    # --- Güvenlik denetimi (yalnızca yöneticiye) ---
+    g = json_oku("guvenlik.json")
+    if g:
+        for c in g.get("kontroller", []):
+            if c.get("durum") in seviyeler:
+                uyarilar.append({
+                    "anahtar": "guvenlik:%s" % c.get("id"),
+                    "user": yonetici,
+                    "seviye": c["durum"],
+                    "baslik": "Güvenlik: %s" % c.get("label", ""),
+                    "metin": "%s %s %s" % (c.get("deger", ""), c.get("not", ""),
+                                           c.get("cozum", "")),
+                })
+
+    # --- Zararlı kod taraması ---
+    # Her şüpheli dosya AYRI uyarı olur: biri temizlenip diğeri kalırsa
+    # "düzeldi" bildirimi yanlış olurdu.
+    t = json_oku("tarama.json")
+    if t:
+        for b in t.get("bulgular", []):
+            if b.get("seviye") not in seviyeler:
+                continue
+            uyarilar.append({
+                "anahtar": "tarama:%s" % b.get("yol"),
+                "user": yonetici,
+                "seviye": b["seviye"],
+                "baslik": "Şüpheli dosya: %s" % b.get("kisa", "")[-60:],
+                "metin": "Puan %s. %s Dosyayı inceleyin; silmeden önce yedek alın."
+                         % (b.get("puan"),
+                            " ".join(x.get("aciklama", "") for x in b.get("bulgular", [])[:2])),
+            })
+
+    # --- Disk kotası ---
+    # Sağlık modülü diski denetlemez; eşik burada uygulanır.
+    dsk = json_oku("disk.json")
+    if dsk:
+        for k in dsk.get("kullanicilar", []):
+            kota_mb = k.get("kota_mb")
+            if not kota_mb:
+                continue
+            pct = k.get("toplam", 0) / (kota_mb * 1048576.0) * 100
+            if pct >= ayar["disk_kritik"]:
+                seviye, etiket = "fail", "kritik"
+            elif pct >= ayar["disk_uyari"]:
+                seviye, etiket = "warn", "yüksek"
+            else:
+                continue
+            if seviye not in seviyeler:
+                continue
+            uyarilar.append({
+                "anahtar": "disk:%s:%s" % (k["user"], etiket),
+                "user": k["user"],
+                "seviye": seviye,
+                "baslik": "Disk kullanımı %s (%%%.0f)" % (etiket, pct),
+                "metin": "Hesap kotasının %%%.0f'ini kullanıyor. "
+                         "Disk Kullanımı sayfasından neyin yer kapladığını "
+                         "görebilirsiniz." % pct,
+            })
+
+    return uyarilar
+
+
+# ------------------------------------------------------------------- çalıştır
+def calistir(ayar, kuru=False):
+    uyarilar = uyarilari_topla(ayar)
+    durum = durum_oku()
+    simdi = time.time()
+    tekrar = ayar.get("tekrar_saat", 24) * 3600
+
+    aktif = {u["anahtar"] for u in uyarilar}
+    gonderilen, atlanan = 0, 0
+
+    for u in uyarilar:
+        k = u["anahtar"]
+        onceki = durum.get(k)
+        if onceki and (simdi - onceki.get("son", 0)) < tekrar:
+            atlanan += 1
+            continue
+
+        etiket = "HATA" if u["seviye"] == "fail" else "UYARI"
+        baslik = "[%s] %s" % (etiket, u["baslik"])
+        govde = "<p>%s</p>" % u["metin"].strip()
+
+        if kuru:
+            print("  [gonderilecek] %-10s %s" % (u["user"], baslik))
+            gonderilen += 1
+            continue
+
+        if bildir(u["user"], baslik, govde,
+                  "error" if u["seviye"] == "fail" else "warning"):
+            gonderilen += 1
+            durum[k] = {"son": simdi, "seviye": u["seviye"], "user": u["user"]}
+            if ayar.get("eposta") and ayar.get("eposta_adres"):
+                eposta_gonder(ayar["eposta_adres"], baslik,
+                              u["metin"].strip() + "\n\nPanel: /list/health/")
+
+    # --- Düzelenler ---
+    duzelen = 0
+    for k in list(durum.keys()):
+        if k in aktif:
+            continue
+        bilgi = durum.pop(k)
+        duzelen += 1
+        if kuru:
+            print("  [duzeldi] %-10s %s" % (bilgi.get("user", "?"), k))
+            continue
+        bildir(bilgi.get("user", ayar.get("yonetici", "admin")),
+               "[DÜZELDİ] " + k.split(":")[-1],
+               "<p>Daha önce bildirilen sorun artık görünmüyor: <code>%s</code></p>" % k,
+               "success")
+
+    if not kuru:
+        durum_yaz(durum)
+
+    print(json.dumps({
+        "aktif": len(uyarilar), "gonderilen": gonderilen,
+        "atlanan": atlanan, "duzelen": duzelen, "kuru": kuru,
+    }, ensure_ascii=False))
+    return 0
+
+
+def durum_yaz_rapor():
+    d = durum_oku()
+    if not d:
+        print("Etkin uyarı yok.")
+        return 0
+    print("%-52s %-6s %s" % ("ANAHTAR", "SEVIYE", "SON BILDIRIM"))
+    for k, v in sorted(d.items()):
+        print("%-52s %-6s %s" % (
+            k[:52], v.get("seviye", "?"),
+            time.strftime("%d.%m.%Y %H:%M", time.localtime(v.get("son", 0)))))
+    return 0
+
+
+def main():
+    mod = sys.argv[1] if len(sys.argv) > 1 else "calistir"
+    ayar = ayar_yukle()
+
+    if mod == "calistir":
+        return calistir(ayar, "--kuru" in sys.argv)
+    if mod == "durum":
+        return durum_yaz_rapor()
+    if mod == "sifirla":
+        if os.path.isfile(DURUM):
+            os.unlink(DURUM)
+        print("durum temizlendi")
+        return 0
+
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

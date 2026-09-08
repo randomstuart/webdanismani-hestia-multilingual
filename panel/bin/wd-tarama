@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Zararlı yazılım / webshell taraması
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-tarama
+
+NEDEN VAR?
+  Bir hosting sunucusunun kara listeye düşmesinin bir numaralı sebebi,
+  güncellenmemiş bir müşteri sitesine yerleşen webshell'in spam atmasıdır.
+  HestiaCP'de zararlı yazılım taraması yoktur.
+
+NASIL ÇALIŞIR?
+  İmza değil, DAVRANIŞ arar. Webshell'ler sürekli isim değiştirir ama şu
+  kalıplar değişmez: kod çalıştırma fonksiyonlarının gizlenmiş girdiyle
+  birleşmesi, uzun base64 blokları, dosya yükleme + çalıştırma birleşimi.
+
+  Her bulgu bir PUAN toplar; eşiği geçen dosya bildirilir. Tek bir kalıp
+  tek başına suçlama sayılmaz — meşru kod da `base64_decode` kullanır.
+
+YANLIŞ POZİTİF POLİTİKASI
+  Bir tarayıcının en büyük riski, müşterinin çalışan dosyasını "zararlı"
+  diye işaretleyip paniğe yol açmasıdır. Bu yüzden:
+    * Hiçbir dosya SİLİNMEZ veya karantinaya alınmaz. Yalnızca raporlanır.
+    * Bilinen uygulama dosyaları (WordPress çekirdeği vb.) puanı düşürür.
+    * Bulgular "kesin" değil "incelenmeli" olarak sunulur.
+
+Kullanım:
+  wd-tarama refresh [gun]   web köklerini tara, önbelleğe yaz (cron)
+  wd-tarama json | plain
+  wd-tarama dosya <yol>     tek dosyanın neden işaretlendiğini göster
+"""
+
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+CACHE = HESTIA + "/wd/cache/tarama.json"
+
+AZAMI_DOSYA_BOYUT = 3 * 1024 * 1024   # 3 MB üstü kaynak dosya taranmaz
+AZAMI_DOSYA_SAYISI = 60000            # güvenlik freni
+SURE_SINIRI = 600                     # saniye
+
+TARANAN_UZANTI = (".php", ".phtml", ".php5", ".php7", ".inc", ".phar")
+
+# (ad, puan, açıklama, derlenmiş desen)
+KALIPLAR = [
+    ("eval_gizli", 45,
+     "Gizlenmiş veriyi doğrudan çalıştırıyor (klasik webshell imzası)",
+     re.compile(rb"eval\s*\(\s*(base64_decode|gzinflate|str_rot13|gzuncompress|rawurldecode)", re.I)),
+    ("preg_e", 40,
+     "preg_replace /e değiştiricisi — kod çalıştırır, PHP 7'de kaldırıldı",
+     re.compile(rb"preg_replace\s*\(\s*['\"].*/[imsxu]*e[imsxu]*['\"]", re.I)),
+    # Bu iki kalıp TEK BAŞINA eşiği geçmelidir: istekten gelen veriyi doğrudan
+    # çalıştırmanın meşru bir kullanımı yoktur. (Ölçüldü: 30 puanla
+    # `system($_GET["cmd"])` eşiğin altında kalıp kaçıyordu.)
+    ("dinamik_cagri", 45,
+     "İstekten gelen adı fonksiyon olarak çağırıyor",
+     re.compile(rb"\$_(GET|POST|REQUEST|COOKIE)\s*\[[^\]]*\]\s*\(", re.I)),
+    ("sistem_komut", 45,
+     "İstekten gelen veriyi sistem komutu olarak çalıştırıyor",
+     re.compile(rb"(system|exec|shell_exec|passthru|popen|proc_open)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)", re.I)),
+    ("uzun_base64", 20,
+     "Çok uzun base64 bloğu (gizlenmiş kod olabilir)",
+     re.compile(rb"['\"][A-Za-z0-9+/]{300,}={0,2}['\"]")),
+    ("karakter_gizleme", 25,
+     "Fonksiyon adı karakter karakter kuruluyor (imza atlatma)",
+     re.compile(rb"(chr\s*\(\s*\d+\s*\)\s*\.\s*){5,}")),
+    ("dosya_yaz_calistir", 20,
+     "Dosya yazıp hemen dahil ediyor",
+     re.compile(rb"(file_put_contents|fwrite)[^;]{0,200};[^;]{0,80}(include|require)", re.I | re.S)),
+    ("gizli_iframe", 15,
+     "Görünmez iframe (ziyaretçi yönlendirme / zararlı dağıtım)",
+     re.compile(rb"<iframe[^>]{0,200}(width\s*=\s*['\"]?0|display\s*:\s*none)", re.I)),
+    ("posta_dongusu", 20,
+     "Döngü içinde mail gönderimi (spam betiği)",
+     re.compile(rb"(for|while|foreach)[^{]{0,120}\{[^}]{0,400}\bmail\s*\(", re.I | re.S)),
+    ("shell_adi", 45,
+     "Bilinen webshell adı geçiyor",
+     re.compile(rb"(c99shell|r57shell|WSO\s*\d|FilesMan|b374k|IndoXploit|MiniShell)", re.I)),
+]
+
+# Bu yollar meşru uygulama çekirdeğidir; puanı düşürür.
+BILINEN_YOL = re.compile(
+    r"/(wp-includes|wp-admin|vendor|node_modules|core/lib|lib/composer)/", re.I)
+
+ESIK = 40  # bu puanın üstü bildirilir
+
+
+def kabuk(cmd, timeout=60):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=timeout, check=False)
+        return r.returncode, r.stdout
+    except Exception:
+        return 1, ""
+
+
+def v_json(*args):
+    rc, out = kabuk([HESTIA + "/bin/" + args[0]] + list(args[1:]) + ["json"])
+    try:
+        return json.loads(out) if rc == 0 and out else {}
+    except ValueError:
+        return {}
+
+
+def dosya_incele(yol):
+    """Tek dosyayı inceler; (puan, bulgular) döner."""
+    try:
+        boyut = os.path.getsize(yol)
+        if boyut == 0 or boyut > AZAMI_DOSYA_BOYUT:
+            return 0, []
+        with open(yol, "rb") as fh:
+            veri = fh.read()
+    except Exception:
+        return 0, []
+
+    puan = 0
+    bulgular = []
+    for ad, agirlik, aciklama, desen in KALIPLAR:
+        if desen.search(veri):
+            puan += agirlik
+            bulgular.append({"kalip": ad, "aciklama": aciklama, "puan": agirlik})
+
+    if not bulgular:
+        return 0, []
+
+    # Meşru uygulama çekirdeği: aynı kalıplar kütüphanelerde de görülür.
+    if BILINEN_YOL.search(yol):
+        puan = int(puan * 0.5)
+        bulgular.append({"kalip": "bilinen_yol", "puan": 0,
+                         "aciklama": "Bilinen uygulama dizini — puan düşürüldü"})
+
+    return puan, bulgular
+
+
+def tara(gun=0):
+    basla = time.time()
+    kullanicilar = v_json("v-list-users")
+    if not isinstance(kullanicilar, dict):
+        kullanicilar = {}
+
+    sinir = time.time() - gun * 86400 if gun else 0
+    bulunanlar = []
+    sayac = {"dosya": 0, "taranan": 0, "atlanan": 0}
+    eksik = False
+
+    for user in kullanicilar:
+        home = (kullanicilar[user].get("HOME") or "/home/" + user).rstrip("/")
+        kok = os.path.join(home, "web")
+        if not os.path.isdir(kok):
+            continue
+
+        for dizin, altlar, dosyalar in os.walk(kok):
+            # Günlük ve istatistik dizinleri kod içermez.
+            altlar[:] = [a for a in altlar if a not in ("logs", "stats", ".git")]
+            for d in dosyalar:
+                if not d.lower().endswith(TARANAN_UZANTI):
+                    continue
+                sayac["dosya"] += 1
+                if sayac["dosya"] > AZAMI_DOSYA_SAYISI:
+                    eksik = True
+                    break
+                if time.time() - basla > SURE_SINIRI:
+                    eksik = True
+                    break
+
+                yol = os.path.join(dizin, d)
+                try:
+                    mtime = os.path.getmtime(yol)
+                except Exception:
+                    continue
+                if sinir and mtime < sinir:
+                    sayac["atlanan"] += 1
+                    continue
+
+                sayac["taranan"] += 1
+                puan, bulgular = dosya_incele(yol)
+                if puan >= ESIK:
+                    bulunanlar.append({
+                        "yol": yol,
+                        "kisa": yol.replace(home, "~", 1),
+                        "user": user,
+                        "puan": puan,
+                        "boyut": os.path.getsize(yol),
+                        "degisim": int(mtime),
+                        "bulgular": bulgular,
+                        "seviye": "fail" if puan >= 70 else "warn",
+                    })
+            if eksik:
+                break
+        if eksik:
+            break
+
+    bulunanlar.sort(key=lambda x: -x["puan"])
+    return {
+        "ts": int(time.time()),
+        "gun": gun,
+        "sure": round(time.time() - basla, 1),
+        "sayac": sayac,
+        "eksik": eksik,
+        "bulgular": bulunanlar[:200],
+        "ozet": {
+            "fail": len([b for b in bulunanlar if b["seviye"] == "fail"]),
+            "warn": len([b for b in bulunanlar if b["seviye"] == "warn"]),
+        },
+    }
+
+
+def yaz(d):
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    g = CACHE + ".tmp"
+    with open(g, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False)
+    os.replace(g, CACHE)
+    os.chmod(CACHE, 0o644)
+
+
+def main():
+    mod = sys.argv[1] if len(sys.argv) > 1 else "json"
+
+    if mod == "dosya":
+        if len(sys.argv) < 3:
+            print(json.dumps({"ok": False, "hata": "yol verilmedi"}))
+            return 2
+        puan, bulgular = dosya_incele(sys.argv[2])
+        print(json.dumps({"ok": True, "puan": puan, "esik": ESIK,
+                          "bulgular": bulgular}, ensure_ascii=False))
+        return 0
+
+    try:
+        gun = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+    except ValueError:
+        gun = 0
+
+    if mod == "refresh":
+        d = tara(gun)
+        yaz(d)
+        print(json.dumps({"ok": True, "taranan": d["sayac"]["taranan"],
+                          "bulgu": len(d["bulgular"]), "sure": d["sure"]},
+                         ensure_ascii=False))
+        return 0
+
+    d = None
+    try:
+        with open(CACHE, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except Exception:
+        pass
+    if d is None:
+        d = tara(gun)
+        yaz(d)
+
+    if mod == "plain":
+        print("tarama: %d dosya, %d bulgu (%.1f sn)"
+              % (d["sayac"]["taranan"], len(d["bulgular"]), d["sure"]))
+        if d.get("eksik"):
+            print("  UYARI: tarama sinira takildi, sonuc eksik olabilir")
+        for b in d["bulgular"][:15]:
+            print("  [%-4s] puan %-3d %s" % (b["seviye"], b["puan"], b["kisa"]))
+            for x in b["bulgular"][:2]:
+                print("           - %s" % x["aciklama"])
+        return 0
+
+    print(json.dumps(d, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,397 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Bayi (reseller) katmanı
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-bayi
+
+NEDEN VAR?
+  HestiaCP'de bayi rolü yoktur: ya yöneticisin ya kullanıcı. Bu katman, bir
+  kullanıcıyı "bayi" ilan eder ve ona YALNIZCA kendi müşterileri üzerinde
+  sınırlı işlem hakkı verir: hesap açma, askıya alma, paket ve şifre
+  değiştirme, silme. Bayi başka hiçbir kullanıcıyı göremez.
+
+GÜVENLİK MODELİ
+  * Panel, oturumdaki kullanıcı adını BAYI argümanı olarak geçer. Panel
+    süreci (hestiaweb) güvenilir olsa da bu betik her çağrıda yeniden
+    doğrular: BAYI gerçekten bayi mi, USER gerçekten onun müşterisi mi.
+  * Bayinin açabileceği paketler ve müşteri sayısı yönetici tarafından
+    sınırlanır.
+  * Yönetici işlemleri (bayi tanımlama) yalnızca panelde yönetici bağlamı
+    varken çağrılır; betik "ayar*" komutlarını bayiye kapatamaz (sudo aynı),
+    bu yüzden panel tarafında yönetici denetimi ZORUNLUDUR.
+
+DOSYALAR
+  /usr/local/hestia/wd/bayi.json         (0600) bayi tanımları ve müşteri eşlemesi
+  /usr/local/hestia/wd/cache/bayi.json   (0644) yalnızca bayi ADLARI (kenar çubuğu için)
+
+Kullanım (yönetici):
+  wd-bayi ayar
+  wd-bayi bayi-ekle BAYI                 STDIN {ad, paketler[], azami}
+  wd-bayi bayi-sil BAYI
+  wd-bayi bayi-ata BAYI USER
+  wd-bayi bayi-cikar BAYI USER
+Kullanım (bayi):
+  wd-bayi liste BAYI
+  wd-bayi ekle BAYI                      STDIN {kullanici, sifre, eposta, ad, paket}
+  wd-bayi askiya BAYI USER | askidan-cikar BAYI USER
+  wd-bayi sifre BAYI USER                STDIN {sifre}
+  wd-bayi paket BAYI USER PAKET
+  wd-bayi sil BAYI USER
+  wd-bayi paketler BAYI
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+HESTIA = "/usr/local/hestia"
+AYAR = HESTIA + "/wd/bayi.json"
+CACHE = HESTIA + "/wd/cache/bayi.json"
+KULLANICI_DESENI = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+PAKET_DESENI = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+EPOSTA_DESENI = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.I)
+
+
+def hata(mesaj, kod=1):
+    print(json.dumps({"ok": False, "hata": mesaj}, ensure_ascii=False))
+    return kod
+
+
+def hestia(cmd, timeout=120):
+    try:
+        r = subprocess.run([HESTIA + "/bin/" + cmd[0]] + cmd[1:], capture_output=True, text=True, timeout=timeout)
+        return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def hestia_json(cmd):
+    rc, out, _ = hestia(cmd)
+    try:
+        return json.loads(out) if rc == 0 and out else {}
+    except ValueError:
+        return {}
+
+
+def yonetici_adi():
+    try:
+        with open(HESTIA + "/conf/hestia.conf", encoding="utf-8") as fh:
+            for s in fh:
+                if s.startswith("ROOT_USER="):
+                    return s.split("=", 1)[1].strip().strip("'\"") or "admin"
+    except Exception:
+        pass
+    return "admin"
+
+
+def ayar_oku():
+    try:
+        with open(AYAR, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except Exception:
+        d = {}
+    d.setdefault("bayiler", {})
+    return d
+
+
+def ayar_yaz(d):
+    os.makedirs(os.path.dirname(AYAR), exist_ok=True)
+    gecici = AYAR + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False, indent=2)
+    os.chmod(gecici, 0o600)
+    os.replace(gecici, AYAR)
+    # Kenar çubuğu için yalnız adlar (0644)
+    os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+    g2 = CACHE + ".tmp"
+    with open(g2, "w", encoding="utf-8") as fh:
+        json.dump({"ts": int(time.time()), "bayiler": sorted(d["bayiler"].keys())}, fh)
+    os.chmod(g2, 0o644)
+    os.replace(g2, CACHE)
+
+
+def bayi_al(d, bayi):
+    b = d["bayiler"].get(bayi)
+    if not b:
+        return None
+    b.setdefault("musteriler", [])
+    b.setdefault("paketler", [])
+    b.setdefault("azami", 10)
+    return b
+
+
+def musteri_dogrula(d, bayi, user):
+    b = bayi_al(d, bayi)
+    if not b:
+        return None, "Bu hesap bayi değil."
+    if user not in b["musteriler"]:
+        return None, "Bu kullanıcı sizin müşteriniz değil."
+    if user == yonetici_adi() or user == bayi:
+        return None, "Bu kullanıcı üzerinde işlem yapılamaz."
+    return b, None
+
+
+def kullanici_ozeti(user):
+    v = hestia_json(["v-list-user", user, "json"]).get(user, {})
+    return {
+        "kullanici": user,
+        "ad": v.get("NAME") or ((v.get("FNAME", "") + " " + v.get("LNAME", "")).strip()),
+        "eposta": v.get("CONTACT", ""),
+        "paket": v.get("PACKAGE", ""),
+        "askida": str(v.get("SUSPENDED", "no")) == "yes",
+        "disk": int(v.get("U_DISK", 0) or 0), "disk_kota": v.get("DISK_QUOTA", "unlimited"),
+        "bant": int(v.get("U_BANDWIDTH", 0) or 0), "bant_kota": v.get("BANDWIDTH", "unlimited"),
+        "web": int(v.get("U_WEB_DOMAINS", 0) or 0), "mail": int(v.get("U_MAIL_ACCOUNTS", 0) or 0),
+        "db": int(v.get("U_DATABASES", 0) or 0), "olusturma": v.get("DATE", ""),
+        "var": bool(v),
+    }
+
+
+# ------------------------------------------------------------------ yönetici
+def ayar():
+    d = ayar_oku()
+    out = []
+    for ad, b in sorted(d["bayiler"].items()):
+        b = bayi_al(d, ad)
+        out.append({"bayi": ad, "ad": b.get("ad", ""), "paketler": b["paketler"], "azami": b["azami"],
+                    "musteriler": b["musteriler"], "musteri_sayisi": len(b["musteriler"])})
+    tum = sorted(hestia_json(["v-list-users", "json"]).keys())
+    paketler = sorted(hestia_json(["v-list-user-packages", "json"]).keys())
+    print(json.dumps({"ok": True, "bayiler": out, "kullanicilar": tum, "paketler": paketler, "yonetici": yonetici_adi()}, ensure_ascii=False))
+    return 0
+
+
+def bayi_ekle(bayi):
+    try:
+        g = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return hata("JSON çözülemedi.")
+    if bayi == yonetici_adi():
+        return hata("Yönetici bayi olamaz.")
+    if bayi not in hestia_json(["v-list-users", "json"]):
+        return hata("Böyle bir kullanıcı yok: " + bayi)
+    d = ayar_oku()
+    b = d["bayiler"].setdefault(bayi, {"musteriler": []})
+    b["ad"] = str(g.get("ad", "")).strip()[:80]
+    b["paketler"] = [p for p in (g.get("paketler") or []) if PAKET_DESENI.match(str(p))][:20]
+    try:
+        b["azami"] = max(1, min(500, int(g.get("azami", 10))))
+    except (TypeError, ValueError):
+        b["azami"] = 10
+    ayar_yaz(d)
+    print(json.dumps({"ok": True, "bayi": bayi}))
+    return 0
+
+
+def bayi_sil(bayi):
+    d = ayar_oku()
+    if bayi not in d["bayiler"]:
+        return hata("Bayi yok.")
+    del d["bayiler"][bayi]
+    ayar_yaz(d)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def bayi_ata(bayi, user, cikar=False):
+    d = ayar_oku()
+    b = bayi_al(d, bayi)
+    if not b:
+        return hata("Bayi yok.")
+    if cikar:
+        b["musteriler"] = [u for u in b["musteriler"] if u != user]
+    else:
+        if user == yonetici_adi() or user == bayi:
+            return hata("Bu kullanıcı atanamaz.")
+        if user not in hestia_json(["v-list-users", "json"]):
+            return hata("Böyle bir kullanıcı yok: " + user)
+        for ad, ob in d["bayiler"].items():
+            if ad != bayi and user in ob.get("musteriler", []):
+                return hata("Bu kullanıcı zaten '%s' bayisine bağlı." % ad)
+        if user not in b["musteriler"]:
+            b["musteriler"].append(user)
+    ayar_yaz(d)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+# ---------------------------------------------------------------------- bayi
+def liste(bayi):
+    d = ayar_oku()
+    b = bayi_al(d, bayi)
+    if not b:
+        return hata("Bu hesap bayi değil.")
+    musteriler = []
+    kayip = []
+    for u in b["musteriler"]:
+        o = kullanici_ozeti(u)
+        if o["var"]:
+            musteriler.append(o)
+        else:
+            kayip.append(u)
+    if kayip:
+        b["musteriler"] = [u for u in b["musteriler"] if u not in kayip]
+        ayar_yaz(d)
+    tum_paketler = hestia_json(["v-list-user-packages", "json"])
+    paketler = []
+    for p in (b["paketler"] or sorted(tum_paketler.keys())):
+        v = tum_paketler.get(p)
+        if v is not None:
+            paketler.append({"ad": p, "disk": v.get("DISK_QUOTA", ""), "bant": v.get("BANDWIDTH", ""),
+                             "web": v.get("WEB_DOMAINS", ""), "mail": v.get("MAIL_ACCOUNTS", ""), "db": v.get("DATABASES", "")})
+    print(json.dumps({"ok": True, "bayi": bayi, "ad": b.get("ad", ""), "azami": b["azami"],
+                      "musteriler": musteriler, "paketler": paketler}, ensure_ascii=False))
+    return 0
+
+
+def ekle(bayi):
+    try:
+        g = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return hata("JSON çözülemedi.")
+    d = ayar_oku()
+    b = bayi_al(d, bayi)
+    if not b:
+        return hata("Bu hesap bayi değil.")
+    if len(b["musteriler"]) >= int(b["azami"]):
+        return hata("Müşteri sınırınıza ulaştınız (%d)." % b["azami"])
+    user = str(g.get("kullanici", "")).strip().lower()
+    if not KULLANICI_DESENI.match(user):
+        return hata("Kullanıcı adı harfle başlamalı; küçük harf, rakam, - ve _ (2-32 karakter).")
+    if user in hestia_json(["v-list-users", "json"]):
+        return hata("Bu kullanıcı adı alınmış.")
+    sifre = str(g.get("sifre", ""))
+    if len(sifre) < 8:
+        return hata("Şifre en az 8 karakter olmalı.")
+    eposta = str(g.get("eposta", "")).strip()
+    if not EPOSTA_DESENI.match(eposta):
+        return hata("Geçerli bir e-posta girin.")
+    paket = str(g.get("paket", "")).strip()
+    izinli = b["paketler"] or sorted(hestia_json(["v-list-user-packages", "json"]).keys())
+    if paket not in izinli:
+        return hata("Bu paketi açma yetkiniz yok.")
+    ad = re.sub(r"[^A-Za-z0-9ÇĞİÖŞÜçğıöşü .'-]", "", str(g.get("ad", "")))[:60].strip() or user
+    parcalar = ad.split(" ", 1)
+    rc, out, err = hestia(["v-add-user", user, sifre, eposta, paket, parcalar[0], parcalar[1] if len(parcalar) > 1 else ""])
+    if rc != 0:
+        return hata("Hesap açılamadı: " + (err or out)[-200:])
+    b["musteriler"].append(user)
+    ayar_yaz(d)
+    print(json.dumps({"ok": True, "kullanici": user}))
+    return 0
+
+
+def askiya(bayi, user, kaldir=False):
+    d = ayar_oku()
+    b, h = musteri_dogrula(d, bayi, user)
+    if not b:
+        return hata(h)
+    rc, out, err = hestia(["v-unsuspend-user" if kaldir else "v-suspend-user", user])
+    if rc != 0:
+        return hata((err or out)[-200:] or "İşlem başarısız.")
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def sifre(bayi, user):
+    try:
+        g = json.loads(sys.stdin.read() or "{}")
+    except ValueError:
+        return hata("JSON çözülemedi.")
+    d = ayar_oku()
+    b, h = musteri_dogrula(d, bayi, user)
+    if not b:
+        return hata(h)
+    yeni = str(g.get("sifre", ""))
+    if len(yeni) < 8:
+        return hata("Şifre en az 8 karakter olmalı.")
+    rc, out, err = hestia(["v-change-user-password", user, yeni])
+    if rc != 0:
+        return hata((err or out)[-200:] or "Şifre değiştirilemedi.")
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def paket(bayi, user, yeni):
+    d = ayar_oku()
+    b, h = musteri_dogrula(d, bayi, user)
+    if not b:
+        return hata(h)
+    izinli = b["paketler"] or sorted(hestia_json(["v-list-user-packages", "json"]).keys())
+    if not PAKET_DESENI.match(yeni) or yeni not in izinli:
+        return hata("Bu paketi atama yetkiniz yok.")
+    rc, out, err = hestia(["v-change-user-package", user, yeni])
+    if rc != 0:
+        return hata((err or out)[-200:] or "Paket değiştirilemedi.")
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def sil(bayi, user):
+    d = ayar_oku()
+    b, h = musteri_dogrula(d, bayi, user)
+    if not b:
+        return hata(h)
+    rc, out, err = hestia(["v-delete-user", user], 600)
+    if rc != 0:
+        return hata((err or out)[-200:] or "Hesap silinemedi.")
+    b["musteriler"] = [u for u in b["musteriler"] if u != user]
+    ayar_yaz(d)
+    print(json.dumps({"ok": True}))
+    return 0
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write(__doc__)
+        return 2
+    mod = sys.argv[1]
+    if mod == "ayar":
+        return ayar()
+    if len(sys.argv) < 3:
+        sys.stderr.write(__doc__)
+        return 2
+    bayi = sys.argv[2]
+    if not re.match(r"^[a-z0-9._-]{1,32}$", bayi, re.I):
+        return hata("Geçersiz bayi adı.")
+    if mod == "bayi-ekle":
+        return bayi_ekle(bayi)
+    if mod == "bayi-sil":
+        return bayi_sil(bayi)
+    if mod == "liste":
+        return liste(bayi)
+    if mod == "ekle":
+        return ekle(bayi)
+    if mod == "paketler":
+        return liste(bayi)
+    if len(sys.argv) < 4:
+        sys.stderr.write(__doc__)
+        return 2
+    user = sys.argv[3]
+    if not re.match(r"^[a-z0-9._-]{1,32}$", user, re.I):
+        return hata("Geçersiz kullanıcı.")
+    if mod == "bayi-ata":
+        return bayi_ata(bayi, user)
+    if mod == "bayi-cikar":
+        return bayi_ata(bayi, user, cikar=True)
+    if mod == "askiya":
+        return askiya(bayi, user)
+    if mod == "askidan-cikar":
+        return askiya(bayi, user, kaldir=True)
+    if mod == "sifre":
+        return sifre(bayi, user)
+    if mod == "paket":
+        if len(sys.argv) < 5:
+            return hata("Paket adı gerekli.")
+        return paket(bayi, user, sys.argv[4])
+    if mod == "sil":
+        return sil(bayi, user)
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

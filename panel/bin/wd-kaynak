@@ -1,0 +1,487 @@
+#!/usr/bin/env python3
+"""
+WebDanışmanı — Site kaynak limitleri
+
+Kurulum yeri: /usr/local/hestia/wd/bin/wd-kaynak
+
+SORUN
+  HestiaCP'nin stok php-fpm şablonunda `pm.max_children = 8` dışında hiçbir
+  sınır yok: `memory_limit` ve `request_terminate_timeout` bulunmuyor.
+
+  php.ini'deki `memory_limit = 128M` bir VARSAYILANDIR, tavan değildir —
+  müşterinin kodu `ini_set('memory_limit','2048M')` ile bunu yükseltebilir.
+  Sınırı zorunlu kılan tek yol `php_admin_value`'dur.
+
+  `request_terminate_timeout` hiç yoktur; `max_execution_time` bloke I/O'da
+  (dış HTTP isteği, kilitli sorgu) saymaz. Takılan bir işçi havuzdaki yerini
+  süresiz tutar. Tek bir müşteri sunucuyu kilitleyebilir.
+
+ÇÖZÜM
+  Limit kademesi başına YENİ bir php-fpm şablonu üretilir ve her alan adı,
+  sahibinin paketine karşılık gelen şablona bağlanır.
+
+  Şablon adı ÖNEMLİ: HestiaCP PHP sürümünü şablon adından
+  `^.*PHP-([0-9])_([0-9])$` ile çözer — desen SONA sabitlidir, önek serbesttir.
+  Bu yüzden ad `wd-orta-PHP-8_3` biçimindedir; `PHP-8_3-orta` çözümlenmez ve
+  sessizce varsayılan PHP sürümüne düşer.
+
+  Şablonlar YENİ dosyadır; HestiaCP güncellemesi stok .tpl dosyalarını
+  değiştirir ama bunları silmez.
+
+Kullanım:
+  wd-kaynak sablonlar          limit şablonlarını üret/güncelle
+  wd-kaynak durum              hangi alan adı hangi kademede (değişiklik yok)
+  wd-kaynak uygula             paketlere göre şablonları ata
+  wd-kaynak uygula --kuru      ne yapılacağını yaz, uygulama
+  wd-kaynak uygula --yeni      yalnızca hâlâ stok şablonda olanlara ata (cron)
+  wd-kaynak onbellek           panelin okuduğu eşleme dosyasını tazele (cron)
+  wd-kaynak json               makine okunur çıktı
+  wd-kaynak geri-al            siteleri stok şablona döndür ve şablonları sil
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+
+HESTIA = "/usr/local/hestia"
+TPLDIR = HESTIA + "/data/templates/web/php-fpm"
+AYAR = HESTIA + "/wd/kaynak.json"
+
+# ---------------------------------------------------------------- varsayılan
+# Kademeler. Bir kademe = bir php-fpm şablonu.
+#   bellek   : php_admin_value[memory_limit] — müşteri YÜKSELTEMEZ
+#   sure     : request_terminate_timeout — takılan işçiyi kesin öldürür
+#   surec    : pm.max_children — aynı anda kaç PHP işçisi
+# `pm = ondemand` olduğu için bunlar tavan değerdir, ayrılmış bellek değil.
+VARSAYILAN = {
+    "kademeler": {
+        "kucuk": {"bellek": "128M", "sure": 60, "surec": 5,
+                  "ad": "Küçük", "aciklama": "Tanıtım / küçük site"},
+        "orta": {"bellek": "256M", "sure": 120, "surec": 8,
+                 "ad": "Orta", "aciklama": "WordPress / kurumsal site"},
+        "buyuk": {"bellek": "384M", "sure": 180, "surec": 12,
+                  "ad": "Büyük", "aciklama": "E-ticaret / yoğun site"},
+        "genis": {"bellek": "512M", "sure": 300, "surec": 16,
+                  "ad": "Geniş", "aciklama": "Ağır uygulama"},
+    },
+    # Paket -> kademe. Burada olmayan paket "varsayilan" kademesini alır.
+    "paketler": {
+        "Baslangic": "kucuk",
+        "Standart": "orta",
+        "Pro": "buyuk",
+        "Kurumsal": "genis",
+        "default": "orta",
+    },
+    "varsayilan": "orta",
+    # Cron yeni açılan siteleri kendiliğinden kademeye alsın mı?
+    # VARSAYILAN KAPALI: çalışan bir sitenin php-fpm havuzunu haber vermeden
+    # değiştirmek yöneticinin kararı olmalı. Açmak için `true` yapın.
+    "otomatik": False,
+    # Bu paketlerdeki alan adlarına dokunulmaz (yönetici/sistem).
+    "haric_paketler": ["system"],
+}
+
+ONEK = "wd-"
+
+
+def ayar_yukle():
+    """
+    Ayari diskten okur; yoksa varsayilani YAZAR.
+
+    Dosya 0644'tur: panel (hestiaweb) kademe adlarini ve limit degerlerini
+    buradan DOGRUDAN okur, boylece her sayfa yuklemesinde alt surec
+    calistirmak gerekmez.
+    """
+    if os.path.isfile(AYAR):
+        try:
+            with open(AYAR, encoding="utf-8") as fh:
+                d = json.load(fh)
+            for k, v in VARSAYILAN.items():
+                d.setdefault(k, v)
+            return d
+        except Exception as e:
+            sys.stderr.write("kaynak.json okunamadi (%s), varsayilan kullaniliyor\n" % e)
+        return json.loads(json.dumps(VARSAYILAN))
+
+    d = json.loads(json.dumps(VARSAYILAN))
+    try:
+        os.makedirs(os.path.dirname(AYAR), exist_ok=True)
+        with open(AYAR, "w", encoding="utf-8") as fh:
+            json.dump(d, fh, ensure_ascii=False, indent=2)
+        os.chmod(AYAR, 0o644)
+    except Exception as e:
+        sys.stderr.write("kaynak.json yazilamadi: %s\n" % e)
+    return d
+
+
+def kabuk(cmd, timeout=60):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=timeout, check=False)
+        return r.returncode, r.stdout.strip(), r.stderr.strip()
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def v_json(*args):
+    rc, out, _ = kabuk([HESTIA + "/bin/" + args[0]] + list(args[1:]) + ["json"])
+    if rc != 0 or not out:
+        return {}
+    try:
+        return json.loads(out)
+    except ValueError:
+        return {}
+
+
+def php_surumleri():
+    """Kurulu PHP sürümlerini stok şablonlardan çıkarır (PHP-8_3 -> 8_3)."""
+    s = set()
+    for f in os.listdir(TPLDIR):
+        m = re.match(r"^PHP-(\d)_(\d)\.tpl$", f)
+        if m:
+            s.add("%s_%s" % (m.group(1), m.group(2)))
+    return sorted(s)
+
+
+# ------------------------------------------------------------------ şablonlar
+GOVDE = """; WebDanismani - kaynak limitli havuz sablonu
+;#=========================================================================#
+;# Kademe: %(ad)s - %(aciklama)s
+;#
+;# BU DOSYA URETILIR. Degistirmek icin:
+;#   /usr/local/hestia/wd/kaynak.json duzenleyin, sonra
+;#   /usr/local/hestia/wd/bin/wd-kaynak sablonlar
+;#
+;# Stok sablondan farki, asagidaki UC satirdir. Gerisi stokla aynidir.
+;#   php_admin_value[memory_limit]      stok sablonda YOK -> musteri
+;#                                      ini_set ile sinirsiz bellek alabiliyordu
+;#   request_terminate_timeout          stok sablonda YOK -> takilan istek
+;#                                      havuzdaki yerini suresiz tutuyordu
+;#   pm.max_children                    kademeye gore
+;#=========================================================================#
+
+[%%domain%%]
+listen = /run/php/php%%backend_version%%-fpm-%%domain%%.sock
+listen.owner = %%user%%
+listen.group = www-data
+listen.mode = 0660
+
+user = %%user%%
+group = %%user%%
+
+pm = ondemand
+pm.max_children = %(surec)s
+pm.max_requests = 4000
+pm.process_idle_timeout = 10s
+pm.status_path = /status
+
+; Takilan istegi kesin olarak sonlandirir. max_execution_time bloke I/O'da
+; (dis HTTP istegi, kilitli sorgu) saymaz; bu satir sayar.
+request_terminate_timeout = %(sure)ss
+
+; Yavas istekleri gunluge yazar - "sitem yavas" sikayetlerinin teshisi.
+request_slowlog_timeout = 10s
+slowlog = /var/log/php-fpm-slow-%%domain%%.log
+
+; php_admin_value: musteri kodu ini_set ile BU degeri yukseltemez.
+; (php_value olsaydi yukseltilebilirdi.)
+php_admin_value[memory_limit] = %(bellek)s
+php_admin_value[max_execution_time] = %(sure)s
+
+php_admin_value[upload_tmp_dir] = /home/%%user%%/tmp
+php_admin_value[session.save_path] = /home/%%user%%/tmp
+php_admin_value[open_basedir] = /home/%%user%%/.composer:/home/%%user%%/web/%%domain%%/public_html:/home/%%user%%/web/%%domain%%/private:/home/%%user%%/web/%%domain%%/public_shtml:/home/%%user%%/tmp:/tmp:/var/www/html:/bin:/usr/bin:/usr/local/bin:/usr/share:/opt
+php_admin_value[sendmail_path] = /usr/sbin/sendmail -t -i -f admin@%%domain%%
+
+env[PATH] = /usr/local/bin:/usr/bin:/bin
+env[TMP] = /home/%%user%%/tmp
+env[TMPDIR] = /home/%%user%%/tmp
+env[TEMP] = /home/%%user%%/tmp
+"""
+
+
+def sablon_adi(kademe, surum):
+    # Sondaki PHP-x_y ZORUNLU: HestiaCP surumu buradan cozer.
+    return "%s%s-PHP-%s" % (ONEK, kademe, surum)
+
+
+def sablonlar_uret(ayar, sessiz=False):
+    surumler = php_surumleri()
+    if not surumler:
+        sys.stderr.write("HATA: stok PHP sablonu bulunamadi: %s\n" % TPLDIR)
+        return 1
+    yazilan = 0
+    for kademe, k in ayar["kademeler"].items():
+        for surum in surumler:
+            ad = sablon_adi(kademe, surum)
+            yol = os.path.join(TPLDIR, ad + ".tpl")
+            icerik = GOVDE % {
+                "ad": k.get("ad", kademe),
+                "aciklama": k.get("aciklama", ""),
+                "surec": k["surec"],
+                "sure": k["sure"],
+                "bellek": k["bellek"],
+            }
+            eski = ""
+            if os.path.isfile(yol):
+                with open(yol, encoding="utf-8") as fh:
+                    eski = fh.read()
+            if eski != icerik:
+                with open(yol, "w", encoding="utf-8") as fh:
+                    fh.write(icerik)
+                os.chmod(yol, 0o644)
+                yazilan += 1
+                if not sessiz:
+                    print("  yazildi  %s.tpl  (%s, %s islem, %ss)"
+                          % (ad, k["bellek"], k["surec"], k["sure"]))
+            elif not sessiz:
+                print("  guncel   %s.tpl" % ad)
+    if not sessiz:
+        print("%d sablon guncellendi, %d PHP surumu icin."
+              % (yazilan, len(surumler)))
+    return 0
+
+
+# --------------------------------------------------------------------- durum
+def alan_adlari(ayar):
+    """Her web alan adi icin sahibi, paketi, mevcut ve olmasi gereken sablon."""
+    sonuc = []
+    kullanicilar = v_json("v-list-users")
+    if not isinstance(kullanicilar, dict):
+        return sonuc
+
+    for user, u in kullanicilar.items():
+        paket = u.get("PACKAGE", "")
+        if paket in ayar.get("haric_paketler", []):
+            continue
+        kademe = ayar["paketler"].get(paket, ayar["varsayilan"])
+        for d, w in (v_json("v-list-web-domains", user) or {}).items():
+            mevcut = w.get("BACKEND", "")
+            m = re.search(r"PHP-(\d_\d)$", mevcut)
+            surum = m.group(1) if m else None
+            if surum is None:
+                # Backend yoksa ya da adlandirma taninmiyorsa dokunulmaz:
+                # PHP surumunu tahmin etmek calisan bir siteyi bozabilir.
+                hedef = None
+            else:
+                hedef = sablon_adi(kademe, surum)
+            sonuc.append({
+                "domain": d,
+                "user": user,
+                "paket": paket,
+                "kademe": kademe,
+                "mevcut": mevcut,
+                "hedef": hedef,
+                "uyumlu": (hedef is not None and mevcut == hedef),
+                "limit": ayar["kademeler"].get(kademe, {}),
+            })
+    sonuc.sort(key=lambda x: (x["user"], x["domain"]))
+    return sonuc
+
+
+def ram_toplam_kb():
+    try:
+        with open("/proc/meminfo") as fh:
+            for satir in fh:
+                if satir.startswith("MemTotal:"):
+                    return int(satir.split()[1])
+    except Exception:
+        pass
+    return 0
+
+
+def bellek_mb(s):
+    m = re.match(r"^(\d+)\s*([MG])?$", str(s).strip(), re.I)
+    if not m:
+        return 0
+    n = int(m.group(1))
+    return n * 1024 if (m.group(2) or "M").upper() == "G" else n
+
+
+def tavan_ozeti(liste, ayar):
+    """
+    En kotu durumda ayrilabilecek toplam bellek.
+    `pm = ondemand` oldugu icin bu AYRILMIS bellek degil, teorik tavandir;
+    yine de RAM'i asiyorsa kademe dagilimi gozden gecirilmelidir.
+    """
+    toplam = 0
+    for d in liste:
+        k = d["limit"]
+        if k:
+            toplam += bellek_mb(k.get("bellek", 0)) * int(k.get("surec", 0))
+    ram = ram_toplam_kb() // 1024
+    return {"tavan_mb": toplam, "ram_mb": ram,
+            "asiyor": ram > 0 and toplam > ram}
+
+
+def durum_yaz(ayar):
+    liste = alan_adlari(ayar)
+    if not liste:
+        print("Denetlenecek web alan adi yok.")
+        return 0
+    print("%-34s %-10s %-10s %-22s %s"
+          % ("ALAN ADI", "KULLANICI", "PAKET", "KADEME", "DURUM"))
+    for d in liste:
+        if d["hedef"] is None:
+            durum = "atlanir (backend taninmadi: %s)" % (d["mevcut"] or "-")
+        elif d["uyumlu"]:
+            durum = "uygun"
+        else:
+            durum = "%s -> %s" % (d["mevcut"] or "-", d["hedef"])
+        k = d["limit"]
+        kad = "%s (%s/%s islem)" % (d["kademe"], k.get("bellek", "?"),
+                                    k.get("surec", "?"))
+        print("%-34s %-10s %-10s %-22s %s"
+              % (d["domain"][:34], d["user"][:10], d["paket"][:10], kad, durum))
+
+    o = tavan_ozeti(liste, ayar)
+    print()
+    print("Teorik bellek tavani: %d MB / sunucu RAM %d MB"
+          % (o["tavan_mb"], o["ram_mb"]))
+    if o["asiyor"]:
+        print("  UYARI: tavan RAM'i asiyor. `pm = ondemand` oldugu icin bu")
+        print("  bellek AYRILMIS degildir, ama tum siteler ayni anda dolarsa")
+        print("  takas/OOM riski vardir. Kademeleri kucultmeyi degerlendirin.")
+    return 0
+
+
+# -------------------------------------------------------------------- uygula
+def uygula(ayar, kuru=False, yalniz_yeni=False):
+    """
+    Şablonları alan adlarına atar.
+
+    `yalniz_yeni=True` iken YALNIZCA hâlâ stok şablonda (PHP-x_y) olan alan
+    adlarına dokunulur. Cron bu modda çalışır: yeni açılan siteler otomatik
+    korunur, ama yönetici bir siteyi bilerek başka bir kademeye aldıysa o
+    seçim EZİLMEZ. Elle çalıştırmada (yalniz_yeni=False) hepsi hizalanır.
+    """
+    liste = alan_adlari(ayar)
+    degisen, hata, atlanan = 0, 0, 0
+    for d in liste:
+        if d["hedef"] is None:
+            atlanan += 1
+            continue
+        if d["uyumlu"]:
+            continue
+        if yalniz_yeni and not re.match(r"^PHP-\d_\d$", d["mevcut"] or ""):
+            # Zaten özel bir kademeye alınmış; elle verilmiş karar korunur.
+            atlanan += 1
+            continue
+        if kuru:
+            print("  [kuru] %s: %s -> %s"
+                  % (d["domain"], d["mevcut"] or "-", d["hedef"]))
+            degisen += 1
+            continue
+        rc, out, err = kabuk([
+            HESTIA + "/bin/v-change-web-domain-backend-tpl",
+            d["user"], d["domain"], d["hedef"],
+        ], timeout=120)
+        if rc == 0:
+            print("  %s -> %s" % (d["domain"], d["hedef"]))
+            degisen += 1
+        else:
+            print("  HATA %s: %s" % (d["domain"], (err or out).strip()))
+            hata += 1
+
+    print()
+    print("%d alan adi %s, %d hata, %d atlandi."
+          % (degisen, "degisecek" if kuru else "guncellendi", hata, atlanan))
+    return 1 if hata else 0
+
+
+# ----------------------------------------------------------------------- main
+def main():
+    mod = sys.argv[1] if len(sys.argv) > 1 else "durum"
+    ayar = ayar_yukle()
+
+    if mod == "sablonlar":
+        return sablonlar_uret(ayar)
+
+    if mod == "durum":
+        return durum_yaz(ayar)
+
+    if mod == "uygula":
+        kuru = "--kuru" in sys.argv
+        yeni = "--yeni" in sys.argv
+        # `--yeni` cron tarafindan cagrilir; ayar kapaliysa hicbir sey yapilmaz.
+        if yeni and not ayar.get("otomatik", False):
+            print("otomatik atama kapali (kaynak.json > otomatik: true yapin)")
+            return 0
+        if not kuru:
+            # Sablonlar yoksa atama basarisiz olurdu; once uret.
+            sablonlar_uret(ayar, sessiz=True)
+        return uygula(ayar, kuru, yeni)
+
+    if mod == "geri-al":
+        # Kaldirma yolu. Sablonlari silmeden ONCE onlara bagli alan adlarini
+        # stok PHP-x_y sablonuna dondurur; tersi yapilirsa siteler bir sonraki
+        # yeniden olusturmada havuzsuz kalir.
+        hata = 0
+        kullanicilar = v_json("v-list-users")
+        for user in (kullanicilar or {}):
+            for d, w in (v_json("v-list-web-domains", user) or {}).items():
+                mevcut = w.get("BACKEND", "")
+                if not mevcut.startswith(ONEK):
+                    continue
+                m = re.search(r"PHP-(\d_\d)$", mevcut)
+                if not m:
+                    print("  ATLANDI %s: surum cozulemedi (%s)" % (d, mevcut))
+                    hata += 1
+                    continue
+                stok = "PHP-" + m.group(1)
+                rc, out, err = kabuk([
+                    HESTIA + "/bin/v-change-web-domain-backend-tpl",
+                    user, d, stok,
+                ], timeout=120)
+                if rc == 0:
+                    print("  %s -> %s" % (d, stok))
+                else:
+                    print("  HATA %s: %s" % (d, (err or out).strip()))
+                    hata += 1
+        # Sablonlari sil
+        silinen = 0
+        for f in os.listdir(TPLDIR):
+            if f.startswith(ONEK) and f.endswith(".tpl"):
+                os.unlink(os.path.join(TPLDIR, f))
+                silinen += 1
+        print("%d sablon silindi." % silinen)
+        return 1 if hata else 0
+
+    if mod in ("json", "onbellek"):
+        liste = alan_adlari(ayar)
+        veri = {
+            "ts": int(os.path.getmtime(AYAR)) if os.path.isfile(AYAR) else 0,
+            "kademeler": ayar["kademeler"],
+            "paketler": ayar["paketler"],
+            "siteler": liste,
+            "ozet": tavan_ozeti(liste, ayar),
+        }
+        if mod == "json":
+            print(json.dumps(veri, ensure_ascii=False))
+            return 0
+
+        # `onbellek`: panelin DOGRUDAN okuyabilecegi bir dosya yazar.
+        # Araclar sayfasi her site satiri icin kademe bilgisini ister; bunu
+        # alt surec calistirarak almak sayfa basina onlarca surec demekti.
+        yol = HESTIA + "/wd/cache/kaynak.json"
+        try:
+            os.makedirs(os.path.dirname(yol), exist_ok=True)
+            gecici = yol + ".tmp"
+            with open(gecici, "w", encoding="utf-8") as fh:
+                json.dump(veri, fh, ensure_ascii=False)
+            os.replace(gecici, yol)
+            os.chmod(yol, 0o644)
+        except Exception as e:
+            sys.stderr.write("onbellek yazilamadi: %s\n" % e)
+            return 1
+        print(json.dumps({"ok": True, "site": len(liste)}))
+        return 0
+
+    sys.stderr.write(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
