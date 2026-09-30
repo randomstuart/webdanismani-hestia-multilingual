@@ -1,10 +1,10 @@
 <?php
 /**
- * WebDanışmanı — "Yedek Gezgini" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/yedek/index.php
+ * WebDanışmanı — "Backup Explorer" page
+ * Installs to: /usr/local/hestia/web/list/yedek/index.php
  *
- * Yedeğin içinde gezdirir, tek dosya/klasör geri yükler. Yönetici "look"
- * ile müşteriye bakarken o müşterinin yedeklerini görür.
+ * Browse inside a backup and restore a single file/folder. When an admin
+ * "look"s at a customer, that customer's backups are shown.
  */
 
 ob_start();
@@ -48,16 +48,16 @@ if (!empty($_POST["ok"])) {
 				. "&durum=" . (!empty($d["yerine"]) ? "yerine" : "kopya") . "&d=" . urlencode((string) ($d["yol"] ?? "")));
 			exit();
 		}
-		$wd_hata = "Geri yüklenemedi: " . ($d["hata"] ?? "");
+		$wd_hata = sprintf(wd__("Restore failed: %s"), $d["hata"] ?? "");
 	} else {
-		$wd_hata = "Eksik seçim.";
+		$wd_hata = wd__("Incomplete selection.");
 	}
 }
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"kopya" => "Geri yüklendi (canlı dosyalara dokunulmadı): {d}. Dosya Yöneticisi ile inceleyip istediğinizi taşıyın.",
-		"yerine" => "Canlı dosyanın yerine yazıldı: {d}. Önceki hâli private/wd-geri altında saklandı.",
+		"kopya" => wd__("Restored (live files untouched): {d}. Review in File Manager and move what you need."),
+		"yerine" => wd__("Overwrote live file: {d}. Previous copy kept under private/wd-geri."),
 	]);
 }
 
@@ -86,7 +86,7 @@ $wd_icerik = null;
 if ($wd_secili && $wd_domain !== "" && !empty($wd_secili["dosya_var"])) {
 	$wd_icerik = wd_modul_json("wd-yedek", ["icerik", $wd_user, $wd_yedek, $wd_domain, $wd_yol], null, 1800);
 	if (empty($wd_icerik["ok"])) {
-		$wd_hata = $wd_hata !== "" ? $wd_hata : ("İçerik okunamadı: " . ($wd_icerik["hata"] ?? ""));
+		$wd_hata = $wd_hata !== "" ? $wd_hata : sprintf(wd__("Could not read contents: %s"), $wd_icerik["hata"] ?? "");
 		$wd_icerik = null;
 	}
 }

@@ -1,10 +1,10 @@
 <?php
 /**
- * WebDanışmanı — "Kaynak Geçmişi" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/gecmis/index.php
+ * WebDanışmanı — "Resource History" page
+ * Installs to: /usr/local/hestia/web/list/gecmis/index.php
  *
- * Site başına CPU/RAM'in zaman içindeki seyri. Anlık ölçüm Araçlar
- * sayfasında; burada "gece 3'te ne oldu" sorusunun cevabı var.
+ * Per-site CPU/RAM over time. Live readings are on the Tools page; this
+ * answers "what happened at 3am?"
  */
 
 ob_start();

@@ -1,7 +1,7 @@
 <?php
 /**
- * WebDanışmanı — "Node.js Uygulamaları" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/node/index.php
+ * WebDanışmanı — "Node.js Apps" page
+ * Installs to: /usr/local/hestia/web/list/node/index.php
  */
 
 ob_start();
@@ -23,7 +23,7 @@ if (!empty($_POST["ok"])) {
 	$islem = (string) ($_POST["islem"] ?? "");
 	$dom = strtolower(trim((string) ($_POST["v_domain"] ?? "")));
 	if (!isset($wd_doms[$dom])) {
-		$wd_hata = "Geçersiz alan adı.";
+		$wd_hata = wd__("Invalid domain.");
 	} elseif ($islem === "ekle") {
 		$secenek = [
 			"giris" => trim((string) ($_POST["v_giris"] ?? "app.js")),
@@ -35,14 +35,14 @@ if (!empty($_POST["ok"])) {
 			header("Location: /list/node/?durum=eklendi&d=" . urlencode($dom . " · port " . (int) ($d["port"] ?? 0) . " · " . (string) ($d["durum"] ?? "")));
 			exit();
 		}
-		$wd_hata = "Uygulama eklenemedi: " . ($d["hata"] ?? "");
+		$wd_hata = sprintf(wd__("Could not add application: %s"), $d["hata"] ?? "");
 	} elseif ($islem === "kaldir" || $islem === "yeniden") {
 		$d = wd_modul_json("wd-node", [$islem, $wd_user, $dom], null, 200);
 		if (!empty($d["ok"])) {
 			header("Location: /list/node/?durum=" . ($islem === "kaldir" ? "kaldirildi" : "yeniden") . "&d=" . urlencode($dom));
 			exit();
 		}
-		$wd_hata = "İşlem yapılamadı: " . ($d["hata"] ?? "");
+		$wd_hata = sprintf(wd__("Action could not be completed: %s"), $d["hata"] ?? "");
 	} elseif ($islem === "gunluk") {
 		$wd_gunluk = wd_modul_json("wd-node", ["gunluk", $wd_user, $dom, "120"], null, 60);
 		$wd_gunluk["domain"] = $dom;
@@ -51,9 +51,9 @@ if (!empty($_POST["ok"])) {
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"eklendi" => "Uygulama başlatıldı: {d}",
-		"kaldirildi" => "{d} için Node.js uygulaması kaldırıldı; alan adı stok PHP şablonuna döndü.",
-		"yeniden" => "{d} yeniden başlatıldı.",
+		"eklendi" => wd__("Application started: {d}"),
+		"kaldirildi" => wd__("Node.js application for {d} removed; domain returned to stock PHP template."),
+		"yeniden" => wd__("{d} restarted."),
 	]);
 }
 

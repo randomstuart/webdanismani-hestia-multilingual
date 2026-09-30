@@ -1,0 +1,6016 @@
+# WebDanışmanı panel UI translations.
+# Copyright (C) WebDanışmanı contributors
+# This file is distributed under the same license as the package.
+msgid ""
+msgstr ""
+"Project-Id-Version: webdanismani-hestia 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-30 19:31+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: bin/wd-gecmis:219
+msgid "  %-32s cpu avg %%%-5.1f peak %%%-5.1f  mem peak %d MB"
+msgstr ""
+
+#: bin/wd-mailrapor:247
+msgid "  [%-4s] %-38s %5d messages  %%%.1f bounce"
+msgstr ""
+
+#: bin/wd-health:707
+msgid "  [%s] backup %s %s: %s"
+msgstr ""
+
+#: bin/wd-kaynak:382
+msgid "  [dry-run] %s: %s -> %s"
+msgstr ""
+
+#: bin/wd-cloudflare:383
+msgid "  [will add]     %-6s %-32s %s"
+msgstr ""
+
+#: bin/wd-cloudflare:372
+msgid "  [will update] %-6s %-32s %s -> %s"
+msgstr ""
+
+#: bin/wd-cloudflare:482
+msgid "  API error    : %s"
+msgstr ""
+
+#: bin/wd-guvenlik:649
+msgid "  attacker: %-16s %d attempts"
+msgstr ""
+
+#: bin/wd-kaynak:249
+msgid "  current  %s.tpl"
+msgstr ""
+
+#: bin/wd-kaynak:394
+#: bin/wd-kaynak:450
+msgid "  ERROR %s: %s"
+msgstr ""
+
+#: bin/wd-cloudflare:480
+msgid "  IP updated   : %s"
+msgstr ""
+
+#: bin/wd-kaynak:354
+msgid "  memory is NOT reserved, but if all sites fill at once"
+msgstr ""
+
+#: bin/wd-gecmis:216
+msgid "  oldest record: %s"
+msgstr ""
+
+#: bin/wd-cloudflare:477
+msgid "  Real IP      : %s (v4 %d, v6 %d)"
+msgstr ""
+
+#: bin/wd-kaynak:439
+msgid "  SKIPPED %s: could not resolve version (%s)"
+msgstr ""
+
+#: bin/wd-kaynak:355
+msgid "  there is swap/OOM risk. Consider lowering tiers."
+msgstr ""
+
+#: bin/wd-cloudflare:476
+msgid "  Token        : %s"
+msgstr ""
+
+#: bin/wd-kaynak:353
+msgid "  WARNING: ceiling exceeds RAM. With `pm = ondemand` this"
+msgstr ""
+
+#: bin/wd-tarama:272
+msgid "  WARNING: scan hit a limit; results may be incomplete"
+msgstr ""
+
+#: bin/wd-kaynak:246
+msgid "  wrote    %s.tpl  (%s, %s workers, %ss)"
+msgstr ""
+
+#: bin/wd-cloudflare:484
+msgid "  zone: %-28s %s %s"
+msgstr ""
+
+#: bin/wd-health:167
+msgid " %s could not be queried (resolver block) — does not mean you are listed."
+msgstr ""
+
+#: bin/wd-git:216
+msgid " — For a private repo, add the deploy key shown in the panel to the repository."
+msgstr ""
+
+#: bin/wd-health:451
+msgid "%.0f MB (previous %.0f MB)"
+msgstr ""
+
+#: templates/list_bayi.php:36
+msgid "%d / %d customers · packages: %s"
+msgstr ""
+
+#: templates/list_kur.php:73
+msgid "%d app"
+msgid_plural "%d apps"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_guvenlik.php:144
+msgid "%d attempt"
+msgid_plural "%d attempts"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_guvenlik.php:89
+msgid "%d check"
+msgid_plural "%d checks"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/wd-sidebar.php:78
+msgid "%d check needs attention"
+msgid_plural "%d checks need attention"
+msgstr[0] ""
+msgstr[1] ""
+
+#: inc/wd-i18n.php:13
+#: inc/wd-i18n.php:82
+msgid "%d day"
+msgid_plural "%d days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-health:542
+#: bin/wd-health:546
+msgid "%d days (%s)"
+msgstr ""
+
+#: bin/wd-kaynak:398
+msgid "%d domains %s, %d errors, %d skipped."
+msgstr ""
+
+#: bin/wd-health:439
+msgid "%d entry"
+msgid_plural "%d entries"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-guvenlik:454
+#: templates/list_guvenlik.php:163
+#: templates/list_kur.php:28
+#: templates/list_yedek.php:89
+msgid "%d file"
+msgid_plural "%d files"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_mailrapor.php:69
+msgid "%d frozen"
+msgid_plural "%d frozen"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_yedek.php:72
+msgid "%d item"
+msgid_plural "%d items"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-guvenlik:228
+msgid "%d jails · %d active bans · %d total"
+msgstr ""
+
+#: templates/list_git.php:40
+msgid "%d local change"
+msgid_plural "%d local changes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_yedek.php:72
+msgid "%d member"
+msgid_plural "%d members"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-health:220
+#: templates/list_mailrapor.php:107
+msgid "%d message"
+msgid_plural "%d messages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-guvenlik:329
+msgid "%d package"
+msgid_plural "%d packages"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-guvenlik:335
+msgid "%d package (non-security)"
+msgid_plural "%d packages (non-security)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_gecmis.php:85
+msgid "%d reading"
+msgid_plural "%d readings"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-health:240
+msgid "%d record"
+msgid_plural "%d records"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_gecmis.php:68
+msgid "%d sample"
+msgid_plural "%d samples"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-kaynak:458
+msgid "%d templates deleted."
+msgstr ""
+
+#: bin/wd-kaynak:251
+msgid "%d templates updated for %d PHP versions."
+msgstr ""
+
+#: templates/list_tools.php:304
+msgid "%d tool"
+msgid_plural "%d tools"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_wp.php:66
+#: templates/list_wp.php:124
+msgid "%d update"
+msgid_plural "%d updates"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-health:210
+#: bin/wd-health:214
+msgid "%d waiting"
+msgid_plural "%d waiting"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_yedek.php:123
+msgid "%d web · %d database · %d mail"
+msgstr ""
+
+#: templates/list_cloudflare.php:98
+msgid "%d zone visible"
+msgid_plural "%d zones visible"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-health:391
+#: bin/wd-health:398
+#: bin/wd-health:403
+msgid "%s (%d hours ago)"
+msgstr ""
+
+#: bin/wd-kaynak:343
+msgid "%s (%s/%s workers)"
+msgstr ""
+
+#: bin/wd-guvenlik:428
+msgid "%s (port %d)"
+msgstr ""
+
+#: templates/list_tools.php:506
+msgid "%s cores"
+msgstr ""
+
+#: bin/wd-phpayar:232
+msgid "%s is invalid: %s"
+msgstr ""
+
+#: bin/wd-phpayar:261
+msgid "%s must be a number"
+msgstr ""
+
+#: templates/list_tools.php:466
+#: templates/list_tools.php:483
+msgid "%s processes"
+msgstr ""
+
+#: bin/wd-phpayar:263
+msgid "%s reduced to cap (%d)"
+msgstr ""
+
+#: bin/wd-phpayar:234
+msgid "%s reduced to cap (%dM)"
+msgstr ""
+
+#: templates/list_wp.php:111
+msgid "%s will be deactivated. Continue?"
+msgstr ""
+
+#: templates/list_yedek.php:92
+msgid "%s will be extracted from the backup under private/wd-geri (live site untouched). Continue?"
+msgstr ""
+
+#: templates/list_kur.php:150
+msgid "%s will be removed from the catalog (installed sites are not affected). Continue?"
+msgstr ""
+
+#: templates/list_bayi.php:101
+msgid "%s will be suspended; their sites and mail stop. Continue?"
+msgstr ""
+
+#: templates/list_bayi.php:43
+msgid "%s will be unlinked from the reseller (account is not deleted). Continue?"
+msgstr ""
+
+#: templates/list_yedek.php:64
+msgid "(incremental/remote backup mode: %s)"
+msgstr ""
+
+#: bin/wd-cloudflare:485
+msgid "(paused)"
+msgstr ""
+
+#: templates/list_waf.php:54
+msgid "(Rate-limit zone is not set up on the server; admin must run kur-modul.sh.)"
+msgstr ""
+
+#: templates/list_errorpages.php:156
+msgid "(root-relative like"
+msgstr ""
+
+#: bin/wd-mailrapor:112
+msgid "(system)"
+msgstr ""
+
+#: templates/list_phpayar.php:84
+msgid "-1 = same as execution time"
+msgstr ""
+
+#: templates/list_waf.php:53
+msgid ".sql, .bak, .old, .log, .sh, wp-config.php, readme.html, composer.json cannot be downloaded directly."
+msgstr ""
+
+#: templates/list_tools.php:189
+msgid "/ unlimited"
+msgstr ""
+
+#: templates/list_phpayar.php:94
+msgid "1440 = 24 min"
+msgstr ""
+
+#: templates/list_erisim.php:84
+#: templates/list_waf.php:75
+#: templates/list_waf.php:86
+msgid "24 hours"
+msgstr ""
+
+#: templates/list_erisim.php:89
+msgid "24h avg"
+msgstr ""
+
+#: templates/list_httpauth.php:125
+msgid "2–32 characters; letters, digits, period, underscore, or hyphen"
+msgstr ""
+
+#: templates/list_erisim.php:86
+msgid "30 days"
+msgstr ""
+
+#: templates/list_gecmis.php:137
+msgid "30 days; older records are deleted automatically."
+msgstr ""
+
+#: templates/list_yonlendirme.php:178
+msgid "301 or 302?"
+msgstr ""
+
+#: templates/list_yonlendirme.php:71
+msgid "301 permanent · 302 temporary"
+msgstr ""
+
+#: templates/list_phpayar.php:182
+msgid "5 minutes"
+msgstr ""
+
+#: templates/list_erisim.php:85
+msgid "7 days"
+msgstr ""
+
+#: bin/wd-erisim:286
+msgid "<b>%s</b> is reachable again. Downtime was about %d minutes."
+msgstr ""
+
+#: bin/wd-uyari:309
+msgid "<p>A previously reported issue is no longer visible: <code>%s</code></p>"
+msgstr ""
+
+#: bin/wd-uyari:308
+msgid "[RESOLVED] "
+msgstr ""
+
+#: templates/list_klon.php:105
+msgid "A new domain is opened with the same PHP version and files are copied. For WordPress a new database is created, content is transferred, and all URLs are rewritten to the staging address. Staging is closed to search engines."
+msgstr ""
+
+#: bin/wd-node:249
+msgid "A Node.js application is already defined for this domain."
+msgstr ""
+
+#: templates/list_waf.php:52
+msgid "A PHP file that sneaks under uploads/, storage/, media/, images/ cannot run. The most common entry point on compromised sites."
+msgstr ""
+
+#: templates/list_httpauth.php:174
+msgid "A protected site cannot be crawled or indexed. Remember to remove protection when you go live."
+msgstr ""
+
+#: bin/wd-health:497
+#: bin/wd-health:502
+#: bin/wd-health:504
+#: templates/list_health.php:327
+msgid "A record"
+msgstr ""
+
+#: bin/wd-klon:258
+msgid "A record already exists for this target."
+msgstr ""
+
+#: bin/wd-git:192
+msgid "A repository record already exists for this target."
+msgstr ""
+
+#: templates/list_bayi.php:179
+msgid "A reseller only sees and manages accounts linked to them; they cannot list other users or enter server settings."
+msgstr ""
+
+#: templates/list_wp.php:153
+msgid "A small \"must-use\" plugin is placed on your site; the panel creates a 120-second single-use link. With no token file the plugin does nothing."
+msgstr ""
+
+#: templates/list_mailrapor.php:155
+msgid "Above 15% is a warning, above 35% is serious. Only accounts sending more than 20 messages are flagged — ratios mislead on small samples."
+msgstr ""
+
+#: templates/list_errorpages.php:155
+msgid "absolute paths"
+msgstr ""
+
+#: templates/list_mailrapor.php:49
+msgid "ACCEPTED"
+msgstr ""
+
+#: list-errorpages/index.php:52
+msgid "Access Denied"
+msgstr ""
+
+#: templates/list_yonlendirme.php:128
+msgid "Access Rules"
+msgstr ""
+
+#: templates/list_bayi.php:78
+msgid "Account"
+msgstr ""
+
+#: templates/list_tools.php:134
+msgid "ACCOUNT"
+msgstr ""
+
+#: bin/wd-disk:145
+msgid "Account backup archives"
+msgstr ""
+
+#: templates/list_tools.php:123
+msgid "Account Settings"
+msgstr ""
+
+#: templates/list_disk.php:251
+msgid "Accounts"
+msgstr ""
+
+#: templates/wd-sidebar.php:154
+msgid "Accounts: %s"
+msgstr ""
+
+#: list-guvenlik/index.php:72
+msgid "Action applied: %s"
+msgstr ""
+
+#: list-wp/index.php:114
+msgid "Action completed for {d}."
+msgstr ""
+
+#: list-bayi/index.php:64
+#: list-bayi/index.php:92
+#: list-bayi/index.php:123
+#: list-git/index.php:76
+#: list-kur/index.php:118
+msgid "Action could not be completed."
+msgstr ""
+
+#: list-node/index.php:45
+msgid "Action could not be completed: %s"
+msgstr ""
+
+#: list-httpauth/index.php:96
+msgid "Action failed (code %d)."
+msgstr ""
+
+#: bin/wd-bayi:303
+#: bin/wd-wp:336
+msgid "Action failed."
+msgstr ""
+
+#: list-wp/index.php:78
+msgid "Action failed: %s"
+msgstr ""
+
+#: bin/wd-guvenlik:625
+msgid "Action not specified."
+msgstr ""
+
+#: templates/list_guvenlik.php:221
+msgid "Actions like “disable SSH password login” are rejected if there is no"
+msgstr ""
+
+#: bin/wd-cloudflare:478
+msgid "active"
+msgstr ""
+
+#: bin/wd-health:235
+msgid "Add a TXT record in DNS: \"v=spf1 +a +mx +ip4:%s ~all\""
+msgstr ""
+
+#: bin/wd-health:499
+msgid "Add an A record in DNS: %s -> %s"
+msgstr ""
+
+#: templates/list_kur.php:75
+msgid "Add an app from the box on the right."
+msgstr ""
+
+#: bin/wd-health:308
+msgid "Add an MX record in DNS: 10 mail.%s"
+msgstr ""
+
+#: templates/wd-topbar.php:36
+msgid "Add Domain"
+msgstr ""
+
+#: bin/wd-health:250
+msgid "Add ip4:%s to the record."
+msgstr ""
+
+#: templates/list_tools.php:28
+msgid "Add New Domain"
+msgstr ""
+
+#: templates/list_tools.php:107
+msgid "Add New Job"
+msgstr ""
+
+#: templates/list_tools.php:80
+msgid "Add New Zone"
+msgstr ""
+
+#: templates/list_httpauth.php:133
+msgid "Add Protection"
+msgstr ""
+
+#: templates/list_yonlendirme.php:99
+msgid "Add Row"
+msgstr ""
+
+#: templates/list_health.php:79
+msgid "Add the record in that provider's DNS panel."
+msgstr ""
+
+#: templates/list_kur.php:118
+#: templates/list_kur.php:138
+msgid "Add to Catalog"
+msgstr ""
+
+#: templates/list_bayi.php:151
+msgid "Add User"
+msgstr ""
+
+#: templates/list_waf.php:54
+msgid "Addresses like wp-login.php, xmlrpc.php, /giris, /login: 30 requests per IP per minute; excess gets 429."
+msgstr ""
+
+#: bin/wd-guvenlik:285
+msgid "Admin account is protected by password only; the panel is exposed."
+msgstr ""
+
+#: templates/list_wp.php:153
+msgid "Admin login"
+msgstr ""
+
+#: templates/list_kur.php:118
+msgid "admin only"
+msgstr ""
+
+#: bin/wd-bayi:182
+msgid "Administrator cannot be a reseller."
+msgstr ""
+
+#: bin/wd-wp:412
+msgid "Administrator user not found."
+msgstr ""
+
+#: templates/list_yonlendirme.php:189
+msgid "After enabling, browsers force HTTPS for a year. If SSL is not solid,"
+msgstr ""
+
+#: templates/list_yonlendirme.php:172
+msgid "After rules are written,"
+msgstr ""
+
+#: templates/list_erisim.php:139
+msgid "After two consecutive failed checks (10 min) a panel notification is sent; when the site recovers a second notification includes the outage duration. One-off blips do not alarm."
+msgstr ""
+
+#: templates/list_disk.php:244
+#: templates/list_erisim.php:59
+#: templates/list_health.php:284
+#: templates/list_wp.php:49
+msgid "ago"
+msgstr ""
+
+#: templates/wd-sidebar.php:127
+msgid "Aliases: %s"
+msgstr ""
+
+#: templates/list_bayi.php:36
+msgid "all"
+msgstr ""
+
+#: templates/wd-sidebar.php:79
+msgid "All checks OK"
+msgstr ""
+
+#: templates/list_health.php:178
+msgid "All checks passed. Nothing needs fixing in your mail, domain, or SSL settings."
+msgstr ""
+
+#: list-yonlendirme/index.php:147
+msgid "All custom rules for this domain were removed."
+msgstr ""
+
+#: templates/list_yonlendirme.php:156
+msgid "ALL custom rules for this domain will be removed. Continue?"
+msgstr ""
+
+#: templates/wd-sidebar.php:59
+msgid "All management tools"
+msgstr ""
+
+#: templates/list_tools.php:269
+msgid "All management tools for your hosting account — HestiaCP"
+msgstr ""
+
+#: templates/list_node.php:79
+msgid "All requests for this domain go to the app; PHP will not run."
+msgstr ""
+
+#: list-wp/index.php:111
+msgid "All sites re-scanned."
+msgstr ""
+
+#: templates/list_cloudflare.php:55
+msgid "all visitors appear as Cloudflare IPs"
+msgstr ""
+
+#: templates/list_waf.php:67
+msgid "All WAF rules for this domain will be removed. Continue?"
+msgstr ""
+
+#: list-waf/index.php:64
+msgid "All WAF rules removed."
+msgstr ""
+
+#: templates/list_node.php:97
+msgid "All your domains already have an app defined, or you have no domains."
+msgstr ""
+
+#: bin/wd-guvenlik:203
+msgid "Allowed attempts per connection is high."
+msgstr ""
+
+#: templates/list_node.php:108
+msgid "also readable from File Manager."
+msgstr ""
+
+#: templates/list_gecmis.php:132
+msgid "an idle site has no workers; zero means “no usage”, not “no data”."
+msgstr ""
+
+#: templates/list_node.php:105
+msgid "and bind to"
+msgstr ""
+
+#: bin/wd-guvenlik:455
+msgid "Any local user on the server can modify these files."
+msgstr ""
+
+#: bin/wd-cloudflare:207
+msgid "apache validation failed, disabled:\n%s\n"
+msgstr ""
+
+#: bin/wd-guvenlik:297
+#: bin/wd-guvenlik:301
+#: bin/wd-guvenlik:306
+#: bin/wd-guvenlik:309
+msgid "API access"
+msgstr ""
+
+#: bin/wd-guvenlik:302
+msgid "API is open to the world via 0.0.0.0."
+msgstr ""
+
+#: templates/list_cloudflare.php:108
+msgid "API response:"
+msgstr ""
+
+#: templates/list_cloudflare.php:88
+#: templates/list_cloudflare.php:134
+msgid "API Token"
+msgstr ""
+
+#: inc/wd-modul.php:187
+#: templates/list_kur.php:14
+msgid "App Installer"
+msgstr ""
+
+#: templates/list_node.php:40
+msgid "App output (private/node.log):"
+msgstr ""
+
+#: templates/list_waf.php:20
+msgid "Application Firewall"
+msgstr ""
+
+#: bin/wd-kur:265
+msgid "Application not in catalog: %s"
+msgstr ""
+
+#: list-node/index.php:54
+msgid "Application started: {d}"
+msgstr ""
+
+#: bin/wd-guvenlik:521
+msgid "applied"
+msgstr ""
+
+#: bin/wd-health:429
+msgid "Archive could not be listed within 120 seconds; it may be very large."
+msgstr ""
+
+#: bin/wd-health:411
+msgid "Archive file"
+msgstr ""
+
+#: bin/wd-health:427
+#: bin/wd-health:432
+#: bin/wd-health:438
+msgid "Archive integrity"
+msgstr ""
+
+#: templates/list_disk.php:286
+msgid "are your site itself — take a backup before deleting."
+msgstr ""
+
+#: templates/list_httpauth.php:35
+msgid "Asks visitors for a username and password in the browser. For sites not yet live and areas meant for internal use."
+msgstr ""
+
+#: templates/list_httpauth.php:131
+msgid "At least 8 characters"
+msgstr ""
+
+#: bin/wd-guvenlik:202
+msgid "Attempt limit"
+msgstr ""
+
+#: templates/list_guvenlik.php:29
+msgid "Audit"
+msgstr ""
+
+#: templates/list_git.php:37
+msgid "auto"
+msgstr ""
+
+#: templates/list_git.php:112
+#: templates/list_wp.php:99
+msgid "Auto"
+msgstr ""
+
+#: templates/list_git.php:46
+msgid "Auto pull"
+msgstr ""
+
+#: list-git/index.php:74
+msgid "Auto-pull disabled."
+msgstr ""
+
+#: list-git/index.php:73
+msgid "Auto-pull enabled; tried every 5 minutes."
+msgstr ""
+
+#: list-wp/index.php:116
+msgid "Auto-updates disabled (core minor versions only)."
+msgstr ""
+
+#: list-wp/index.php:115
+msgid "Auto-updates enabled (core + plugins + themes)."
+msgstr ""
+
+#: templates/list_klon.php:84
+msgid "Automatic (copy if WordPress)"
+msgstr ""
+
+#: bin/wd-kaynak:419
+msgid "automatic assignment off (set otomatik: true in kaynak.json)"
+msgstr ""
+
+#: bin/wd-health:543
+msgid "Automatic renewal may not have run."
+msgstr ""
+
+#: templates/list_gecmis.php:83
+msgid "avg"
+msgstr ""
+
+#: tema/wd-fm.js:158
+msgid "Back to control panel"
+msgstr ""
+
+#: bin/wd-health:360
+#: templates/list_yedek.php:40
+msgid "Backup"
+msgstr ""
+
+#: templates/list_guvenlik.php:201
+msgid "backup"
+msgstr ""
+
+#: templates/wd-sidebar.php:191
+msgid "BACKUP"
+msgstr ""
+
+#: bin/wd-health:433
+msgid "Backup archive cannot be read: %s"
+msgstr ""
+
+#: inc/wd-modul.php:190
+#: templates/list_yedek.php:25
+msgid "Backup Browser"
+msgstr ""
+
+#: templates/list_yedek.php:117
+msgid "Backup count"
+msgstr ""
+
+#: bin/wd-health:387
+msgid "Backup date could not be read."
+msgstr ""
+
+#: bin/wd-yedek:164
+msgid "Backup file not found (file browser is not supported in incremental/remote mode)."
+msgstr ""
+
+#: bin/wd-yedek:249
+msgid "Backup file not found."
+msgstr ""
+
+#: bin/wd-health:392
+msgid "Backup is older than 48 hours; daily backups may not be running."
+msgstr ""
+
+#: bin/wd-health:450
+#: bin/wd-health:457
+msgid "Backup size"
+msgstr ""
+
+#: templates/list_yedek.php:115
+msgid "Backup Status"
+msgstr ""
+
+#: bin/wd-uyari:197
+msgid "Backup: %s"
+msgstr ""
+
+#: bin/wd-disk:144
+#: templates/list_health.php:207
+#: templates/list_tools.php:117
+#: templates/list_tools.php:255
+#: templates/list_yedek.php:132
+#: templates/wd-sidebar.php:191
+#: templates/wd-sidebar.php:195
+#: tema/wd-fm.js:77
+msgid "Backups"
+msgstr ""
+
+#: templates/list_tools.php:115
+msgid "BACKUPS"
+msgstr ""
+
+#: templates/list_bayi.php:78
+msgid "Bandwidth"
+msgstr ""
+
+#: templates/list_tools.php:218
+msgid "BANDWIDTH"
+msgstr ""
+
+#: templates/list_gecmis.php:116
+msgid "Bars show hourly"
+msgstr ""
+
+#: templates/list_guvenlik.php:202
+msgid "before deleting — a finding is not a conviction, it is a signal to review. Full path:"
+msgstr ""
+
+#: templates/list_phpayar.php:101
+msgid "Behavior"
+msgstr ""
+
+#: bin/wd-health:171
+#: bin/wd-health:180
+#: bin/wd-health:188
+msgid "Blacklist (RBL)"
+msgstr ""
+
+#: templates/list_guvenlik.php:241
+msgid "Blacklist link"
+msgstr ""
+
+#: templates/list_waf.php:49
+msgid "Block bad bots"
+msgstr ""
+
+#: templates/list_waf.php:50
+msgid "Block command-line clients"
+msgstr ""
+
+#: templates/list_waf.php:51
+msgid "Block injection patterns"
+msgstr ""
+
+#: templates/list_waf.php:52
+msgid "Block PHP execution in upload directories"
+msgstr ""
+
+#: templates/list_waf.php:37
+msgid "BLOCKED (24 H)"
+msgstr ""
+
+#: inc/wd-modul.php:183
+msgid "Blocks bad bots and attack patterns; rate-limits login pages"
+msgstr ""
+
+#: templates/list_waf.php:20
+msgid "Blocks bad bots, injection patterns, and login brute force at the nginx layer."
+msgstr ""
+
+#: templates/list_kur.php:131
+msgid "blog (optional)"
+msgstr ""
+
+#: templates/list_kur.php:123
+msgid "Blog Software"
+msgstr ""
+
+#: templates/list_waf.php:59
+msgid "Bot and query rules are not applied to these addresses. One IP per line."
+msgstr ""
+
+#: templates/list_mailrapor.php:153
+msgid "Bounce rate"
+msgstr ""
+
+#: templates/list_mailrapor.php:119
+msgid "Bounce rate is high. The account password may be compromised or the recipient list is broken. Change the password and inspect the outbound queue:"
+msgstr ""
+
+#: templates/list_mailrapor.php:59
+msgid "BOUNCED"
+msgstr ""
+
+#: templates/list_mailrapor.php:111
+msgid "bounced"
+msgstr ""
+
+#: templates/list_git.php:83
+msgid "Branch"
+msgstr ""
+
+#: templates/list_git.php:38
+msgid "branch %s"
+msgstr ""
+
+#: bin/wd-kaynak:70
+msgid "Brochure / small site"
+msgstr ""
+
+#: inc/wd-modul.php:190
+msgid "Browse a backup archive; restore a single file or folder"
+msgstr ""
+
+#: templates/list_yedek.php:25
+msgid "Browse inside a backup; restore a single file or folder. Live files are not touched unless you ask."
+msgstr ""
+
+#: inc/wd-modul.php:190
+msgid "BROWSER"
+msgstr ""
+
+#: templates/list_yonlendirme.php:13
+msgid "Browser uses HTTPS only for one year. Enable only if SSL is solid."
+msgstr ""
+
+#: bin/wd-guvenlik:214
+msgid "Brute-force protection is disabled."
+msgstr ""
+
+#: templates/list_disk.php:156
+msgid "By domain"
+msgstr ""
+
+#: list-wp/index.php:121
+msgid "Cache cleared."
+msgstr ""
+
+#: list-cloudflare/index.php:161
+msgid "Cache purged: %s"
+msgstr ""
+
+#: bin/wd-tarama:72
+msgid "Calls a name from the request as a function"
+msgstr ""
+
+#: templates/list_phpayar.php:67
+msgid "cannot be smaller than the upload limit"
+msgstr ""
+
+#: templates/list_kur.php:144
+msgid "Catalog"
+msgstr ""
+
+#: templates/list_kur.php:75
+msgid "Catalog is empty."
+msgstr ""
+
+#: templates/list_disk.php:284
+#: templates/list_klon.php:107
+msgid "Caution"
+msgstr ""
+
+#: templates/list_phpayar.php:62
+#: templates/list_phpayar.php:72
+#: templates/list_phpayar.php:79
+msgid "ceiling"
+msgstr ""
+
+#: bin/wd-health:537
+msgid "Certificate has expired; browsers will show a warning."
+msgstr ""
+
+#: templates/list_httpauth.php:94
+msgid "Change password"
+msgstr ""
+
+#: templates/list_health.php:275
+msgid "Check"
+msgstr ""
+
+#: list-erisim/index.php:36
+msgid "Check failed: %s"
+msgstr ""
+
+#: templates/list_erisim.php:79
+#: templates/list_health.php:121
+msgid "Check Now"
+msgstr ""
+
+#: bin/wd-health:393
+msgid "Check on the server: grep backup /etc/cron.d/hestia"
+msgstr ""
+
+#: templates/list_health.php:129
+msgid "Check re-run; the results below were just collected."
+msgstr ""
+
+#: templates/list_health.php:297
+msgid "Checked"
+msgstr ""
+
+#: bin/wd-health:191
+msgid "Checked lists are clean."
+msgstr ""
+
+#: templates/list_guvenlik.php:65
+#: templates/list_health.php:163
+msgid "checks"
+msgstr ""
+
+#: templates/list_erisim.php:147
+msgid "Checks run from this server; if the server itself is down this page also fails. Off-server monitoring needs a separate service."
+msgstr ""
+
+#: templates/list_kur.php:73
+msgid "Choose an app"
+msgstr ""
+
+#: bin/wd-health:190
+msgid "clean: "
+msgstr ""
+
+#: templates/list_wp.php:81
+msgid "Clear cache"
+msgstr ""
+
+#: templates/list_phpayar.php:162
+msgid "Clear Log"
+msgstr ""
+
+#: bin/wd-wp:433
+#: bin/wd-wp:437
+#: bin/wd-wp:443
+msgid "cleared"
+msgstr ""
+
+#: inc/wd-modul.php:186
+msgid "CLONE"
+msgstr ""
+
+#: templates/list_git.php:89
+#: templates/list_git.php:110
+msgid "Clone"
+msgstr ""
+
+#: inc/wd-modul.php:186
+#: templates/list_klon.php:15
+msgid "Clone / Staging"
+msgstr ""
+
+#: inc/wd-modul.php:188
+msgid "Clone a repo into a site; manual or automatic pull"
+msgstr ""
+
+#: templates/list_git.php:21
+msgid "Clone a repository onto the site; pull changes with one click or automatically."
+msgstr ""
+
+#: inc/wd-modul.php:186
+msgid "Clone a site for testing, then push changes live"
+msgstr ""
+
+#: bin/wd-git:219
+msgid "cloned"
+msgstr ""
+
+#: templates/list_tools.php:273
+msgid "Close All"
+msgstr ""
+
+#: bin/wd-guvenlik:438
+msgid "Close them in Panel > Firewall if not needed."
+msgstr ""
+
+#: templates/list_tools.php:146
+msgid "Cloudflare"
+msgstr ""
+
+#: list-cloudflare/index.php:156
+msgid "Cloudflare IP list updated (%d IPv4 ranges). Real visitor IPs are being read correctly again."
+msgstr ""
+
+#: templates/list_cloudflare.php:163
+msgid "Cloudflare nameserver"
+msgstr ""
+
+#: bin/wd-cloudflare:111
+msgid "Cloudflare token is not configured."
+msgstr ""
+
+#: list-cloudflare/index.php:149
+msgid "Cloudflare token verified and saved."
+msgstr ""
+
+#: templates/list_cloudflare.php:40
+msgid "Cloudflare tool could not run. On the server run"
+msgstr ""
+
+#: templates/list_kur.php:122
+msgid "Code"
+msgstr ""
+
+#: bin/wd-klon:263
+msgid "code %d"
+msgstr ""
+
+#: bin/wd-kur:157
+msgid "Code may only contain A-Z, 0-9, - and _ (2-31 characters)."
+msgstr ""
+
+#: templates/list_bayi.php:163
+msgid "Company / person"
+msgstr ""
+
+#: bin/wd-health:454
+msgid "Compare backup contents; take a manual backup if needed."
+msgstr ""
+
+#: templates/list_wp.php:80
+msgid "Compares core files with the official release"
+msgstr ""
+
+#: templates/list_health.php:116
+msgid "Compares settings stored in the panel with what DNS actually shows from outside — mail delivery, domain routing, and SSL are checked here."
+msgstr ""
+
+#: tema/wd-fm.js:356
+msgid "Compress"
+msgstr ""
+
+#: templates/list_kur.php:136
+msgid "Config file"
+msgstr ""
+
+#: templates/list_kur.php:137
+msgid "Config template"
+msgstr ""
+
+#: templates/list_git.php:61
+msgid "Connect repository"
+msgstr ""
+
+#: templates/list_git.php:31
+msgid "Connected repositories"
+msgstr ""
+
+#: bin/wd-erisim:180
+msgid "connection refused"
+msgstr ""
+
+#: templates/list_mailrapor.php:176
+msgid "connections were rejected. Most are bot scans; that is normal."
+msgstr ""
+
+#: list-errorpages/index.php:53
+msgid "Content permanently removed"
+msgstr ""
+
+#: list-errorpages/index.php:143
+msgid "Content too large (%s KB). Maximum is %d KB."
+msgstr ""
+
+#: tema/wd-fm.js:155
+msgid "CONTROL PANEL"
+msgstr ""
+
+#: templates/list_git.php:101
+#: tema/wd-fm.js:349
+msgid "Copy"
+msgstr ""
+
+#: templates/list_klon.php:86
+msgid "Copy %s"
+msgstr ""
+
+#: templates/list_klon.php:15
+msgid "Copy the site files and database to a test address; push live with one click when done."
+msgstr ""
+
+#: templates/list_git.php:101
+msgid "Copy:"
+msgstr ""
+
+#: templates/list_klon.php:64
+msgid "Copying may take a few minutes depending on site size. Continue?"
+msgstr ""
+
+#: templates/list_wp.php:78
+msgid "Core + plugin + theme auto-updates"
+msgstr ""
+
+#: templates/list_wp.php:154
+msgid "Core files are compared with official checksums from wordpress.org. A difference is a core file change, not a plugin; the most common cause is malware injection."
+msgstr ""
+
+#: templates/list_wp.php:91
+msgid "Core files differ from the official release"
+msgstr ""
+
+#: list-wp/index.php:119
+msgid "Core files match the official release exactly."
+msgstr ""
+
+#: list-wp/index.php:120
+msgid "Core has modified or extra files; review the list below."
+msgstr ""
+
+#: templates/list_wp.php:85
+msgid "Core update available:"
+msgstr ""
+
+#: templates/list_wp.php:76
+msgid "Core, plugins, and themes will be updated. Taking a backup first is recommended. Continue?"
+msgstr ""
+
+#: bin/wd-wp:311
+msgid "Core: %s"
+msgstr ""
+
+#: templates/wd-sidebar.php:265
+msgid "cores"
+msgstr ""
+
+#: bin/wd-health:432
+msgid "CORRUPT"
+msgstr ""
+
+#: list-node/index.php:38
+msgid "Could not add application: %s"
+msgstr ""
+
+#: list-kur/index.php:84
+msgid "Could not add to catalog: %s"
+msgstr ""
+
+#: bin/wd-node:331
+msgid "Could not assign nginx template: %s"
+msgstr ""
+
+#: bin/wd-klon:357
+msgid "Could not back up live database; publish aborted."
+msgstr ""
+
+#: bin/wd-klon:354
+msgid "Could not back up live site: %s"
+msgstr ""
+
+#: list-cloudflare/index.php:109
+msgid "Could not change development mode: %s"
+msgstr ""
+
+#: bin/wd-wp:363
+msgid "Could not change maintenance mode."
+msgstr ""
+
+#: bin/wd-bayi:337
+#: list-bayi/index.php:106
+msgid "Could not change package."
+msgstr ""
+
+#: bin/wd-bayi:322
+#: list-bayi/index.php:99
+msgid "Could not change password."
+msgstr ""
+
+#: bin/wd-guvenlik:323
+msgid "could not check"
+msgstr ""
+
+#: inc/wd-helpers.php:739
+msgid "Could not check"
+msgstr ""
+
+#: list-wp/index.php:103
+msgid "Could not clear cache: %s"
+msgstr ""
+
+#: list-git/index.php:36
+msgid "Could not clone."
+msgstr ""
+
+#: bin/wd-git:217
+msgid "Could not clone: %s"
+msgstr ""
+
+#: bin/wd-klon:315
+msgid "Could not copy database: %s"
+msgstr ""
+
+#: bin/wd-klon:284
+msgid "Could not copy files: %s"
+msgstr ""
+
+#: list-bayi/index.php:83
+msgid "Could not create account."
+msgstr ""
+
+#: bin/wd-bayi:289
+msgid "Could not create account: %s"
+msgstr ""
+
+#: list-klon/index.php:43
+msgid "Could not create clone: %s"
+msgstr ""
+
+#: bin/wd-kur:326
+msgid "Could not create database: %s"
+msgstr ""
+
+#: bin/wd-klon:263
+msgid "Could not create domain: %s"
+msgstr ""
+
+#: bin/wd-klon:310
+msgid "Could not create staging database: %s"
+msgstr ""
+
+#: list-errorpages/index.php:152
+msgid "Could not create temporary file."
+msgstr ""
+
+#: bin/wd-bayi:349
+msgid "Could not delete account."
+msgstr ""
+
+#: bin/wd-klon:387
+msgid "Could not delete domain: %s"
+msgstr ""
+
+#: list-klon/index.php:56
+msgid "Could not delete: %s"
+msgstr ""
+
+#: bin/wd-yedek:274
+msgid "Could not extract from archive: %s"
+msgstr ""
+
+#: bin/wd-kur:309
+msgid "Could not extract package: %s"
+msgstr ""
+
+#: bin/wd-cloudflare:148
+msgid "Could not fetch Cloudflare IP list: %s\n"
+msgstr ""
+
+#: bin/wd-git:237
+msgid "Could not generate deploy key: %s"
+msgstr ""
+
+#: templates/list_git.php:103
+msgid "Could not generate key."
+msgstr ""
+
+#: bin/wd-git:124
+msgid "Could not generate key: %s"
+msgstr ""
+
+#: list-wp/index.php:94
+msgid "Could not generate login link: %s"
+msgstr ""
+
+#: bin/wd-bayi:180
+#: bin/wd-bayi:263
+#: bin/wd-bayi:312
+#: bin/wd-kur:438
+#: bin/wd-phpayar:405
+#: bin/wd-waf:387
+msgid "Could not parse JSON."
+msgstr ""
+
+#: bin/wd-kur:161
+msgid "Could not parse manifest JSON."
+msgstr ""
+
+#: bin/wd-yonlendirme:306
+msgid "Could not parse rule JSON."
+msgstr ""
+
+#: bin/wd-cloudflare:336
+msgid "Could not parse zone JSON"
+msgstr ""
+
+#: list-klon/index.php:57
+msgid "Could not publish: %s"
+msgstr ""
+
+#: list-cloudflare/index.php:98
+msgid "Could not purge cache: %s"
+msgstr ""
+
+#: list-cloudflare/index.php:137
+msgid "Could not push DNS: %s"
+msgstr ""
+
+#: bin/wd-health:180
+msgid "could not query"
+msgstr ""
+
+#: bin/wd-health:527
+msgid "could not read"
+msgstr ""
+
+#: bin/wd-yedek:178
+msgid "Could not read archive: %s"
+msgstr ""
+
+#: list-yedek/index.php:89
+msgid "Could not read contents: %s"
+msgstr ""
+
+#: bin/wd-cloudflare:330
+msgid "Could not read Hestia zone"
+msgstr ""
+
+#: bin/wd-kaynak:114
+msgid "could not read kaynak.json (%s), using defaults\n"
+msgstr ""
+
+#: list-bayi/index.php:130
+msgid "Could not read list."
+msgstr ""
+
+#: bin/wd-phpayar:373
+#: bin/wd-waf:355
+msgid "Could not read log: %s"
+msgstr ""
+
+#: bin/wd-git:129
+msgid "Could not read public key."
+msgstr ""
+
+#: templates/list_waf.php:31
+msgid "Could not read rules."
+msgstr ""
+
+#: list-waf/index.php:73
+msgid "Could not read rules: %s"
+msgstr ""
+
+#: templates/list_phpayar.php:44
+msgid "Could not read settings for this domain."
+msgstr ""
+
+#: list-phpayar/index.php:86
+msgid "Could not read settings: %s"
+msgstr ""
+
+#: list-errorpages/index.php:217
+msgid "Could not read user home directory."
+msgstr ""
+
+#: list-yonlendirme/index.php:78
+msgid "Could not remove rules: %s"
+msgstr ""
+
+#: list-phpayar/index.php:40
+#: list-waf/index.php:36
+msgid "Could not remove: %s"
+msgstr ""
+
+#: bin/wd-node:181
+msgid "Could not resolve 'location /' block in stock template: %s"
+msgstr ""
+
+#: list-errorpages/index.php:178
+msgid "Could not save (code %d)."
+msgstr ""
+
+#: list-bayi/index.php:53
+#: list-yonlendirme/index.php:139
+msgid "Could not save."
+msgstr ""
+
+#: list-phpayar/index.php:65
+#: list-waf/index.php:55
+msgid "Could not save: %s"
+msgstr ""
+
+#: bin/wd-kur:362
+msgid "Could not set ownership: %s"
+msgstr ""
+
+#: inc/wd-modul.php:76
+#: list-cloudflare/index.php:44
+#: list-yonlendirme/index.php:40
+msgid "could not start process"
+msgstr ""
+
+#: bin/wd-node:315
+msgid "Could not start service: %s"
+msgstr ""
+
+#: bin/wd-gecmis:65
+msgid "could not take measurement\n"
+msgstr ""
+
+#: bin/wd-klon:369
+msgid "Could not transfer database: %s — backup: %s"
+msgstr ""
+
+#: bin/wd-klon:363
+msgid "Could not transfer files: %s — backup: %s"
+msgstr ""
+
+#: list-cloudflare/index.php:85
+msgid "Could not update IP list: %s"
+msgstr ""
+
+#: bin/wd-klon:321
+#: bin/wd-wp:351
+msgid "Could not update wp-config.php: %s"
+msgstr ""
+
+#: bin/wd-kaynak:486
+msgid "could not write cache: %s\n"
+msgstr ""
+
+#: bin/wd-kaynak:124
+msgid "could not write kaynak.json: %s\n"
+msgstr ""
+
+#: bin/wd-waf:209
+msgid "Could not write nginx http context: %s"
+msgstr ""
+
+#: bin/wd-phpayar:346
+msgid "Could not write: %s"
+msgstr ""
+
+#: templates/list_tools.php:195
+msgid "CPU"
+msgstr ""
+
+#: bin/wd-guvenlik:195
+msgid "Create a separate sudo-capable user and disable root login."
+msgstr ""
+
+#: templates/list_bayi.php:135
+msgid "Create Account"
+msgstr ""
+
+#: templates/list_kur.php:134
+msgid "Create database"
+msgstr ""
+
+#: templates/list_klon.php:96
+msgid "Create Staging"
+msgstr ""
+
+#: inc/wd-modul.php:191
+msgid "Create, suspend, and re-package your own customers"
+msgstr ""
+
+#: templates/list_klon.php:105
+msgid "Creation"
+msgstr ""
+
+#: bin/wd-uyari:244
+msgid "critical"
+msgstr ""
+
+#: templates/list_tools.php:107
+#: templates/list_tools.php:252
+msgid "Cron Jobs"
+msgstr ""
+
+#: templates/wd-sidebar.php:174
+#: tema/wd-fm.js:76
+msgid "CRON Jobs"
+msgstr ""
+
+#: templates/list_tools.php:105
+msgid "CRON — Scheduled Jobs"
+msgstr ""
+
+#: bin/wd-guvenlik:312
+msgid "CSRF protection"
+msgstr ""
+
+#: templates/list_waf.php:50
+msgid "curl, wget, python-requests, Go/Java clients. Do NOT enable if your site has an API or webhook receiver."
+msgstr ""
+
+#: tema/wd-fm.js:526
+msgid "Current path"
+msgstr ""
+
+#: templates/list_tools.php:331
+msgid "Current User"
+msgstr ""
+
+#: templates/list_errorpages.php:18
+#: templates/list_tools.php:45
+msgid "Custom Error Pages"
+msgstr ""
+
+#: templates/list_phpayar.php:145
+msgid "Custom PHP settings will be removed and server defaults restored. Continue?"
+msgstr ""
+
+#: list-phpayar/index.php:73
+msgid "Custom settings removed; server defaults apply."
+msgstr ""
+
+#: list-bayi/index.php:117
+msgid "Customer account created: {d}"
+msgstr ""
+
+#: templates/list_bayi.php:75
+msgid "Customer accounts"
+msgstr ""
+
+#: templates/list_bayi.php:182
+msgid "Customer accounts share server quotas; the reseller limit and package quotas cap total usage."
+msgstr ""
+
+#: templates/list_bayi.php:181
+msgid "Customer login"
+msgstr ""
+
+#: inc/wd-modul.php:210
+#: templates/list_bayi.php:69
+msgid "CUSTOMERS"
+msgstr ""
+
+#: templates/list_bayi.php:181
+msgid "Customers log into this panel with their own username and password. The reseller can reset the password but cannot open a session as the customer."
+msgstr ""
+
+#: templates/list_klon.php:29
+#: templates/list_klon.php:82
+#: templates/list_kur.php:30
+#: templates/list_yedek.php:132
+msgid "Database"
+msgstr ""
+
+#: templates/list_kur.php:83
+msgid "database"
+msgstr ""
+
+#: templates/list_tools.php:98
+msgid "DATABASE"
+msgstr ""
+
+#: templates/list_yedek.php:132
+msgid "Database restore is done from the"
+msgstr ""
+
+#: templates/list_tools.php:92
+#: templates/list_tools.php:249
+#: templates/wd-sidebar.php:166
+msgid "Databases"
+msgstr ""
+
+#: inc/wd-helpers.php:134
+#: inc/wd-modul.php:339
+#: templates/list_gecmis.php:58
+#: templates/list_mailrapor.php:82
+msgid "day"
+msgid_plural "days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_kur.php:33
+msgid "DB host"
+msgstr ""
+
+#: templates/list_kur.php:32
+msgid "DB password"
+msgstr ""
+
+#: templates/list_kur.php:31
+msgid "DB user"
+msgstr ""
+
+#: templates/wd-sidebar.php:162
+#: tema/wd-fm.js:75
+msgid "DB — Databases"
+msgstr ""
+
+#: list-errorpages/index.php:131
+msgid "Default template not found: %s"
+msgstr ""
+
+#: templates/list_bayi.php:147
+msgid "Define / update reseller"
+msgstr ""
+
+#: templates/list_bayi.php:20
+msgid "Define resellers: packages they can open, customer limit, and linked accounts."
+msgstr ""
+
+#: templates/list_bayi.php:104
+#: templates/list_httpauth.php:103
+#: templates/list_klon.php:52
+#: templates/list_kur.php:152
+#: tema/wd-fm.js:352
+msgid "Delete"
+msgstr ""
+
+#: templates/list_cloudflare.php:112
+msgid "Delete the token? API actions will become unavailable."
+msgstr ""
+
+#: templates/list_cloudflare.php:116
+msgid "Delete Token"
+msgstr ""
+
+#: templates/list_httpauth.php:97
+msgid "Delete user %s? They will no longer be able to access the site."
+msgstr ""
+
+#: templates/list_mailrapor.php:54
+msgid "DELIVERED"
+msgstr ""
+
+#: templates/list_mailrapor.php:110
+msgid "delivered"
+msgstr ""
+
+#: templates/list_mailrapor.php:53
+msgid "Delivered to the recipient"
+msgstr ""
+
+#: templates/list_git.php:96
+msgid "Deploy Key"
+msgstr ""
+
+#: templates/list_kur.php:128
+msgid "Description"
+msgstr ""
+
+#: templates/list_cloudflare.php:234
+msgid "Development mode"
+msgstr ""
+
+#: list-cloudflare/index.php:167
+msgid "Development mode disabled: %s"
+msgstr ""
+
+#: list-cloudflare/index.php:164
+msgid "Development mode enabled (3 hours): %s"
+msgstr ""
+
+#: templates/list_klon.php:91
+msgid "Different target domain"
+msgstr ""
+
+#: bin/wd-git:248
+msgid "Directory is no longer a git repository."
+msgstr ""
+
+#: templates/list_httpauth.php:33
+#: templates/list_tools.php:44
+msgid "Directory Password Protection"
+msgstr ""
+
+#: templates/list_cloudflare.php:192
+#: templates/list_wp.php:111
+msgid "Disable"
+msgstr ""
+
+#: templates/list_git.php:46
+msgid "Disable auto"
+msgstr ""
+
+#: templates/list_wp.php:78
+msgid "Disable auto-updates"
+msgstr ""
+
+#: templates/list_wp.php:79
+msgid "Disable maintenance mode"
+msgstr ""
+
+#: bin/wd-guvenlik:178
+msgid "Disable password login if key-based login works."
+msgstr ""
+
+#: templates/list_waf.php:55
+msgid "Disable xmlrpc.php"
+msgstr ""
+
+#: bin/wd-guvenlik:184
+#: bin/wd-guvenlik:199
+#: bin/wd-guvenlik:309
+msgid "disabled"
+msgstr ""
+
+#: templates/list_cloudflare.php:61
+#: templates/list_waf.php:39
+msgid "Disabled"
+msgstr ""
+
+#: templates/list_cloudflare.php:236
+msgid "Disables cache for 3 hours. Use while working on the site so changes appear immediately."
+msgstr ""
+
+#: templates/list_bayi.php:78
+msgid "Disk"
+msgstr ""
+
+#: templates/list_bayi.php:129
+msgid "disk"
+msgstr ""
+
+#: templates/list_tools.php:212
+#: templates/wd-sidebar.php:96
+msgid "DISK"
+msgstr ""
+
+#: templates/list_disk.php:115
+msgid "Disk breakdown:"
+msgstr ""
+
+#: templates/list_disk.php:36
+#: templates/wd-sidebar.php:96
+#: tema/wd-fm.js:71
+msgid "Disk Usage"
+msgstr ""
+
+#: bin/wd-uyari:255
+msgid "Disk usage %s (%%%.0f)"
+msgstr ""
+
+#: templates/list_tools.php:86
+msgid "DNS"
+msgstr ""
+
+#: templates/list_cloudflare.php:240
+msgid "DNS push"
+msgstr ""
+
+#: list-cloudflare/index.php:171
+msgid "DNS pushed: %s — %d added, %d updated."
+msgstr ""
+
+#: templates/list_tools.php:83
+msgid "DNS Records"
+msgstr ""
+
+#: bin/wd-erisim:178
+msgid "DNS resolution failed"
+msgstr ""
+
+#: templates/list_tools.php:79
+#: templates/list_tools.php:243
+#: templates/wd-sidebar.php:136
+#: tema/wd-fm.js:73
+msgid "DNS Zones"
+msgstr ""
+
+#: templates/list_cloudflare.php:126
+msgid "Do"
+msgstr ""
+
+#: templates/list_klon.php:85
+msgid "Do not copy (files only)"
+msgstr ""
+
+#: templates/list_yonlendirme.php:190
+msgid "do not enable"
+msgstr ""
+
+#: bin/wd-kur:289
+msgid "Document root does not exist: %s"
+msgstr ""
+
+#: bin/wd-phpayar:334
+msgid "Document root missing: "
+msgstr ""
+
+#: bin/wd-klon:347
+msgid "Document root not found."
+msgstr ""
+
+#: bin/wd-kaynak:334
+msgid "DOMAIN"
+msgstr ""
+
+#: inc/wd-modul.php:288
+#: templates/list_errorpages.php:57
+#: templates/list_git.php:72
+#: templates/list_httpauth.php:151
+#: templates/list_node.php:75
+#: templates/list_yedek.php:48
+#: templates/list_yonlendirme.php:47
+msgid "Domain"
+msgstr ""
+
+#: templates/list_klon.php:50
+msgid "Domain %s, its files, and the staging database will be deleted. The live site is not affected. Continue?"
+msgstr ""
+
+#: bin/wd-git:177
+#: bin/wd-node:246
+#: bin/wd-yedek:246
+msgid "Domain does not belong to this account."
+msgstr ""
+
+#: bin/wd-health:498
+msgid "Domain does not resolve to any IP."
+msgstr ""
+
+#: bin/wd-erisim:252
+msgid "Domain is not on the monitoring list."
+msgstr ""
+
+#: bin/wd-kur:375
+msgid "Domain not found."
+msgstr ""
+
+#: bin/wd-health:505
+msgid "Domain points to another server; the site is not published from here."
+msgstr ""
+
+#: templates/list_tools.php:31
+msgid "Domain Settings"
+msgstr ""
+
+#: templates/wd-sidebar.php:126
+#: templates/wd-sidebar.php:153
+msgid "Domains"
+msgstr ""
+
+#: templates/list_yonlendirme.php:140
+msgid "Domains allowed to hotlink"
+msgstr ""
+
+#: tema/wd-fm.js:351
+msgid "Download"
+msgstr ""
+
+#: bin/wd-guvenlik:570
+msgid "dry-run: vsftpd will be stopped and disabled"
+msgstr ""
+
+#: bin/wd-guvenlik:593
+msgid "dry-run: will remove -> "
+msgstr ""
+
+#: templates/list_erisim.php:109
+msgid "Duration"
+msgstr ""
+
+#: templates/list_errorpages.php:170
+msgid "During a server error your site is down; this page is the only place left to give visitors a contact path."
+msgstr ""
+
+#: templates/list_klon.php:107
+msgid "During publish, data added on live in the meantime (orders/comments) is REPLACED by staging data. For store sites, use \"Do not copy (files only)\" for theme/plugin-only work."
+msgstr ""
+
+#: bin/wd-kaynak:74
+msgid "E-commerce / busy site"
+msgstr ""
+
+#: templates/list_kur.php:91
+msgid "e.g. panel"
+msgstr ""
+
+#: tema/wd-fm.js:354
+msgid "Edit"
+msgstr ""
+
+#: templates/list_errorpages.php:20
+msgid "Edit the page visitors see when they open a missing URL or when an error occurs on the site."
+msgstr ""
+
+#: bin/wd-disk:142
+#: templates/list_bayi.php:123
+#: templates/list_tools.php:389
+msgid "Email"
+msgstr ""
+
+#: templates/list_node.php:41
+#: templates/list_phpayar.php:153
+msgid "empty"
+msgstr ""
+
+#: templates/list_git.php:83
+msgid "empty = default"
+msgstr ""
+
+#: templates/list_node.php:87
+msgid "empty = public_html"
+msgstr ""
+
+#: templates/list_git.php:78
+#: templates/list_kur.php:90
+msgid "empty = site root"
+msgstr ""
+
+#: templates/list_yedek.php:80
+msgid "Empty folder."
+msgstr ""
+
+#: templates/list_wp.php:112
+msgid "Enable"
+msgstr ""
+
+#: templates/list_wp.php:78
+msgid "Enable auto-updates"
+msgstr ""
+
+#: templates/list_cloudflare.php:183
+msgid "Enable Development Mode (3 h)"
+msgstr ""
+
+#: templates/list_phpayar.php:127
+msgid "Enable if legacy scripts use"
+msgstr ""
+
+#: templates/list_phpayar.php:117
+msgid "Enable only during development; file paths can leak to visitors."
+msgstr ""
+
+#: bin/wd-guvenlik:176
+#: bin/wd-guvenlik:191
+#: templates/list_bayi.php:95
+#: templates/list_wp.php:105
+#: templates/list_wp.php:132
+msgid "enabled"
+msgstr ""
+
+#: templates/list_cloudflare.php:61
+#: templates/list_tools.php:352
+#: templates/list_waf.php:39
+msgid "Enabled"
+msgstr ""
+
+#: bin/wd-guvenlik:298
+msgid "enabled but IP list empty (nobody can connect)"
+msgstr ""
+
+#: bin/wd-guvenlik:290
+msgid "enabled for all admins"
+msgstr ""
+
+#: templates/list_httpauth.php:178
+msgid "Encryption"
+msgstr ""
+
+#: templates/list_erisim.php:109
+msgid "End"
+msgstr ""
+
+#: bin/wd-guvenlik:360
+#: bin/wd-guvenlik:365
+msgid "End-of-life PHP"
+msgstr ""
+
+#: bin/wd-bayi:280
+msgid "Enter a valid email address."
+msgstr ""
+
+#: templates/list_wp.php:74
+msgid "Enter the admin panel without a password (120s single-use link)"
+msgstr ""
+
+#: templates/list_klon.php:29
+msgid "Enter these details into your application's config file manually."
+msgstr ""
+
+#: templates/list_httpauth.php:167
+msgid "entire"
+msgstr ""
+
+#: templates/list_node.php:82
+msgid "Entry file"
+msgstr ""
+
+#: bin/wd-node:261
+msgid "Entry file not found: %s (upload files first)"
+msgstr ""
+
+#: templates/list_node.php:105
+msgid "environment variable (3000–3999, automatic). Your code must listen on"
+msgstr ""
+
+#: bin/wd-uyari:280
+msgid "ERROR"
+msgstr ""
+
+#: list-phpayar/index.php:74
+msgid "Error log cleared."
+msgstr ""
+
+#: bin/wd-git:251
+msgid "ERROR: %s"
+msgstr ""
+
+#: bin/wd-kaynak:222
+msgid "ERROR: no stock PHP template found: %s\n"
+msgstr ""
+
+#: templates/list_yonlendirme.php:93
+msgid "exact"
+msgstr ""
+
+#: templates/list_phpayar.php:77
+msgid "Execution time (sec)"
+msgstr ""
+
+#: templates/list_kur.php:165
+msgid "Existing files are not overwritten. To install to root, empty the root or use a subdirectory."
+msgstr ""
+
+#: templates/list_tools.php:356
+msgid "expired"
+msgstr ""
+
+#: bin/wd-health:536
+msgid "expired (%s)"
+msgstr ""
+
+#: inc/wd-modul.php:184
+msgid "External HTTP check every 5 minutes; notify after failures"
+msgstr ""
+
+#: templates/list_yedek.php:95
+msgid "Extract under private/wd-geri"
+msgstr ""
+
+#: bin/wd-yedek:282
+msgid "Extracted content not found."
+msgstr ""
+
+#: templates/list_guvenlik.php:148
+msgid "fail2ban is already blocking these. If a block keeps repeating you can ban it permanently from the Firewall."
+msgstr ""
+
+#: templates/list_waf.php:110
+msgid "False positives"
+msgstr ""
+
+#: tema/wd-fm.js:346
+msgid "File"
+msgstr ""
+
+#: templates/list_phpayar.php:178
+msgid "file in the document root. The file belongs to you; the server is not restarted."
+msgstr ""
+
+#: templates/list_tools.php:48
+#: templates/wd-sidebar.php:228
+#: tema/wd-fm.js:78
+msgid "File Manager"
+msgstr ""
+
+#: templates/list_yedek.php:43
+msgid "file missing"
+msgstr ""
+
+#: bin/wd-guvenlik:458
+msgid "File permissions"
+msgstr ""
+
+#: templates/list_phpayar.php:60
+msgid "File upload limit"
+msgstr ""
+
+#: templates/list_kur.php:28
+msgid "Files"
+msgstr ""
+
+#: templates/wd-sidebar.php:228
+msgid "FILES"
+msgstr ""
+
+#: tema/wd-fm.js:631
+msgid "files"
+msgstr ""
+
+#: templates/list_klon.php:46
+msgid "Files and database on %s will be transferred to the LIVE site %s. The current live site is backed up under private/. Continue?"
+msgstr ""
+
+#: templates/list_kur.php:24
+msgid "Files placed"
+msgstr ""
+
+#: templates/list_disk.php:286
+msgid "Files under"
+msgstr ""
+
+#: templates/list_kur.php:38
+msgid "Finish Setup"
+msgstr ""
+
+#: templates/list_tools.php:142
+msgid "Firewall"
+msgstr ""
+
+#: list-waf/index.php:63
+msgid "Firewall disabled for this domain (rules kept)."
+msgstr ""
+
+#: templates/list_waf.php:48
+msgid "Firewall enabled"
+msgstr ""
+
+#: bin/wd-guvenlik:424
+msgid "firewall list could not be read"
+msgstr ""
+
+#: list-waf/index.php:62
+msgid "Firewall rules saved and published."
+msgstr ""
+
+#: bin/wd-guvenlik:180
+msgid "FIRST add your own SSH key, then disable password login."
+msgstr ""
+
+#: templates/list_yedek.php:133
+msgid "First open"
+msgstr ""
+
+#: templates/list_klon.php:106
+msgid "First the live site files and database are backed up as"
+msgstr ""
+
+#: templates/list_guvenlik.php:122
+msgid "Fix now"
+msgstr ""
+
+#: bin/wd-guvenlik:456
+msgid "Fix permissions: chmod o-w <file>"
+msgstr ""
+
+#: bin/wd-health:330
+msgid "Fix the MX record: 10 mail.%s (do not write the domain twice)."
+msgstr ""
+
+#: tema/wd-fm.js:347
+msgid "Folder"
+msgstr ""
+
+#: tema/wd-fm.js:262
+msgid "Folder tree"
+msgstr ""
+
+#: tema/wd-fm.js:264
+msgid "FOLDERS"
+msgstr ""
+
+#: tema/wd-fm.js:631
+msgid "folders"
+msgstr ""
+
+#: templates/list_disk.php:105
+msgid "For a full result run"
+msgstr ""
+
+#: templates/list_yonlendirme.php:181
+msgid "for permanent moves (passes search ranking). Use"
+msgstr ""
+
+#: templates/list_git.php:99
+msgid "For private repos add this public key under GitHub → Settings → Deploy keys (or GitLab → Deploy Keys). Read-only access is enough."
+msgstr ""
+
+#: templates/list_git.php:67
+msgid "For private repos use a"
+msgstr ""
+
+#: templates/list_yonlendirme.php:183
+msgid "for temporary campaigns."
+msgstr ""
+
+#: templates/list_cloudflare.php:230
+msgid "for that domain. Temporarily set the cloud to grey while issuing a certificate."
+msgstr ""
+
+#: templates/list_phpayar.php:65
+msgid "Form post limit"
+msgstr ""
+
+#: bin/wd-health:219
+msgid "Frozen mail"
+msgstr ""
+
+#: templates/list_mailrapor.php:165
+msgid "Frozen messages"
+msgstr ""
+
+#: templates/list_bayi.php:126
+msgid "Full name"
+msgstr ""
+
+#: bin/wd-tarama:81
+msgid "Function name built character by character (signature evasion)"
+msgstr ""
+
+#: templates/list_yedek.php:95
+#: templates/list_yedek.php:130
+msgid "Get copy"
+msgstr ""
+
+#: inc/wd-modul.php:188
+#: templates/list_git.php:21
+msgid "Git Deploy"
+msgstr ""
+
+#: list-errorpages/index.php:53
+msgid "Gone"
+msgstr ""
+
+#: templates/list_tools.php:145
+msgid "Graphs"
+msgstr ""
+
+#: inc/wd-modul.php:335
+#: inc/wd-modul.php:339
+msgid "h"
+msgstr ""
+
+#: templates/wd-sidebar.php:70
+msgid "HEALTH"
+msgstr ""
+
+#: templates/list_health.php:114
+#: templates/list_tools.php:122
+#: templates/wd-sidebar.php:70
+#: tema/wd-fm.js:70
+msgid "Health Center"
+msgstr ""
+
+#: bin/wd-kaynak:76
+msgid "Heavy application"
+msgstr ""
+
+#: inc/wd-i18n.php:14
+msgid "Hello %s"
+msgstr ""
+
+#: templates/list_waf.php:53
+msgid "Hide sensitive files"
+msgstr ""
+
+#: bin/wd-uyari:246
+msgid "high"
+msgstr ""
+
+#: templates/list_gecmis.php:41
+msgid "History tool could not run. On the server run"
+msgstr ""
+
+#: bin/wd-gecmis:214
+msgid "history: %d samples, last %d days"
+msgstr ""
+
+#: templates/list_tools.php:373
+msgid "Home Directory"
+msgstr ""
+
+#: tema/wd-fm.js:303
+#: tema/wd-fm.js:520
+msgid "Home directory"
+msgstr ""
+
+#: templates/list_tools.php:335
+msgid "Hosting Package"
+msgstr ""
+
+#: templates/list_tools.php:141
+msgid "Hosting Packages"
+msgstr ""
+
+#: templates/list_yonlendirme.php:133
+msgid "Hotlink protection"
+msgstr ""
+
+#: inc/wd-helpers.php:134
+#: inc/wd-helpers.php:137
+msgid "hour"
+msgid_plural "hours"
+msgstr[0] ""
+msgstr[1] ""
+
+#: templates/list_gecmis.php:92
+msgid "hourly peak CPU usage"
+msgstr ""
+
+#: templates/list_errorpages.php:137
+#: templates/list_yonlendirme.php:167
+msgid "How Does It Work?"
+msgstr ""
+
+#: templates/list_bayi.php:177
+#: templates/list_erisim.php:131
+#: templates/list_git.php:108
+#: templates/list_klon.php:103
+#: templates/list_kur.php:162
+#: templates/list_node.php:103
+#: templates/list_phpayar.php:174
+#: templates/list_waf.php:103
+msgid "How It Works"
+msgstr ""
+
+#: templates/list_disk.php:265
+msgid "How to Free Space?"
+msgstr ""
+
+#: templates/list_gecmis.php:111
+#: templates/list_mailrapor.php:150
+msgid "How to Read This?"
+msgstr ""
+
+#: templates/list_yonlendirme.php:187
+msgid "HSTS caution"
+msgstr ""
+
+#: templates/list_errorpages.php:109
+msgid "HTML content"
+msgstr ""
+
+#: templates/list_erisim.php:135
+msgid "HTTP 5xx, connection errors, timeouts, and SSL errors count as"
+msgstr ""
+
+#: templates/list_cloudflare.php:229
+msgid "HTTP validation may fail"
+msgstr ""
+
+#: templates/list_gecmis.php:128
+msgid "Idle periods"
+msgstr ""
+
+#: templates/list_tools.php:490
+msgid "idle — no running PHP process"
+msgstr ""
+
+#: templates/list_waf.php:111
+msgid "If a plugin stopped working, try disabling \"Command-line clients\" and \"Injection patterns\" in turn. Add your own IP to the allow list."
+msgstr ""
+
+#: templates/list_cloudflare.php:228
+msgid "If a record is proxied through Cloudflare, Let's Encrypt"
+msgstr ""
+
+#: templates/list_mailrapor.php:161
+msgid "If an account that normally sends a few mails a day suddenly sends hundreds, the password is almost always compromised."
+msgstr ""
+
+#: templates/list_yonlendirme.php:91
+msgid "If checked, only this exact URL; otherwise sub-paths move too"
+msgstr ""
+
+#: templates/list_git.php:111
+msgid "if files were edited manually on the server, pull is refused; commit those changes to the repo first."
+msgstr ""
+
+#: bin/wd-health:336
+msgid "If mail should stay on this server, set MX to mail.%s."
+msgstr ""
+
+#: templates/list_guvenlik.php:243
+msgid "If the server IP is blacklisted, start here: a compromised site is often sending spam. Read together with Mail Report."
+msgstr ""
+
+#: templates/list_waf.php:115
+msgid "If the site is behind Cloudflare, the admin must keep the IP list current in the Cloudflare module for real visitor IPs; otherwise rate limiting treats all visitors as one IP."
+msgstr ""
+
+#: templates/list_cloudflare.php:54
+msgid "If this list is not configured,"
+msgstr ""
+
+#: templates/list_waf.php:55
+msgid "If you do not use Jetpack or the mobile app on WordPress, disable it; it is a target for brute force and DDoS reflection."
+msgstr ""
+
+#: bin/wd-health:506
+msgid "If you will host the domain here, set the A record to %s."
+msgstr ""
+
+#: templates/list_klon.php:79
+msgid "if your domain's DNS is on this panel, the A record is added automatically."
+msgstr ""
+
+#: templates/list_yonlendirme.php:101
+msgid "If “exact” is unchecked, a"
+msgstr ""
+
+#: templates/list_errorpages.php:154
+msgid "Image and CSS paths inside the error page must use"
+msgstr ""
+
+#: templates/list_cloudflare.php:120
+msgid "In the Cloudflare panel create a token via"
+msgstr ""
+
+#: templates/list_mailrapor.php:174
+msgid "In this period"
+msgstr ""
+
+#: bin/wd-cloudflare:478
+msgid "INACTIVE"
+msgstr ""
+
+#: templates/list_wp.php:105
+#: templates/list_wp.php:132
+msgid "inactive"
+msgstr ""
+
+#: bin/wd-disk:141
+msgid "Includes public_html, logs and statistics"
+msgstr ""
+
+#: list-yedek/index.php:53
+msgid "Incomplete selection."
+msgstr ""
+
+#: templates/list_phpayar.php:82
+msgid "Input parsing time (sec)"
+msgstr ""
+
+#: inc/wd-modul.php:187
+msgid "INSTALL"
+msgstr ""
+
+#: templates/list_kur.php:105
+msgid "Install"
+msgstr ""
+
+#: inc/wd-modul.php:187
+msgid "Install catalog apps onto a selected domain"
+msgstr ""
+
+#: templates/list_node.php:91
+msgid "Install dependencies if package.json exists"
+msgstr ""
+
+#: templates/list_kur.php:14
+msgid "Install ready-made software on the selected domain in one click; database and configuration are prepared automatically."
+msgstr ""
+
+#: list-kur/index.php:109
+msgid "Installation failed: %s"
+msgstr ""
+
+#: templates/list_kur.php:52
+msgid "Installed apps"
+msgstr ""
+
+#: templates/list_wp.php:154
+msgid "Integrity"
+msgstr ""
+
+#: templates/list_wp.php:68
+msgid "integrity issue"
+msgstr ""
+
+#: bin/wd-kur:262
+msgid "Invalid application code."
+msgstr ""
+
+#: bin/wd-yedek:328
+msgid "Invalid backup name or domain."
+msgstr ""
+
+#: bin/wd-git:183
+msgid "Invalid branch name."
+msgstr ""
+
+#: bin/wd-kur:187
+msgid "Invalid code."
+msgstr ""
+
+#: bin/wd-kur:150
+msgid "Invalid config.dosya"
+msgstr ""
+
+#: bin/wd-klon:299
+msgid "Invalid database name."
+msgstr ""
+
+#: bin/wd-yonlendirme:183
+msgid "Invalid destination: %s"
+msgstr ""
+
+#: list-httpauth/index.php:59
+msgid "Invalid domain"
+msgstr ""
+
+#: bin/wd-git:319
+#: bin/wd-klon:415
+#: bin/wd-klon:426
+#: bin/wd-node:414
+#: list-erisim/index.php:29
+#: list-git/index.php:26
+#: list-klon/index.php:48
+#: list-kur/index.php:93
+msgid "Invalid domain."
+msgstr ""
+
+#: list-errorpages/index.php:121
+msgid "Invalid domain: %s"
+msgstr ""
+
+#: bin/wd-node:252
+msgid "Invalid entry file name."
+msgstr ""
+
+#: bin/wd-yonlendirme:204
+msgid "Invalid hotlink domain: %s"
+msgstr ""
+
+#: bin/wd-waf:238
+#: bin/wd-yonlendirme:197
+msgid "Invalid IP: %s"
+msgstr ""
+
+#: bin/wd-waf:282
+msgid "Invalid nginx configuration, change reverted: %s"
+msgstr ""
+
+#: list-errorpages/index.php:123
+msgid "Invalid page: %s"
+msgstr ""
+
+#: bin/wd-yedek:201
+msgid "Invalid path."
+msgstr ""
+
+#: bin/wd-wp:332
+msgid "Invalid plugin or action."
+msgstr ""
+
+#: bin/wd-bayi:368
+msgid "Invalid reseller name."
+msgstr ""
+
+#: list-bayi/index.php:41
+msgid "Invalid reseller."
+msgstr ""
+
+#: inc/wd-modul.php:62
+msgid "invalid script name"
+msgstr ""
+
+#: list-wp/index.php:47
+msgid "Invalid site."
+msgstr ""
+
+#: list-klon/index.php:32
+msgid "Invalid source domain."
+msgstr ""
+
+#: bin/wd-yonlendirme:181
+msgid "Invalid source path: %s"
+msgstr ""
+
+#: bin/wd-kur:278
+msgid "Invalid subdirectory name (letters, digits, dots, hyphens)."
+msgstr ""
+
+#: bin/wd-git:186
+#: bin/wd-git:330
+#: bin/wd-git:338
+#: bin/wd-git:343
+#: bin/wd-node:255
+#: list-git/index.php:28
+msgid "Invalid subdirectory."
+msgstr ""
+
+#: list-klon/index.php:34
+msgid "Invalid target domain."
+msgstr ""
+
+#: bin/wd-wp:321
+msgid "Invalid target."
+msgstr ""
+
+#: bin/wd-cloudflare:224
+msgid "Invalid token.\n"
+msgstr ""
+
+#: bin/wd-kur:427
+#: bin/wd-phpayar:394
+#: bin/wd-waf:374
+#: bin/wd-yonlendirme:294
+msgid "Invalid user or domain."
+msgstr ""
+
+#: bin/wd-wp:468
+msgid "Invalid user, domain, or path."
+msgstr ""
+
+#: bin/wd-bayi:384
+#: bin/wd-git:309
+#: bin/wd-klon:407
+#: bin/wd-node:406
+#: bin/wd-wp:456
+#: bin/wd-wp:461
+#: bin/wd-yedek:320
+#: list-bayi/index.php:66
+msgid "Invalid user."
+msgstr ""
+
+#: list-cloudflare/index.php:90
+msgid "Invalid zone."
+msgstr ""
+
+#: bin/wd-tarama:87
+msgid "Invisible iframe (visitor redirect / malware distribution)"
+msgstr ""
+
+#: templates/list_tools.php:143
+msgid "IP Addresses"
+msgstr ""
+
+#: templates/list_yonlendirme.php:146
+msgid "IP addresses to block"
+msgstr ""
+
+#: templates/list_waf.php:57
+msgid "IPs exempt from rules"
+msgstr ""
+
+#: templates/list_cloudflare.php:64
+msgid "IPv6 ranges"
+msgstr ""
+
+#: templates/list_git.php:113
+msgid "is blocked from web access (nginx dotfile rule)."
+msgstr ""
+
+#: templates/list_httpauth.php:186
+msgid "Is it enough?"
+msgstr ""
+
+#: templates/list_waf.php:118
+#: templates/list_yonlendirme.php:170
+msgid "Is it safe?"
+msgstr ""
+
+#: inc/wd-helpers.php:737
+msgid "Issue"
+msgstr ""
+
+#: templates/list_health.php:148
+msgid "ISSUES"
+msgstr ""
+
+#: bin/wd-health:692
+msgid "issues: %d errors, %d warnings  (last check %s)"
+msgstr ""
+
+#: templates/list_httpauth.php:182
+msgid "it can be read on the network. Keep SSL enabled on the site."
+msgstr ""
+
+#: templates/wd-sidebar.php:178
+msgid "Jobs"
+msgstr ""
+
+#: bin/wd-uyari:327
+msgid "KEY"
+msgstr ""
+
+#: bin/wd-guvenlik:191
+msgid "key-only"
+msgstr ""
+
+#: bin/wd-tarama:146
+msgid "Known application directory — score reduced"
+msgstr ""
+
+#: bin/wd-tarama:93
+msgid "Known webshell name present"
+msgstr ""
+
+#: bin/wd-kaynak:74
+msgid "Large"
+msgstr ""
+
+#: templates/list_disk.php:281
+msgid "Large mailboxes fill the quota quickly. Clean old attachments."
+msgstr ""
+
+#: templates/list_disk.php:213
+msgid "Largest directories"
+msgstr ""
+
+#: templates/list_disk.php:197
+msgid "Largest files"
+msgstr ""
+
+#: templates/list_mailrapor.php:92
+msgid "last %d day"
+msgid_plural "last %d days"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-mailrapor:242
+msgid "last %d days: %d accepted, %d delivered, %d bounced, %d deferred"
+msgstr ""
+
+#: templates/list_erisim.php:99
+msgid "Last 8 hours, 5-minute intervals (left to right: oldest to newest)"
+msgstr ""
+
+#: templates/list_erisim.php:58
+msgid "LAST CHECK"
+msgstr ""
+
+#: templates/list_erisim.php:91
+msgid "last check"
+msgstr ""
+
+#: templates/list_health.php:278
+msgid "Last Check"
+msgstr ""
+
+#: templates/list_tools.php:378
+msgid "Last Login"
+msgstr ""
+
+#: bin/wd-uyari:327
+msgid "LAST NOTIFIED"
+msgstr ""
+
+#: templates/list_klon.php:43
+msgid "last publish %s"
+msgstr ""
+
+#: templates/list_git.php:42
+msgid "last pull"
+msgstr ""
+
+#: templates/list_erisim.php:87
+msgid "last response"
+msgstr ""
+
+#: templates/list_disk.php:239
+msgid "Last Scan"
+msgstr ""
+
+#: templates/list_wp.php:49
+msgid "LAST SCAN"
+msgstr ""
+
+#: bin/wd-disk:282
+msgid "last scan %s"
+msgstr ""
+
+#: templates/list_cloudflare.php:66
+msgid "last update"
+msgstr ""
+
+#: bin/wd-health:386
+#: bin/wd-health:390
+#: bin/wd-health:397
+#: bin/wd-health:402
+#: templates/list_yedek.php:119
+msgid "Latest backup"
+msgstr ""
+
+#: bin/wd-health:399
+msgid "Latest backup is more than a day old."
+msgstr ""
+
+#: bin/wd-health:242
+msgid "Leave only one SPF TXT record."
+msgstr ""
+
+#: templates/list_tools.php:349
+msgid "Let's Encrypt SSL"
+msgstr ""
+
+#: bin/wd-uyari:327
+msgid "LEVEL"
+msgstr ""
+
+#: templates/list_kur.php:35
+msgid "License"
+msgstr ""
+
+#: templates/list_kur.php:95
+msgid "License key"
+msgstr ""
+
+#: bin/wd-kur:284
+msgid "License key format is invalid."
+msgstr ""
+
+#: templates/list_kur.php:135
+msgid "license.key becomes required at install."
+msgstr ""
+
+#: templates/list_kur.php:35
+msgid "license.key written"
+msgstr ""
+
+#: templates/list_kur.php:83
+msgid "licensed"
+msgstr ""
+
+#: templates/list_kur.php:135
+msgid "Licensed software"
+msgstr ""
+
+#: templates/list_erisim.php:146
+msgid "Limit"
+msgstr ""
+
+#: templates/list_tools.php:453
+msgid "limit · live PHP"
+msgstr ""
+
+#: templates/list_phpayar.php:54
+msgid "Limits"
+msgstr ""
+
+#: templates/list_bayi.php:60
+msgid "Link existing user"
+msgstr ""
+
+#: templates/list_errorpages.php:152
+msgid "Links"
+msgstr ""
+
+#: bin/wd-cloudflare:157
+msgid "List shorter than expected (v4=%d v6=%d); file NOT changed.\n"
+msgstr ""
+
+#: templates/list_yedek.php:106
+msgid "List truncated at 2,000 items; go into a subfolder."
+msgstr ""
+
+#: templates/list_errorpages.php:140
+msgid "Live immediately"
+msgstr ""
+
+#: templates/wd-topbar.php:41
+msgid "Location"
+msgstr ""
+
+#: templates/list_guvenlik.php:219
+msgid "Lockout protection"
+msgstr ""
+
+#: templates/list_node.php:37
+#: templates/list_node.php:57
+#: templates/list_node.php:108
+msgid "Log"
+msgstr ""
+
+#: templates/list_phpayar.php:121
+msgid "Log errors"
+msgstr ""
+
+#: templates/list_wp.php:74
+msgid "Log in as admin"
+msgstr ""
+
+#: templates/list_phpayar.php:157
+msgid "Log is empty — no recorded errors."
+msgstr ""
+
+#: templates/wd-topbar.php:89
+#: templates/wd-topbar.php:91
+msgid "Log out"
+msgstr ""
+
+#: templates/list_phpayar.php:157
+msgid "Logging is off. Enable \"Log errors\"."
+msgstr ""
+
+#: templates/list_guvenlik.php:223
+msgid "login key on the server. Keys on accounts with an"
+msgstr ""
+
+#: templates/list_waf.php:54
+msgid "Login page brute-force protection"
+msgstr ""
+
+#: templates/list_tools.php:132
+#: templates/wd-sidebar.php:253
+msgid "Logs"
+msgstr ""
+
+#: templates/wd-sidebar.php:253
+msgid "LOGS"
+msgstr ""
+
+#: templates/list_cloudflare.php:56
+msgid "logs are useless and fail2ban bans the wrong address, or even bans Cloudflare and takes the whole site down."
+msgstr ""
+
+#: templates/list_mailrapor.php:34
+msgid "Logs rescanned."
+msgstr ""
+
+#: templates/list_disk.php:198
+msgid "look here first to free space"
+msgstr ""
+
+#: templates/list_disk.php:280
+msgid "Mail"
+msgstr ""
+
+#: templates/wd-sidebar.php:149
+msgid "MAIL"
+msgstr ""
+
+#: templates/list_tools.php:60
+#: templates/list_tools.php:246
+msgid "Mail Accounts"
+msgstr ""
+
+#: templates/list_tools.php:56
+msgid "Mail Domains"
+msgstr ""
+
+#: templates/list_tools.php:69
+msgid "Mail Health Check"
+msgstr ""
+
+#: bin/wd-health:209
+#: bin/wd-health:213
+msgid "Mail queue"
+msgstr ""
+
+#: templates/list_mailrapor.php:20
+#: templates/list_tools.php:71
+msgid "Mail Report"
+msgstr ""
+
+#: templates/list_tools.php:62
+msgid "Mail Settings"
+msgstr ""
+
+#: templates/list_tools.php:73
+#: templates/wd-sidebar.php:149
+#: tema/wd-fm.js:74
+msgid "MAIL — Email"
+msgstr ""
+
+#: templates/wd-sidebar.php:76
+msgid "Mail, DNS and SSL checks"
+msgstr ""
+
+#: templates/list_disk.php:183
+msgid "Mailboxes"
+msgstr ""
+
+#: templates/list_wp.php:67
+msgid "maintenance mode"
+msgstr ""
+
+#: templates/list_wp.php:79
+msgid "Maintenance mode"
+msgstr ""
+
+#: list-wp/index.php:118
+msgid "Maintenance mode disabled."
+msgstr ""
+
+#: list-wp/index.php:117
+msgid "Maintenance mode enabled; visitors see the maintenance page."
+msgstr ""
+
+#: templates/list_guvenlik.php:159
+msgid "Malware Scan"
+msgstr ""
+
+#: list-guvenlik/index.php:70
+msgid "Malware scan re-run."
+msgstr ""
+
+#: templates/list_health.php:77
+msgid "Managing nameserver:"
+msgstr ""
+
+#: templates/list_bayi.php:164
+msgid "Max customers"
+msgstr ""
+
+#: templates/list_phpayar.php:87
+msgid "Max form fields"
+msgstr ""
+
+#: templates/list_disk.php:104
+msgid "may be incomplete"
+msgstr ""
+
+#: bin/wd-kaynak:72
+msgid "Medium"
+msgstr ""
+
+#: templates/list_gecmis.php:84
+msgid "mem peak"
+msgstr ""
+
+#: templates/list_tools.php:204
+msgid "MEMORY"
+msgstr ""
+
+#: templates/list_phpayar.php:70
+msgid "Memory limit"
+msgstr ""
+
+#: templates/list_mailrapor.php:50
+msgid "messages"
+msgstr ""
+
+#: templates/list_mailrapor.php:48
+msgid "Messages accepted by the system"
+msgstr ""
+
+#: bin/wd-disk:143
+msgid "Messages in mailboxes"
+msgstr ""
+
+#: inc/wd-helpers.php:137
+#: inc/wd-modul.php:330
+#: inc/wd-modul.php:335
+msgid "min"
+msgstr ""
+
+#: templates/list_kur.php:126
+msgid "Min PHP"
+msgstr ""
+
+#: inc/wd-helpers.php:140
+msgid "minute"
+msgid_plural "minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: bin/wd-health:282
+msgid "mismatch"
+msgstr ""
+
+#: templates/list_erisim.php:46
+msgid "MONITORED SITES"
+msgstr ""
+
+#: templates/list_waf.php:75
+msgid "Most blocked IPs"
+msgstr ""
+
+#: templates/list_mailrapor.php:132
+msgid "Most Written Domains"
+msgstr ""
+
+#: tema/wd-fm.js:350
+msgid "Move"
+msgstr ""
+
+#: bin/wd-guvenlik:362
+msgid "Move sites to a current PHP version."
+msgstr ""
+
+#: bin/wd-health:241
+msgid "Multiple SPF records are invalid; all are ignored."
+msgstr ""
+
+#: templates/list_yonlendirme.php:83
+msgid "Must start with /"
+msgstr ""
+
+#: templates/list_wp.php:105
+msgid "must-use"
+msgstr ""
+
+#: bin/wd-health:322
+msgid "MX could not be resolved."
+msgstr ""
+
+#: bin/wd-health:335
+msgid "MX does not point to this server; mail is going elsewhere."
+msgstr ""
+
+#: bin/wd-health:328
+msgid "MX target does not resolve (%s); mail cannot be delivered."
+msgstr ""
+
+#: inc/wd-modul.php:209
+#: templates/list_bayi.php:19
+msgid "My Customers"
+msgstr ""
+
+#: bin/wd-klon:142
+msgid "mysql import failed"
+msgstr ""
+
+#: bin/wd-klon:140
+msgid "mysqldump failed"
+msgstr ""
+
+#: templates/list_kur.php:123
+msgid "Name"
+msgstr ""
+
+#: templates/list_node.php:71
+msgid "New app"
+msgstr ""
+
+#: templates/list_bayi.php:118
+msgid "New customer account"
+msgstr ""
+
+#: templates/list_tools.php:93
+msgid "New Database"
+msgstr ""
+
+#: templates/list_tools.php:84
+msgid "New DNS Record"
+msgstr ""
+
+#: templates/list_tools.php:61
+msgid "New Mail Account"
+msgstr ""
+
+#: templates/list_tools.php:57
+msgid "New Mail Domain"
+msgstr ""
+
+#: templates/list_httpauth.php:202
+msgid "New password (at least 8 characters):"
+msgstr ""
+
+#: templates/list_bayi.php:103
+msgid "New password for %s (at least 8 characters):"
+msgstr ""
+
+#: templates/list_klon.php:67
+msgid "New staging"
+msgstr ""
+
+#: bin/wd-wp:437
+msgid "nginx cache: %s"
+msgstr ""
+
+#: bin/wd-yonlendirme:255
+msgid "nginx configuration invalid, change rolled back: "
+msgstr ""
+
+#: templates/list_yonlendirme.php:173
+msgid "nginx validation"
+msgstr ""
+
+#: bin/wd-cloudflare:190
+msgid "nginx validation failed, rolled back:\n%s\n"
+msgstr ""
+
+#: templates/list_waf.php:119
+msgid "nginx validation runs on every save; an invalid rule rolls back to the previous state."
+msgstr ""
+
+#: bin/wd-cloudflare:476
+msgid "no"
+msgstr ""
+
+#: templates/list_git.php:37
+msgid "no .git"
+msgstr ""
+
+#: bin/wd-guvenlik:163
+msgid "No account has an SSH key configured."
+msgstr ""
+
+#: templates/list_disk.php:70
+msgid "No accounts to display."
+msgstr ""
+
+#: bin/wd-uyari:325
+msgid "No active alerts."
+msgstr ""
+
+#: templates/list_yedek.php:34
+msgid "No backups yet. You can create one from the Backups page."
+msgstr ""
+
+#: bin/wd-health:521
+msgid "No certificate; the site will not open over https://."
+msgstr ""
+
+#: templates/list_erisim.php:65
+msgid "No check has run yet; the first result arrives in a few minutes."
+msgstr ""
+
+#: bin/wd-klon:341
+#: bin/wd-klon:382
+msgid "No clone record for this target."
+msgstr ""
+
+#: bin/wd-wp:443
+msgid "no command"
+msgstr ""
+
+#: bin/wd-health:267
+msgid "No DKIM key has been generated for this domain."
+msgstr ""
+
+#: bin/wd-health:296
+msgid "No DMARC record; spoofed mail can be sent in your domain's name."
+msgstr ""
+
+#: list-cloudflare/index.php:120
+msgid "No DNS zone for this domain in the panel."
+msgstr ""
+
+#: templates/list_health.php:262
+msgid "No domains to check. After you add a web or mail domain they appear here."
+msgstr ""
+
+#: bin/wd-kur:311
+msgid "No files extracted from package; zip_kok in the manifest may be wrong."
+msgstr ""
+
+#: bin/wd-node:265
+msgid "No free port found."
+msgstr ""
+
+#: templates/list_bayi.php:40
+msgid "No linked customers."
+msgstr ""
+
+#: templates/list_erisim.php:65
+msgid "No monitored sites."
+msgstr ""
+
+#: bin/wd-health:307
+msgid "No MX record; external mail will NOT arrive for this domain."
+msgstr ""
+
+#: bin/wd-node:345
+#: bin/wd-node:366
+#: bin/wd-node:376
+msgid "No Node.js application on this domain."
+msgstr ""
+
+#: templates/list_kur.php:83
+#: templates/list_kur.php:148
+msgid "no package"
+msgstr ""
+
+#: list-errorpages/index.php:52
+msgid "No permission to access the file"
+msgstr ""
+
+#: templates/list_httpauth.php:71
+msgid "no protection"
+msgstr ""
+
+#: bin/wd-health:118
+msgid "No PTR record."
+msgstr ""
+
+#: bin/wd-git:245
+#: bin/wd-git:268
+#: bin/wd-git:280
+msgid "No record."
+msgstr ""
+
+#: templates/list_gecmis.php:48
+msgid "No records for this period. The collector samples every 5 minutes; charts become meaningful a few hours after install."
+msgstr ""
+
+#: templates/list_mailrapor.php:42
+msgid "No report yet. Click Rescan above."
+msgstr ""
+
+#: templates/list_bayi.php:31
+msgid "No resellers defined yet. Make a user a reseller from the box on the right."
+msgstr ""
+
+#: templates/list_tools.php:469
+msgid "No resource limit assigned to this site; stock template is used. On the server: wd-kaynak uygula"
+msgstr ""
+
+#: templates/list_wp.php:53
+msgid "No scan yet. Start with \"Rescan\"."
+msgstr ""
+
+#: templates/list_mailrapor.php:97
+msgid "No sending in this period."
+msgstr ""
+
+#: bin/wd-health:234
+msgid "No SPF record; your mail will go to spam."
+msgstr ""
+
+#: tema/wd-fm.js:321
+msgid "No subfolders"
+msgstr ""
+
+#: bin/wd-yedek:258
+msgid "No such path in the backup: %s"
+msgstr ""
+
+#: bin/wd-bayi:184
+#: bin/wd-bayi:219
+msgid "No such user: %s"
+msgstr ""
+
+#: templates/list_guvenlik.php:180
+msgid "No suspicious files found."
+msgstr ""
+
+#: templates/list_cloudflare.php:49
+msgid "no token required"
+msgstr ""
+
+#: bin/wd-guvenlik:591
+msgid "No unused EOL PHP versions that can be removed."
+msgstr ""
+
+#: templates/list_bayi.php:150
+msgid "No user available to make a reseller. First open an account for the reseller on the Users page; then select them here."
+msgstr ""
+
+#: bin/wd-kaynak:331
+msgid "No web domains to check."
+msgstr ""
+
+#: templates/list_wp.php:53
+msgid "No WordPress install found. You can install WordPress via App Installer > Quick Install."
+msgstr ""
+
+#: bin/wd-guvenlik:459
+msgid "no world-writable files"
+msgstr ""
+
+#: bin/wd-cloudflare:283
+msgid "No zone found for '%s' in the Cloudflare account."
+msgstr ""
+
+#: templates/list_node.php:109
+msgid "Node version"
+msgstr ""
+
+#: list-node/index.php:55
+msgid "Node.js application for {d} removed; domain returned to stock PHP template."
+msgstr ""
+
+#: inc/wd-modul.php:189
+#: templates/list_node.php:24
+msgid "Node.js Apps"
+msgstr ""
+
+#: bin/wd-node:239
+msgid "Node.js is not installed on the server (admin: install nodejs from the NodeSource repository)."
+msgstr ""
+
+#: templates/list_node.php:32
+msgid "Node.js is not installed on the server. This page activates when the admin installs nodejs from the NodeSource repository."
+msgstr ""
+
+#: templates/list_klon.php:108
+msgid "Non-WordPress"
+msgstr ""
+
+#: bin/wd-guvenlik:162
+msgid "none"
+msgstr ""
+
+#: templates/list_bayi.php:165
+msgid "none selected = all"
+msgstr ""
+
+#: templates/list_cloudflare.php:126
+msgid "not"
+msgstr ""
+
+#: bin/wd-kur:169
+msgid "Not a valid ZIP file."
+msgstr ""
+
+#: templates/list_yedek.php:121
+msgid "Not configured — backups are only on this server. If the server is lost, so are the backups; ask the admin to set a remote backup target."
+msgstr ""
+
+#: templates/list_cloudflare.php:243
+msgid "not deleted"
+msgstr ""
+
+#: bin/wd-wp:437
+msgid "not enabled"
+msgstr ""
+
+#: templates/list_httpauth.php:188
+msgid "Not enough alone for sensitive data — it does not replace in-app sign-in."
+msgstr ""
+
+#: templates/list_node.php:109
+msgid "not installed"
+msgstr ""
+
+#: templates/list_health.php:169
+msgid "not queried"
+msgstr ""
+
+#: bin/wd-guvenlik:213
+msgid "not running"
+msgstr ""
+
+#: templates/list_cloudflare.php:89
+msgid "not set"
+msgstr ""
+
+#: templates/list_guvenlik.php:229
+msgid "Nothing is deleted"
+msgstr ""
+
+#: templates/list_erisim.php:138
+msgid "Notification"
+msgstr ""
+
+#: bin/wd-node:273
+msgid "npm install: %s"
+msgstr ""
+
+#: templates/list_guvenlik.php:68
+msgid "Number of files that need review from the malware scan"
+msgstr ""
+
+#: bin/wd-health:520
+#: templates/list_wp.php:107
+msgid "off"
+msgstr ""
+
+#: templates/list_tools.php:361
+msgid "Off"
+msgstr ""
+
+#: bin/wd-guvenlik:284
+msgid "off: "
+msgstr ""
+
+#: bin/wd-kaynak:339
+#: bin/wd-node:273
+msgid "ok"
+msgstr ""
+
+#: inc/wd-helpers.php:733
+#: templates/list_guvenlik.php:64
+#: templates/list_health.php:162
+msgid "OK"
+msgstr ""
+
+#: bin/wd-git:251
+msgid "ok: %s"
+msgstr ""
+
+#: templates/list_disk.php:277
+msgid "Old backup archives. Can be deleted after downloading them elsewhere."
+msgstr ""
+
+#: templates/list_wp.php:107
+msgid "on"
+msgstr ""
+
+#: templates/list_disk.php:61
+#: templates/list_health.php:139
+msgid "On the server run"
+msgstr ""
+
+#: templates/list_disk.php:107
+msgid "on the server."
+msgstr ""
+
+#: bin/wd-guvenlik:331
+msgid "On the server: apt-get update && apt-get upgrade"
+msgstr ""
+
+#: bin/wd-health:222
+msgid "On the server: exim4 -bpru | awk '{print $3}' | xargs -r exim4 -Mrm"
+msgstr ""
+
+#: templates/list_phpayar.php:190
+msgid "on your site to verify the value; delete it when done."
+msgstr ""
+
+#: templates/list_cloudflare.php:242
+msgid "One-way: panel → Cloudflare. Records in Cloudflare are"
+msgstr ""
+
+#: templates/list_cloudflare.php:244
+msgid "only missing ones are added and differing ones updated."
+msgstr ""
+
+#: templates/list_gecmis.php:124
+msgid "Only the site's PHP workers. nginx, Apache, and MariaDB are shared and cannot be split per site."
+msgstr ""
+
+#: bin/wd-git:334
+msgid "on|off required."
+msgstr ""
+
+#: templates/list_guvenlik.php:52
+msgid "OPEN"
+msgstr ""
+
+#: templates/list_kur.php:61
+msgid "Open"
+msgstr ""
+
+#: bin/wd-health:175
+msgid "Open a delisting request on the list's website."
+msgstr ""
+
+#: bin/wd-health:174
+msgid "Open a delisting request. "
+msgstr ""
+
+#: templates/list_tools.php:274
+msgid "Open All"
+msgstr ""
+
+#: templates/list_health.php:19
+#: templates/list_health.php:23
+msgid "Open DNS records"
+msgstr ""
+
+#: bin/wd-guvenlik:429
+msgid "open externally"
+msgstr ""
+
+#: templates/list_health.php:21
+msgid "Open mail settings"
+msgstr ""
+
+#: bin/wd-guvenlik:423
+#: bin/wd-guvenlik:441
+msgid "Open ports"
+msgstr ""
+
+#: templates/list_health.php:25
+msgid "Open SSL settings"
+msgstr ""
+
+#: templates/list_guvenlik.php:200
+msgid "Open the file in File Manager and inspect it. Take a"
+msgstr ""
+
+#: bin/wd-guvenlik:301
+msgid "open to everyone"
+msgstr ""
+
+#: templates/list_bayi.php:20
+msgid "Open your own customer accounts, suspend them, and change packages and passwords."
+msgstr ""
+
+#: templates/list_klon.php:91
+#: templates/list_kur.php:136
+msgid "optional"
+msgstr ""
+
+#: templates/list_disk.php:62
+msgid "or click Rescan above."
+msgstr ""
+
+#: templates/list_cloudflare.php:226
+msgid "Orange cloud"
+msgstr ""
+
+#: bin/wd-disk:152
+msgid "Other"
+msgstr ""
+
+#: bin/wd-disk:155
+msgid "Other files in the home directory (hidden dirs, scripts)"
+msgstr ""
+
+#: templates/list_phpayar.php:134
+msgid "Other lines in the file"
+msgstr ""
+
+#: templates/list_yonlendirme.php:135
+msgid "Other sites cannot display your images on their pages — stops them burning your bandwidth."
+msgstr ""
+
+#: templates/list_tools.php:328
+msgid "Overview"
+msgstr ""
+
+#: templates/list_yedek.php:100
+msgid "Overwrite live file"
+msgstr ""
+
+#: list-yedek/index.php:60
+msgid "Overwrote live file: {d}. Previous copy kept under private/wd-geri."
+msgstr ""
+
+#: bin/wd-kaynak:334
+msgid "PACKAGE"
+msgstr ""
+
+#: templates/list_bayi.php:78
+#: templates/list_bayi.php:127
+msgid "Package"
+msgstr ""
+
+#: templates/list_kur.php:129
+msgid "Package (.zip)"
+msgstr ""
+
+#: list-bayi/index.php:122
+msgid "Package changed for {d}."
+msgstr ""
+
+#: bin/wd-kur:267
+msgid "Package file for this application has not been uploaded."
+msgstr ""
+
+#: templates/list_bayi.php:180
+msgid "Package limit"
+msgstr ""
+
+#: bin/wd-bayi:397
+msgid "Package name required."
+msgstr ""
+
+#: templates/list_bayi.php:71
+msgid "PACKAGE OPTIONS"
+msgstr ""
+
+#: templates/list_tools.php:398
+msgid "Package Usage"
+msgstr ""
+
+#: templates/list_bayi.php:165
+msgid "Packages they can open"
+msgstr ""
+
+#: templates/list_yedek.php:132
+msgid "page (a single database can be selected)."
+msgstr ""
+
+#: list-errorpages/index.php:51
+msgid "Page Not Found"
+msgstr ""
+
+#: list-errorpages/index.php:200
+msgid "Page restored to default content."
+msgstr ""
+
+#: list-errorpages/index.php:201
+msgid "Page saved. Change is live immediately."
+msgstr ""
+
+#: bin/wd-guvenlik:284
+#: bin/wd-guvenlik:289
+msgid "Panel 2FA"
+msgstr ""
+
+#: bin/wd-guvenlik:286
+msgid "Panel > Account Settings > enable Two-Factor Authentication."
+msgstr ""
+
+#: bin/wd-health:362
+msgid "Panel > Backups > Create Backup; or on the server: v-backup-user %s"
+msgstr ""
+
+#: bin/wd-health:268
+msgid "Panel > Mail > edit domain > enable DKIM."
+msgstr ""
+
+#: bin/wd-health:522
+msgid "Panel > Web > edit domain > enable Let's Encrypt."
+msgstr ""
+
+#: bin/wd-health:517
+#: bin/wd-health:538
+msgid "Panel > Web > edit domain > save SSL again."
+msgstr ""
+
+#: bin/wd-guvenlik:313
+msgid "Panel CSRF checks are not at full strictness."
+msgstr ""
+
+#: templates/list_cloudflare.php:197
+msgid "Panel DNS records will be pushed to Cloudflare. Extra records already in Cloudflare are NOT deleted; only missing ones are added and differing ones updated. Continue?"
+msgstr ""
+
+#: tema/wd-fm.js:172
+msgid "Panel menu"
+msgstr ""
+
+#: tema/wd-fm.js:510
+msgid "Parent directory"
+msgstr ""
+
+#: templates/list_wp.php:132
+msgid "parent theme"
+msgstr ""
+
+#: templates/list_bayi.php:103
+#: templates/list_bayi.php:122
+#: templates/list_httpauth.php:128
+#: templates/list_kur.php:166
+msgid "Password"
+msgstr ""
+
+#: templates/list_klon.php:29
+msgid "password"
+msgstr ""
+
+#: list-bayi/index.php:121
+msgid "Password changed for {d}."
+msgstr ""
+
+#: templates/list_klon.php:29
+msgid "Password is shown once."
+msgstr ""
+
+#: bin/wd-bayi:277
+#: bin/wd-bayi:319
+#: list-httpauth/index.php:63
+#: templates/list_httpauth.php:205
+msgid "Password must be at least 8 characters."
+msgstr ""
+
+#: list-httpauth/index.php:120
+msgid "Password protection added: %s"
+msgstr ""
+
+#: list-httpauth/index.php:122
+msgid "Password protection removed: %s"
+msgstr ""
+
+#: list-httpauth/index.php:121
+msgid "Password updated: %s"
+msgstr ""
+
+#: templates/list_errorpages.php:146
+#: templates/list_waf.php:88
+msgid "Path"
+msgstr ""
+
+#: bin/wd-tarama:238
+msgid "path not provided"
+msgstr ""
+
+#: bin/wd-yedek:243
+msgid "Path of the file or folder to restore is required."
+msgstr ""
+
+#: templates/list_yonlendirme.php:70
+msgid "Path Redirects"
+msgstr ""
+
+#: templates/list_yonlendirme.php:25
+msgid "Path redirects, security headers, hotlink protection, and IP blocking."
+msgstr ""
+
+#: bin/wd-yedek:333
+msgid "Path required."
+msgstr ""
+
+#: templates/list_phpayar.php:163
+msgid "Path:"
+msgstr ""
+
+#: templates/list_gecmis.php:79
+#: templates/list_gecmis.php:97
+#: templates/list_gecmis.php:117
+msgid "peak"
+msgstr ""
+
+#: templates/list_wp.php:48
+msgid "PENDING UPDATES"
+msgstr ""
+
+#: templates/list_gecmis.php:33
+msgid "Per-site CPU and memory usage over time — only PHP consumption is measured."
+msgstr ""
+
+#: templates/list_mailrapor.php:58
+msgid "Permanently undeliverable (bounce)"
+msgstr ""
+
+#: templates/list_bayi.php:179
+#: tema/wd-fm.js:355
+msgid "Permissions"
+msgstr ""
+
+#: templates/list_errorpages.php:162
+msgid "PHP does not run"
+msgstr ""
+
+#: templates/list_phpayar.php:152
+msgid "PHP Error Log"
+msgstr ""
+
+#: inc/wd-modul.php:182
+#: templates/list_phpayar.php:30
+msgid "PHP Settings"
+msgstr ""
+
+#: list-phpayar/index.php:72
+msgid "PHP settings saved. PHP will use the new values within 5 minutes at most."
+msgstr ""
+
+#: bin/wd-guvenlik:346
+msgid "PHP versions"
+msgstr ""
+
+#: templates/list_phpayar.php:182
+msgid "PHP-FPM re-reads the file at most every"
+msgstr ""
+
+#: templates/list_tools.php:96
+msgid "phpMyAdmin"
+msgstr ""
+
+#: templates/list_kur.php:137
+msgid "Placeholders:"
+msgstr ""
+
+#: templates/list_wp.php:99
+msgid "Plugin"
+msgstr ""
+
+#: list-wp/index.php:68
+msgid "Plugin action failed: %s"
+msgstr ""
+
+#: bin/wd-wp:316
+msgid "Plugins: %s"
+msgstr ""
+
+#: templates/list_node.php:105
+msgid "Port"
+msgstr ""
+
+#: bin/wd-phpayar:250
+msgid "post_max_size equalized to upload_max_filesize"
+msgstr ""
+
+#: bin/wd-tarama:66
+msgid "preg_replace /e modifier — executes code; removed in PHP 7"
+msgstr ""
+
+#: templates/list_phpayar.php:134
+msgid "preserved"
+msgstr ""
+
+#: templates/list_yonlendirme.php:11
+msgid "Prevents embedding the site in another page's frame (clickjacking)."
+msgstr ""
+
+#: templates/list_errorpages.php:27
+msgid "Preview"
+msgstr ""
+
+#: templates/list_tools.php:345
+msgid "Primary Domain"
+msgstr ""
+
+#: templates/list_erisim.php:79
+msgid "Probe from outside now"
+msgstr ""
+
+#: templates/list_httpauth.php:69
+#: templates/list_httpauth.php:155
+msgid "Protected"
+msgstr ""
+
+#: bin/wd-health:126
+msgid "PTR does not match the server hostname; many providers reject this mail."
+msgstr ""
+
+#: templates/list_klon.php:48
+msgid "Publish"
+msgstr ""
+
+#: bin/wd-health:287
+msgid "published and matching"
+msgstr ""
+
+#: bin/wd-guvenlik:330
+msgid "Published security patches are not installed."
+msgstr ""
+
+#: templates/list_klon.php:106
+msgid "Publishing"
+msgstr ""
+
+#: templates/list_git.php:45
+#: templates/list_git.php:111
+msgid "Pull"
+msgstr ""
+
+#: list-git/index.php:47
+msgid "Pull failed: %s"
+msgstr ""
+
+#: list-git/index.php:72
+msgid "Pulled — {d}"
+msgstr ""
+
+#: templates/list_git.php:112
+msgid "Pulls every 5 minutes. This method was chosen instead of webhooks: no open endpoint on the server is required."
+msgstr ""
+
+#: templates/list_cloudflare.php:174
+msgid "Purge Cache"
+msgstr ""
+
+#: templates/list_cloudflare.php:202
+msgid "Push Panel DNS"
+msgstr ""
+
+#: templates/list_health.php:167
+msgid "Query failed — unknown does not mean there is a problem"
+msgstr ""
+
+#: templates/list_mailrapor.php:66
+msgid "QUEUE"
+msgstr ""
+
+#: bin/wd-health:215
+msgid "Queue is building up; there may be a delivery problem."
+msgstr ""
+
+#: bin/wd-mailrapor:244
+msgid "queue: %d pending, %d frozen | rejected connections: %d"
+msgstr ""
+
+#: templates/list_mailrapor.php:65
+msgid "Queued and frozen messages"
+msgstr ""
+
+#: templates/list_tools.php:34
+#: templates/wd-topbar.php:33
+msgid "Quick Install"
+msgstr ""
+
+#: templates/list_disk.php:144
+msgid "Quota usage"
+msgstr ""
+
+#: templates/list_waf.php:38
+msgid "RATE LIMIT (24 H)"
+msgstr ""
+
+#: templates/list_kur.php:129
+msgid "Re-uploading for an existing code updates the package; leave empty to keep the old package."
+msgstr ""
+
+#: templates/list_cloudflare.php:251
+msgid "readable by root only. The panel does not read the file; actions go through the sudo tool."
+msgstr ""
+
+#: templates/list_cloudflare.php:48
+msgid "Real Visitor IP"
+msgstr ""
+
+#: templates/list_cloudflare.php:22
+msgid "Real visitor IP, cache purge, and DNS push."
+msgstr ""
+
+#: templates/list_erisim.php:106
+msgid "Recent outages (%d)"
+msgstr ""
+
+#: list-git/index.php:75
+msgid "Record removed; files left in place."
+msgstr ""
+
+#: templates/wd-sidebar.php:141
+msgid "Records: %s"
+msgstr ""
+
+#: templates/list_tools.php:46
+msgid "Redirects"
+msgstr ""
+
+#: templates/list_yonlendirme.php:23
+msgid "Redirects and Site Rules"
+msgstr ""
+
+#: templates/list_yonlendirme.php:12
+msgid "Reduces leaking full URL details to external sites."
+msgstr ""
+
+#: tema/wd-fm.js:547
+#: tema/wd-fm.js:551
+msgid "Refresh"
+msgstr ""
+
+#: templates/list_mailrapor.php:172
+msgid "Rejected"
+msgstr ""
+
+#: templates/list_errorpages.php:158
+msgid "relative paths resolve against the failing URL."
+msgstr ""
+
+#: bin/wd-guvenlik:312
+msgid "relaxed"
+msgstr ""
+
+#: templates/list_health.php:332
+msgid "Remaining certificate lifetime. Auto-renewal can fail silently."
+msgstr ""
+
+#: templates/list_yedek.php:121
+msgid "Remote target"
+msgstr ""
+
+#: templates/list_git.php:47
+#: templates/list_node.php:59
+msgid "Remove"
+msgstr ""
+
+#: templates/list_yonlendirme.php:157
+msgid "Remove All Rules"
+msgstr ""
+
+#: templates/list_bayi.php:37
+msgid "Remove reseller"
+msgstr ""
+
+#: templates/list_waf.php:67
+msgid "Remove Rules"
+msgstr ""
+
+#: bin/wd-guvenlik:368
+msgid "Remove unused EOL versions."
+msgstr ""
+
+#: bin/wd-guvenlik:596
+msgid "removed: "
+msgstr ""
+
+#: tema/wd-fm.js:353
+msgid "Rename"
+msgstr ""
+
+#: templates/list_tools.php:355
+msgid "renews in %d days"
+msgstr ""
+
+#: templates/list_yedek.php:100
+#: templates/list_yedek.php:131
+msgid "Replace"
+msgstr ""
+
+#: list-git/index.php:71
+msgid "Repository cloned: {d}"
+msgstr ""
+
+#: templates/list_git.php:65
+msgid "Repository URL"
+msgstr ""
+
+#: bin/wd-git:180
+msgid "Repository URL must be https://, git@host:path, or ssh://."
+msgstr ""
+
+#: list-errorpages/index.php:51
+msgid "Requested address does not exist"
+msgstr ""
+
+#: templates/list_waf.php:77
+#: templates/list_waf.php:88
+msgid "Requests"
+msgstr ""
+
+#: templates/list_waf.php:51
+msgid "Requests containing patterns like UNION SELECT, base64_decode(, <script, ../../, /etc/passwd, php://input get 403."
+msgstr ""
+
+#: templates/list_kur.php:97
+msgid "Required for licensed software; enter the key from the vendor."
+msgstr ""
+
+#: templates/list_cloudflare.php:122
+msgid "Required permissions:"
+msgstr ""
+
+#: templates/list_disk.php:43
+#: templates/list_mailrapor.php:27
+#: templates/list_wp.php:30
+msgid "Rescan"
+msgstr ""
+
+#: templates/list_wp.php:30
+msgid "Rescan all sites (wp-cli, may take a while)"
+msgstr ""
+
+#: inc/wd-modul.php:191
+msgid "RESELLER"
+msgstr ""
+
+#: templates/list_bayi.php:37
+msgid "Reseller definition for %s will be removed; customer accounts are not deleted. Continue?"
+msgstr ""
+
+#: list-bayi/index.php:114
+msgid "Reseller definition removed: {d} (customer accounts remain)."
+msgstr ""
+
+#: inc/wd-modul.php:191
+#: templates/list_bayi.php:19
+msgid "Reseller Management"
+msgstr ""
+
+#: templates/list_bayi.php:163
+msgid "Reseller name"
+msgstr ""
+
+#: bin/wd-bayi:201
+#: bin/wd-bayi:212
+msgid "Reseller not found."
+msgstr ""
+
+#: list-bayi/index.php:113
+msgid "Reseller saved: {d}"
+msgstr ""
+
+#: templates/list_phpayar.php:145
+msgid "Reset to Defaults"
+msgstr ""
+
+#: templates/list_gecmis.php:31
+#: templates/list_tools.php:126
+msgid "Resource History"
+msgstr ""
+
+#: templates/list_tools.php:465
+msgid "Resource tier: %s — max %s memory, %s concurrent processes, request up to %s sec"
+msgstr ""
+
+#: templates/list_bayi.php:182
+msgid "Resources"
+msgstr ""
+
+#: templates/list_erisim.php:135
+msgid "Responses like 401/403/404 show the server answered and count as"
+msgstr ""
+
+#: templates/list_node.php:58
+msgid "Restart"
+msgstr ""
+
+#: templates/list_errorpages.php:120
+msgid "Restore Default"
+msgstr ""
+
+#: bin/wd-yedek:277
+msgid "Restore error: %s"
+msgstr ""
+
+#: list-yedek/index.php:51
+msgid "Restore failed: %s"
+msgstr ""
+
+#: list-yedek/index.php:59
+msgid "Restored (live files untouched): {d}. Review in File Manager and move what you need."
+msgstr ""
+
+#: bin/wd-guvenlik:307
+msgid "restricted: "
+msgstr ""
+
+#: templates/list_gecmis.php:136
+msgid "Retention"
+msgstr ""
+
+#: bin/wd-health:117
+#: bin/wd-health:123
+#: bin/wd-health:125
+msgid "Reverse DNS (PTR)"
+msgstr ""
+
+#: templates/list_guvenlik.php:59
+#: templates/list_health.php:156
+msgid "review"
+msgstr ""
+
+#: bin/wd-guvenlik:194
+msgid "Root can log in with a key; not with a password."
+msgstr ""
+
+#: templates/list_yonlendirme.php:103
+msgid "rule also moves"
+msgstr ""
+
+#: templates/list_waf.php:46
+msgid "Rules"
+msgstr ""
+
+#: templates/list_waf.php:107
+msgid "Rules are written to nginx; requests are cut before reaching PHP. Site code and speed are unaffected."
+msgstr ""
+
+#: list-yonlendirme/index.php:148
+msgid "Rules saved and published (%d redirect(s))."
+msgstr ""
+
+#: inc/wd-modul.php:189
+msgid "Run a Node.js app as a service and bind it to a domain"
+msgstr ""
+
+#: templates/list_node.php:11
+msgid "running"
+msgstr ""
+
+#: templates/list_node.php:48
+msgid "Running apps"
+msgstr ""
+
+#: templates/list_node.php:106
+msgid "Runs as a systemd unit under your account user; restarts in 5 seconds on crash; starts automatically on boot."
+msgstr ""
+
+#: bin/wd-tarama:63
+msgid "Runs obfuscated data directly (classic webshell signature)"
+msgstr ""
+
+#: bin/wd-tarama:75
+msgid "Runs request data as a system command"
+msgstr ""
+
+#: templates/list_yonlendirme.php:174
+msgid "runs. If invalid, the previous state is restored — a bad rule cannot take the site down."
+msgstr ""
+
+#: inc/wd-modul.php:327
+msgid "s"
+msgstr ""
+
+#: inc/wd-i18n.php:12
+#: templates/list_bayi.php:170
+#: templates/list_errorpages.php:115
+#: templates/list_phpayar.php:142
+msgid "Save"
+msgstr ""
+
+#: templates/list_waf.php:64
+#: templates/list_yonlendirme.php:154
+msgid "Save and Publish"
+msgstr ""
+
+#: templates/list_cloudflare.php:139
+msgid "Save and Verify"
+msgstr ""
+
+#: templates/list_cloudflare.php:89
+msgid "saved"
+msgstr ""
+
+#: templates/list_disk.php:236
+#: templates/list_guvenlik.php:35
+#: templates/list_wp.php:156
+msgid "Scan"
+msgstr ""
+
+#: list-wp/index.php:112
+msgid "Scan failed; is wp-cli installed?"
+msgstr ""
+
+#: templates/list_guvenlik.php:171
+msgid "Scan has not run yet. Click Scan above."
+msgstr ""
+
+#: templates/list_guvenlik.php:175
+msgid "Scan hit the time/file limit; results may be incomplete."
+msgstr ""
+
+#: templates/list_disk.php:51
+msgid "Scan re-run; the values below were just measured."
+msgstr ""
+
+#: bin/wd-tarama:269
+msgid "scan: %d files, %d findings (%.1f s)"
+msgstr ""
+
+#: templates/list_waf.php:49
+msgid "Scanners and scrapers such as AhrefsBot, SemrushBot, MJ12bot, sqlmap, nikto, wpscan get 403. Google/Bing are not affected."
+msgstr ""
+
+#: templates/list_guvenlik.php:189
+msgid "score"
+msgstr ""
+
+#: bin/wd-uyari:229
+msgid "Score %s. %s Inspect the file; take a backup before deleting."
+msgstr ""
+
+#: inc/wd-modul.php:66
+msgid "script not installed: %s"
+msgstr ""
+
+#: templates/wd-topbar.php:49
+#: templates/wd-topbar.php:52
+#: templates/wd-topbar.php:54
+msgid "Search"
+msgstr ""
+
+#: templates/list_httpauth.php:172
+msgid "Search engines"
+msgstr ""
+
+#: tema/wd-fm.js:533
+msgid "Search files"
+msgstr ""
+
+#: templates/wd-topbar.php:50
+msgid "Search tools ( / )"
+msgstr ""
+
+#: templates/wd-topbar.php:51
+msgid "Searches domains, email accounts, databases, and cron jobs"
+msgstr ""
+
+#: templates/list_phpayar.php:79
+msgid "sec"
+msgstr ""
+
+#: templates/list_git.php:113
+#: templates/list_guvenlik.php:19
+#: templates/list_tools.php:147
+#: templates/wd-sidebar.php:86
+msgid "Security"
+msgstr ""
+
+#: templates/wd-sidebar.php:86
+msgid "SECURITY"
+msgstr ""
+
+#: templates/list_guvenlik.php:80
+msgid "Security audit has not run yet. Click Audit above."
+msgstr ""
+
+#: list-guvenlik/index.php:71
+msgid "Security audit re-run."
+msgstr ""
+
+#: templates/list_yonlendirme.php:111
+msgid "Security Headers"
+msgstr ""
+
+#: bin/wd-guvenlik:328
+msgid "Security updates"
+msgstr ""
+
+#: bin/wd-guvenlik:643
+msgid "security: %d errors, %d warnings, %d ok"
+msgstr ""
+
+#: bin/wd-uyari:211
+msgid "Security: %s"
+msgstr ""
+
+#: inc/wd-modul.php:298
+#: templates/list_errorpages.php:68
+#: templates/list_yedek.php:58
+#: templates/list_yonlendirme.php:55
+msgid "Select"
+msgstr ""
+
+#: tema/wd-fm.js:540
+msgid "Select in folder tree"
+msgstr ""
+
+#: tema/wd-fm.js:633
+msgid "selected"
+msgstr ""
+
+#: templates/list_yedek.php:123
+msgid "Selected backup"
+msgstr ""
+
+#: templates/list_mailrapor.php:89
+msgid "Senders"
+msgstr ""
+
+#: bin/wd-tarama:90
+msgid "Sends mail inside a loop (spam script)"
+msgstr ""
+
+#: templates/list_health.php:187
+#: templates/list_tools.php:501
+msgid "Server"
+msgstr ""
+
+#: templates/wd-sidebar.php:245
+msgid "SERVER"
+msgstr ""
+
+#: bin/wd-guvenlik:177
+msgid "Server accepts password attempts; a target for brute-force attacks."
+msgstr ""
+
+#: templates/list_guvenlik.php:86
+msgid "Server Audit"
+msgstr ""
+
+#: list-errorpages/index.php:54
+msgid "Server Error"
+msgstr ""
+
+#: templates/wd-sidebar.php:89
+msgid "Server hardening and malware scan"
+msgstr ""
+
+#: templates/list_guvenlik.php:21
+msgid "Server hardening status and malware scanning on customer sites."
+msgstr ""
+
+#: templates/list_health.php:292
+msgid "Server IP"
+msgstr ""
+
+#: templates/wd-sidebar.php:263
+msgid "SERVER LOAD"
+msgstr ""
+
+#: templates/list_tools.php:152
+msgid "SERVER MANAGEMENT"
+msgstr ""
+
+#: templates/list_tools.php:139
+#: templates/wd-sidebar.php:245
+msgid "Server Settings"
+msgstr ""
+
+#: templates/list_tools.php:198
+msgid "Server-wide CPU usage"
+msgstr ""
+
+#: templates/list_tools.php:207
+msgid "Server-wide memory usage"
+msgstr ""
+
+#: bin/wd-uyari:174
+msgid "Server: %s"
+msgstr ""
+
+#: templates/list_node.php:106
+msgid "Service"
+msgstr ""
+
+#: templates/list_disk.php:273
+msgid "Session and upload temp files. Safe to empty."
+msgstr ""
+
+#: bin/wd-disk:147
+msgid "Session and upload temporary files"
+msgstr ""
+
+#: templates/list_phpayar.php:92
+msgid "Session lifetime (sec)"
+msgstr ""
+
+#: bin/wd-guvenlik:204
+msgid "Set MaxAuthTries 4 in sshd_config."
+msgstr ""
+
+#: templates/list_kur.php:132
+msgid "Setup path"
+msgstr ""
+
+#: templates/list_tools.php:367
+msgid "Shared IP"
+msgstr ""
+
+#: templates/list_guvenlik.php:225
+msgid "shell do not count."
+msgstr ""
+
+#: templates/list_phpayar.php:126
+msgid "Short open tag"
+msgstr ""
+
+#: templates/list_phpayar.php:116
+msgid "Show errors on screen"
+msgstr ""
+
+#: templates/list_erisim.php:143
+msgid "Shown in amber when response exceeds %d seconds; no notification is sent."
+msgstr ""
+
+#: templates/list_phpayar.php:122
+msgid "Shown in the \"PHP Error Log\" box below. Recommended."
+msgstr ""
+
+#: templates/list_kur.php:32
+msgid "shown once — save it"
+msgstr ""
+
+#: templates/wd-sidebar.php:99
+msgid "Shows where disk space is used"
+msgstr ""
+
+#: templates/list_disk.php:38
+msgid "Shows where space went — broken down by domain, directory, and file."
+msgstr ""
+
+#: templates/list_health.php:320
+msgid "Signs mail. Even if enabled in the panel, the signature cannot be verified if the DNS record is missing."
+msgstr ""
+
+#: bin/wd-erisim:306
+msgid "Site down: "
+msgstr ""
+
+#: templates/list_erisim.php:95
+msgid "Site has been unreachable since %s (%s)."
+msgstr ""
+
+#: bin/wd-erisim:288
+msgid "Site is reachable again"
+msgstr ""
+
+#: bin/wd-erisim:290
+msgid "Site recovered: "
+msgstr ""
+
+#: templates/list_tools.php:452
+msgid "Site Resources"
+msgstr ""
+
+#: templates/list_kur.php:92
+msgid "Site root has files; empty it first or provide a subdirectory to install to root."
+msgstr ""
+
+#: templates/list_kur.php:92
+msgid "Site root is empty; you can install directly to the root."
+msgstr ""
+
+#: bin/wd-erisim:304
+msgid "Site unreachable"
+msgstr ""
+
+#: templates/list_httpauth.php:168
+msgid "site. The browser asks for username and password before any page loads."
+msgstr ""
+
+#: templates/list_bayi.php:129
+msgid "sites"
+msgstr ""
+
+#: templates/list_gecmis.php:65
+msgid "Sites"
+msgstr ""
+
+#: bin/wd-kaynak:337
+msgid "skipped (unknown backend: %s)"
+msgstr ""
+
+#: templates/list_erisim.php:22
+#: templates/list_erisim.php:142
+msgid "Slow"
+msgstr ""
+
+#: templates/list_erisim.php:54
+msgid "SLOW"
+msgstr ""
+
+#: bin/wd-kaynak:70
+msgid "Small"
+msgstr ""
+
+#: bin/wd-klon:255
+msgid "Source document root does not exist."
+msgstr ""
+
+#: bin/wd-klon:247
+msgid "Source domain does not belong to this account."
+msgstr ""
+
+#: templates/list_klon.php:71
+msgid "Source site"
+msgstr ""
+
+#: templates/list_klon.php:43
+msgid "Source:"
+msgstr ""
+
+#: bin/wd-health:249
+msgid "SPF does not appear to authorize this server."
+msgstr ""
+
+#: bin/wd-guvenlik:162
+#: bin/wd-guvenlik:169
+msgid "SSH key"
+msgstr ""
+
+#: templates/list_tools.php:124
+msgid "SSH Keys"
+msgstr ""
+
+#: bin/wd-guvenlik:176
+#: bin/wd-guvenlik:184
+msgid "SSH password login"
+msgstr ""
+
+#: bin/wd-guvenlik:190
+#: bin/wd-guvenlik:199
+msgid "SSH root login"
+msgstr ""
+
+#: bin/wd-guvenlik:517
+msgid "sshd validation failed: "
+msgstr ""
+
+#: templates/list_tools.php:32
+msgid "SSL / Let's Encrypt"
+msgstr ""
+
+#: bin/wd-health:516
+msgid "SSL appears enabled but the certificate file is missing."
+msgstr ""
+
+#: templates/list_klon.php:27
+msgid "SSL could not be obtained (DNS may not resolve yet)"
+msgstr ""
+
+#: bin/wd-erisim:171
+msgid "SSL error"
+msgstr ""
+
+#: templates/list_tools.php:359
+msgid "SSL present (not LE)"
+msgstr ""
+
+#: list-klon/index.php:65
+msgid "Staging changes published to live site {d}. Previous state backed up under private/."
+msgstr ""
+
+#: templates/list_klon.php:25
+msgid "Staging created"
+msgstr ""
+
+#: list-klon/index.php:64
+msgid "Staging ready: {d}"
+msgstr ""
+
+#: templates/list_klon.php:37
+msgid "Staging sites"
+msgstr ""
+
+#: templates/list_klon.php:48
+msgid "Staging → live"
+msgstr ""
+
+#: templates/list_erisim.php:109
+#: templates/list_node.php:94
+msgid "Start"
+msgstr ""
+
+#: templates/list_node.php:14
+msgid "starting"
+msgstr ""
+
+#: templates/list_tools.php:125
+#: templates/wd-sidebar.php:238
+#: tema/wd-fm.js:79
+msgid "Statistics"
+msgstr ""
+
+#: templates/wd-sidebar.php:238
+msgid "STATS"
+msgstr ""
+
+#: bin/wd-kaynak:334
+#: templates/list_waf.php:39
+msgid "STATUS"
+msgstr ""
+
+#: templates/list_bayi.php:78
+#: templates/list_wp.php:99
+#: templates/list_wp.php:127
+msgid "Status"
+msgstr ""
+
+#: bin/wd-uyari:346
+msgid "status cleared"
+msgstr ""
+
+#: bin/wd-node:176
+msgid "Stock template missing: %s"
+msgstr ""
+
+#: templates/list_yonlendirme.php:10
+msgid "Stops the browser from guessing file types."
+msgstr ""
+
+#: templates/list_git.php:78
+#: templates/list_kur.php:90
+#: templates/list_node.php:87
+msgid "Subdirectory"
+msgstr ""
+
+#: templates/list_klon.php:77
+msgid "Subdomain"
+msgstr ""
+
+#: templates/list_mailrapor.php:55
+msgid "successful"
+msgstr ""
+
+#: templates/list_mailrapor.php:159
+msgid "Sudden volume spike"
+msgstr ""
+
+#: templates/list_guvenlik.php:237
+msgid "Sum of behavior patterns. 40+ is reported, 70+ is serious. A single pattern is not a conviction; legitimate code uses similar functions."
+msgstr ""
+
+#: templates/list_httpauth.php:148
+msgid "Summary"
+msgstr ""
+
+#: templates/wd-sidebar.php:282
+#: tema/wd-fm.js:192
+msgid "Support & forum"
+msgstr ""
+
+#: templates/list_bayi.php:101
+msgid "Suspend"
+msgstr ""
+
+#: templates/list_bayi.php:70
+msgid "SUSPENDED"
+msgstr ""
+
+#: templates/list_bayi.php:95
+msgid "suspended"
+msgstr ""
+
+#: templates/wd-sidebar.php:128
+msgid "Suspended: %s"
+msgstr ""
+
+#: bin/wd-uyari:228
+msgid "Suspicious file: %s"
+msgstr ""
+
+#: templates/list_guvenlik.php:69
+msgid "SUSPICIOUS FILES"
+msgstr ""
+
+#: templates/list_tools.php:504
+msgid "System Load"
+msgstr ""
+
+#: templates/wd-sidebar.php:268
+msgid "System load: %s / %s cores"
+msgstr ""
+
+#: templates/list_errorpages.php:142
+msgid "Takes effect as soon as you save; no server restart needed."
+msgstr ""
+
+#: bin/wd-health:433
+msgid "tar error"
+msgstr ""
+
+#: templates/list_kur.php:28
+msgid "target"
+msgstr ""
+
+#: bin/wd-kur:291
+msgid "Target directory is not empty (%s). Move existing files first or choose a subdirectory."
+msgstr ""
+
+#: bin/wd-git:194
+msgid "Target directory is not empty: %s"
+msgstr ""
+
+#: bin/wd-klon:249
+msgid "Target domain already exists."
+msgstr ""
+
+#: templates/list_kur.php:165
+msgid "Target must be empty"
+msgstr ""
+
+#: templates/list_git.php:80
+msgid "Target must be empty."
+msgstr ""
+
+#: templates/list_klon.php:79
+msgid "Target:"
+msgstr ""
+
+#: templates/list_waf.php:86
+msgid "Targeted paths"
+msgstr ""
+
+#: bin/wd-disk:146
+msgid "Temporary files"
+msgstr ""
+
+#: templates/wd-sidebar.php:234
+msgid "TERMINAL"
+msgstr ""
+
+#: templates/list_klon.php:92
+msgid "test.otherdomain.com (empty = subdomain above)"
+msgstr ""
+
+#: templates/list_httpauth.php:167
+msgid "The"
+msgstr ""
+
+#: templates/list_bayi.php:180
+msgid "The admin chooses which packages the reseller may open; the reseller cannot assign other packages."
+msgstr ""
+
+#: templates/list_health.php:138
+msgid "The check tool is not installed or cannot run."
+msgstr ""
+
+#: templates/list_klon.php:108
+msgid "The database is copied but application configuration must be updated manually; details are shown once after creation."
+msgstr ""
+
+#: templates/list_kur.php:166
+msgid "The database password is shown only once on the post-install screen; you can set a new one from the Databases page."
+msgstr ""
+
+#: templates/list_disk.php:60
+msgid "The disk analysis tool has not run yet."
+msgstr ""
+
+#: bin/wd-health:283
+msgid "The DKIM key in DNS differs from the panel; signatures cannot be verified."
+msgstr ""
+
+#: templates/list_node.php:107
+msgid "The domain is switched to the \"wd-node\" template; all requests including WebSocket are proxied to the app. SSL and Let's Encrypt keep working."
+msgstr ""
+
+#: templates/list_health.php:75
+msgid "the domain's DNS is not on this server."
+msgstr ""
+
+#: templates/list_yedek.php:64
+msgid "The file browser only works with local tar backups; use the Backups page for a full restore."
+msgstr ""
+
+#: bin/wd-guvenlik:437
+msgid "The firewall is exposing these ports externally."
+msgstr ""
+
+#: templates/list_yedek.php:133
+msgid "The first time a backup's contents are opened the archive is scanned and may take seconds; afterwards it is instant."
+msgstr ""
+
+#: templates/list_cloudflare.php:80
+msgid "The list refreshes automatically every day. Before updating, nginx and Apache configs are validated; if invalid, the change is rolled back."
+msgstr ""
+
+#: templates/list_wp.php:156
+msgid "The list refreshes nightly; \"Rescan\" refreshes immediately. After each action the related site is refreshed alone."
+msgstr ""
+
+#: templates/list_yedek.php:130
+msgid "the live site is untouched. Inspect and move it via File Manager."
+msgstr ""
+
+#: templates/list_yedek.php:131
+msgid "The live version is first moved under"
+msgstr ""
+
+#: templates/list_kur.php:164
+msgid "The package is extracted to your domain, a database and user are created if needed, and the license file is written. Then the software's own setup wizard finishes."
+msgstr ""
+
+#: templates/list_git.php:47
+msgid "The record will be removed; files and the .git directory stay in place. Continue?"
+msgstr ""
+
+#: templates/list_git.php:110
+msgid "The repo is cloned shallow (depth 1) as your account user. If a build step (composer, npm build) is needed, run it from the Web Terminal."
+msgstr ""
+
+#: templates/list_bayi.php:161
+msgid "The reseller logs into the panel with their own account and sees the \"My Customers\" page."
+msgstr ""
+
+#: bin/wd-guvenlik:192
+msgid "The root account can be targeted directly."
+msgstr ""
+
+#: templates/list_guvenlik.php:231
+msgid "The scan only reports. It does not quarantine or delete — accidentally destroying a customer's working file does more harm than a late-found webshell."
+msgstr ""
+
+#: templates/list_kur.php:105
+msgid "The selected app will be installed on %s. Continue?"
+msgstr ""
+
+#: templates/list_yedek.php:130
+msgid "The selected file/folder is extracted under"
+msgstr ""
+
+#: templates/list_node.php:59
+msgid "The service for %s will be stopped and removed; the domain returns to the stock PHP template. Files are not deleted. Continue?"
+msgstr ""
+
+#: templates/list_kur.php:39
+msgid "The software's setup wizard opens; enter database details there."
+msgstr ""
+
+#: templates/list_wp.php:127
+msgid "Theme"
+msgstr ""
+
+#: templates/wd-sidebar.php:278
+#: tema/wd-fm.js:191
+msgid "Theme & modules"
+msgstr ""
+
+#: templates/list_wp.php:124
+msgid "Themes (%d)"
+msgstr ""
+
+#: bin/wd-wp:319
+msgid "Themes: %s"
+msgstr ""
+
+#: templates/list_klon.php:106
+msgid "Then staging files are copied to live (except wp-config.php), the staging database is imported to live, and URLs are rewritten back."
+msgstr ""
+
+#: templates/list_yedek.php:131
+msgid "then the backup version is written. Swap them to undo."
+msgstr ""
+
+#: bin/wd-kaynak:350
+msgid "Theoretical memory ceiling: %d MB / server RAM %d MB"
+msgstr ""
+
+#: bin/wd-health:221
+msgid "There are frozen messages that could not be delivered."
+msgstr ""
+
+#: bin/wd-guvenlik:338
+msgid "There are pending updates."
+msgstr ""
+
+#: templates/list_wp.php:91
+msgid "These are WordPress's own files, not plugins; changes may indicate compromise. Before restoring from backup, restore official files with \"Update core only\"."
+msgstr ""
+
+#: templates/list_errorpages.php:164
+msgid "These files are served as plain HTML; PHP code is not executed."
+msgstr ""
+
+#: bin/wd-guvenlik:361
+msgid "These versions no longer receive security patches and are used on live sites."
+msgstr ""
+
+#: templates/list_cloudflare.php:223
+#: templates/list_guvenlik.php:216
+#: templates/list_httpauth.php:162
+msgid "Things to Know"
+msgstr ""
+
+#: bin/wd-health:361
+msgid "This account has no backups."
+msgstr ""
+
+#: bin/wd-bayi:138
+#: bin/wd-bayi:235
+#: bin/wd-bayi:267
+msgid "This account is not a reseller."
+msgstr ""
+
+#: templates/list_disk.php:103
+msgid "This account's scan hit the time limit; values below"
+msgstr ""
+
+#: bin/wd-health:434
+msgid "This backup cannot be restored. Take a new backup and delete the corrupt one."
+msgstr ""
+
+#: bin/wd-yedek:167
+#: bin/wd-yedek:252
+msgid "This backup has no file archive for the domain."
+msgstr ""
+
+#: templates/list_yedek.php:64
+msgid "This backup's archive file is not on the server"
+msgstr ""
+
+#: bin/wd-klon:303
+msgid "This database does not belong to your account: %s"
+msgstr ""
+
+#: bin/wd-kur:270
+#: bin/wd-phpayar:397
+#: bin/wd-waf:376
+#: bin/wd-yonlendirme:296
+msgid "This domain does not belong to user '%s'."
+msgstr ""
+
+#: templates/list_errorpages.php:98
+msgid "This file does not exist yet or cannot be read. It will be created when you save."
+msgstr ""
+
+#: templates/list_httpauth.php:180
+msgid "This method sends the password with every request; without"
+msgstr ""
+
+#: templates/list_errorpages.php:119
+msgid "This page will be restored to the default content. Your changes will be lost. Continue?"
+msgstr ""
+
+#: templates/list_httpauth.php:111
+msgid "This site is public. Add a user below to enable password protection."
+msgstr ""
+
+#: bin/wd-kur:282
+msgid "This software requires a license key; key is missing or malformed."
+msgstr ""
+
+#: bin/wd-kur:302
+msgid "This software requires PHP %s; the domain uses PHP %s. Raise the PHP version in domain settings."
+msgstr ""
+
+#: bin/wd-bayi:217
+msgid "This user cannot be assigned."
+msgstr ""
+
+#: bin/wd-bayi:142
+msgid "This user cannot be modified."
+msgstr ""
+
+#: bin/wd-bayi:222
+msgid "This user is already linked to reseller '%s'."
+msgstr ""
+
+#: bin/wd-bayi:140
+msgid "This user is not your customer."
+msgstr ""
+
+#: bin/wd-bayi:274
+msgid "This username is taken."
+msgstr ""
+
+#: templates/list_guvenlik.php:118
+msgid "This will change a server setting. Continue?\n\nIf prerequisites are not met the action is rejected — lockout protection is in place."
+msgstr ""
+
+#: templates/list_cloudflare.php:209
+msgid "This zone has no DNS zone in the panel, so the push option is disabled."
+msgstr ""
+
+#: bin/wd-kaynak:334
+msgid "TIER"
+msgstr ""
+
+#: templates/list_phpayar.php:55
+msgid "tier: %s"
+msgstr ""
+
+#: bin/wd-git:106
+#: bin/wd-klon:68
+#: bin/wd-node:80
+#: bin/wd-wp:125
+msgid "timed out"
+msgstr ""
+
+#: bin/wd-erisim:176
+#: bin/wd-health:428
+msgid "timeout"
+msgstr ""
+
+#: templates/list_phpayar.php:105
+msgid "Timezone"
+msgstr ""
+
+#: templates/list_guvenlik.php:70
+msgid "to review"
+msgstr ""
+
+#: templates/list_phpayar.php:178
+msgid "To the"
+msgstr ""
+
+#: list-cloudflare/index.php:72
+msgid "Token could not be verified: %s"
+msgstr ""
+
+#: list-cloudflare/index.php:152
+msgid "Token deleted."
+msgstr ""
+
+#: list-cloudflare/index.php:64
+msgid "Token looks too short."
+msgstr ""
+
+#: templates/list_tools.php:267
+#: templates/wd-sidebar.php:56
+#: tema/wd-fm.js:69
+msgid "Tools"
+msgstr ""
+
+#: templates/wd-sidebar.php:56
+msgid "TOOLS"
+msgstr ""
+
+#: templates/list_guvenlik.php:135
+msgid "Top Attacking IPs"
+msgstr ""
+
+#: templates/list_disk.php:256
+msgid "Total"
+msgstr ""
+
+#: bin/wd-health:544
+msgid "Trigger renewal manually: v-update-letsencrypt-ssl"
+msgstr ""
+
+#: templates/list_mailrapor.php:167
+msgid "Undeliverable messages stuck in the queue. If they pile up, clear the queue:"
+msgstr ""
+
+#: templates/list_yonlendirme.php:191
+msgid "undoing it is hard."
+msgstr ""
+
+#: bin/wd-guvenlik:435
+msgid "Unexpected open port"
+msgstr ""
+
+#: bin/wd-erisim:188
+msgid "unknown"
+msgstr ""
+
+#: templates/list_health.php:168
+msgid "UNKNOWN"
+msgstr ""
+
+#: list-guvenlik/index.php:64
+#: list-httpauth/index.php:75
+msgid "Unknown action."
+msgstr ""
+
+#: bin/wd-guvenlik:598
+msgid "Unknown action: "
+msgstr ""
+
+#: bin/wd-cloudflare:132
+msgid "unknown API error"
+msgstr ""
+
+#: bin/wd-erisim:303
+#: list-cloudflare/index.php:72
+#: list-cloudflare/index.php:138
+msgid "unknown error"
+msgstr ""
+
+#: templates/list_disk.php:92
+#: templates/list_tools.php:469
+msgid "unlimited"
+msgstr ""
+
+#: templates/list_bayi.php:45
+msgid "Unlink from reseller"
+msgstr ""
+
+#: templates/list_erisim.php:20
+msgid "Unreachable"
+msgstr ""
+
+#: templates/list_erisim.php:50
+msgid "UNREACHABLE"
+msgstr ""
+
+#: templates/list_erisim.php:135
+msgid "unreachable"
+msgstr ""
+
+#: bin/wd-kur:239
+msgid "Unsafe path in zip: %s"
+msgstr ""
+
+#: templates/list_bayi.php:99
+msgid "Unsuspend"
+msgstr ""
+
+#: templates/list_erisim.php:24
+msgid "Up"
+msgstr ""
+
+#: templates/list_erisim.php:135
+msgid "up"
+msgstr ""
+
+#: bin/wd-guvenlik:339
+#: templates/list_wp.php:66
+msgid "up to date"
+msgstr ""
+
+#: templates/list_wp.php:110
+msgid "Update"
+msgstr ""
+
+#: templates/list_wp.php:76
+msgid "Update all"
+msgstr ""
+
+#: list-wp/index.php:113
+msgid "Update completed."
+msgstr ""
+
+#: templates/list_wp.php:86
+msgid "Update core only"
+msgstr ""
+
+#: list-wp/index.php:58
+msgid "Update failed: %s"
+msgstr ""
+
+#: templates/list_cloudflare.php:76
+msgid "Update IP List"
+msgstr ""
+
+#: templates/list_wp.php:140
+msgid "Update themes"
+msgstr ""
+
+#: bin/wd-kaynak:399
+msgid "updated"
+msgstr ""
+
+#: bin/wd-guvenlik:322
+#: bin/wd-guvenlik:334
+#: bin/wd-guvenlik:339
+#: templates/list_tools.php:144
+#: templates/list_wp.php:155
+msgid "Updates"
+msgstr ""
+
+#: inc/wd-modul.php:185
+msgid "Updates, auto-update, integrity check, one-click admin login"
+msgstr ""
+
+#: templates/list_wp.php:31
+msgid "Updates, auto-updates, integrity check, maintenance mode, and one-click admin login."
+msgstr ""
+
+#: tema/wd-fm.js:348
+msgid "Upload"
+msgstr ""
+
+#: templates/list_phpayar.php:30
+msgid "Upload size, timeout, memory and error display — per domain."
+msgstr ""
+
+#: inc/wd-modul.php:182
+msgid "Upload size, timeouts, error display, and PHP error log"
+msgstr ""
+
+#: list-kur/index.php:51
+msgid "Uploaded file could not be moved to temporary storage."
+msgstr ""
+
+#: inc/wd-modul.php:184
+msgid "UPTIME"
+msgstr ""
+
+#: templates/list_tools.php:509
+#: templates/wd-sidebar.php:271
+msgid "Uptime"
+msgstr ""
+
+#: inc/wd-modul.php:184
+msgid "Uptime Monitor"
+msgstr ""
+
+#: templates/list_erisim.php:34
+msgid "Uptime Monitoring"
+msgstr ""
+
+#: templates/list_guvenlik.php:53
+#: templates/list_health.php:149
+msgid "urgent"
+msgstr ""
+
+#: templates/list_klon.php:27
+#: templates/list_kur.php:27
+msgid "URL"
+msgstr ""
+
+#: templates/list_git.php:67
+msgid "URL and add the deploy key on the right to the repo."
+msgstr ""
+
+#: templates/list_guvenlik.php:222
+msgid "usable"
+msgstr ""
+
+#: bin/wd-klon:423
+msgid "Usage: %s USER TARGET"
+msgstr ""
+
+#: bin/wd-wp:473
+msgid "Usage: eklenti USER DOMAIN PATH NAME action"
+msgstr ""
+
+#: bin/wd-kur:415
+msgid "Usage: katalog-ekle CODE ZIPPATH"
+msgstr ""
+
+#: bin/wd-kur:419
+msgid "Usage: katalog-sil CODE"
+msgstr ""
+
+#: bin/wd-kur:431
+msgid "Usage: kur USER DOMAIN CODE [LICENSE] [SUBDIR]"
+msgstr ""
+
+#: bin/wd-klon:412
+msgid "Usage: olustur USER SOURCE TARGET"
+msgstr ""
+
+#: templates/list_yonlendirme.php:180
+msgid "Use"
+msgstr ""
+
+#: templates/list_phpayar.php:89
+msgid "use 3000+ for WooCommerce/menu save issues"
+msgstr ""
+
+#: templates/list_cloudflare.php:127
+msgid "use a Global API Key — that key has access to the whole account."
+msgstr ""
+
+#: bin/wd-kaynak:334
+msgid "USER"
+msgstr ""
+
+#: templates/list_bayi.php:155
+msgid "User"
+msgstr ""
+
+#: templates/list_klon.php:29
+msgid "user"
+msgstr ""
+
+#: bin/wd-git:114
+msgid "User does not exist."
+msgstr ""
+
+#: bin/wd-git:189
+#: bin/wd-klon:252
+#: bin/wd-kur:273
+#: bin/wd-phpayar:300
+#: bin/wd-phpayar:332
+#: bin/wd-waf:263
+#: bin/wd-waf:296
+#: bin/wd-yonlendirme:230
+msgid "User home directory not found."
+msgstr ""
+
+#: templates/list_bayi.php:121
+#: templates/list_httpauth.php:121
+msgid "Username"
+msgstr ""
+
+#: list-httpauth/index.php:61
+msgid "Username must be 2–32 characters and contain only letters, digits, dots, underscores, or hyphens."
+msgstr ""
+
+#: bin/wd-bayi:272
+msgid "Username must start with a letter; lowercase letters, digits, - and _ (2-32 characters)."
+msgstr ""
+
+#: templates/list_tools.php:140
+#: templates/wd-sidebar.php:110
+msgid "Users"
+msgstr ""
+
+#: templates/wd-sidebar.php:110
+msgid "USERS"
+msgstr ""
+
+#: templates/wd-sidebar.php:114
+msgid "Users: %s · Suspended: %s"
+msgstr ""
+
+#: bin/wd-klon:205
+msgid "v-add-database failed"
+msgstr ""
+
+#: bin/wd-kur:256
+msgid "v-add-database failed (code %d)"
+msgstr ""
+
+#: templates/list_gecmis.php:118
+msgid "values, not averages. A five-minute load that locks the server is hidden by averages."
+msgstr ""
+
+#: list-wp/index.php:86
+msgid "Verification failed: %s"
+msgstr ""
+
+#: templates/list_cloudflare.php:94
+msgid "Verified"
+msgstr ""
+
+#: templates/list_phpayar.php:189
+msgid "Verify"
+msgstr ""
+
+#: templates/list_wp.php:80
+msgid "Verify integrity"
+msgstr ""
+
+#: templates/list_kur.php:125
+#: templates/list_wp.php:99
+#: templates/list_wp.php:127
+msgid "Version"
+msgstr ""
+
+#: bin/wd-tarama:78
+msgid "Very long base64 block (may be obfuscated code)"
+msgstr ""
+
+#: bin/wd-guvenlik:576
+msgid "vsftpd status: "
+msgstr ""
+
+#: bin/wd-uyari:280
+msgid "WARNING"
+msgstr ""
+
+#: inc/wd-helpers.php:735
+msgid "Warning"
+msgstr ""
+
+#: templates/list_yedek.php:97
+msgid "WARNING: %s will OVERWRITE the live version. The current copy is backed up under private/wd-geri. Continue?"
+msgstr ""
+
+#: templates/list_bayi.php:104
+msgid "WARNING: account %s, all its sites, mail, and databases will be PERMANENTLY deleted. Continue?"
+msgstr ""
+
+#: templates/list_guvenlik.php:58
+#: templates/list_health.php:155
+msgid "WARNINGS"
+msgstr ""
+
+#: templates/list_bayi.php:78
+msgid "Web / Mail / DB"
+msgstr ""
+
+#: inc/wd-modul.php:183
+msgid "Web Application Firewall"
+msgstr ""
+
+#: templates/list_health.php:300
+msgid "web domains"
+msgstr ""
+
+#: templates/list_tools.php:27
+#: templates/list_tools.php:240
+msgid "Web Domains"
+msgstr ""
+
+#: templates/list_tools.php:40
+msgid "Web Logs"
+msgstr ""
+
+#: templates/list_disk.php:269
+msgid "Web logs. Safe to delete; the server creates new ones. Usually the fastest win."
+msgstr ""
+
+#: templates/list_tools.php:42
+msgid "Web Statistics"
+msgstr ""
+
+#: templates/list_tools.php:150
+#: templates/wd-sidebar.php:234
+msgid "Web Terminal"
+msgstr ""
+
+#: templates/list_tools.php:50
+#: templates/wd-sidebar.php:122
+#: tema/wd-fm.js:72
+msgid "WEB — Domains"
+msgstr ""
+
+#: templates/list_tools.php:64
+msgid "Webmail"
+msgstr ""
+
+#: bin/wd-disk:140
+msgid "Websites"
+msgstr ""
+
+#: templates/list_erisim.php:134
+msgid "What counts"
+msgstr ""
+
+#: templates/list_health.php:308
+msgid "What Do the Checks Mean?"
+msgstr ""
+
+#: templates/list_kur.php:164
+msgid "What happens"
+msgstr ""
+
+#: templates/list_gecmis.php:122
+msgid "What is measured"
+msgstr ""
+
+#: templates/list_httpauth.php:165
+msgid "What it protects"
+msgstr ""
+
+#: templates/list_health.php:324
+msgid "What receivers do when SPF/DKIM fail. Without it, others can spoof mail as you."
+msgstr ""
+
+#: templates/list_guvenlik.php:235
+msgid "What the score means"
+msgstr ""
+
+#: templates/list_phpayar.php:181
+msgid "When it takes effect"
+msgstr ""
+
+#: templates/list_node.php:91
+msgid "when node_modules is missing"
+msgstr ""
+
+#: templates/list_waf.php:48
+msgid "When off, rules are kept but not applied."
+msgstr ""
+
+#: templates/list_cloudflare.php:53
+msgid "When the site is behind Cloudflare, connections to the server come from Cloudflare."
+msgstr ""
+
+#: templates/list_phpayar.php:177
+msgid "Where it is written"
+msgstr ""
+
+#: templates/list_waf.php:106
+msgid "Where it runs"
+msgstr ""
+
+#: templates/list_yonlendirme.php:195
+msgid "Where stored"
+msgstr ""
+
+#: templates/list_cloudflare.php:248
+msgid "Where the token lives"
+msgstr ""
+
+#: templates/list_health.php:312
+msgid "Which server receives mail for this domain from outside. If wrong, mail never arrives."
+msgstr ""
+
+#: templates/list_health.php:328
+msgid "Which server the domain resolves to. If different from here, the site is not served from this server."
+msgstr ""
+
+#: templates/list_health.php:316
+msgid "Which servers may send mail for this domain. Without it, messages land in spam."
+msgstr ""
+
+#: templates/list_mailrapor.php:22
+msgid "Who is sending how much mail, and what is bouncing. Spot a compromised account here before the IP hits a blacklist."
+msgstr ""
+
+#: templates/list_errorpages.php:168
+msgid "Why 5xx matters"
+msgstr ""
+
+#: templates/list_phpayar.php:185
+msgid "Why ceilings exist"
+msgstr ""
+
+#: templates/list_gecmis.php:114
+msgid "Why peak"
+msgstr ""
+
+#: bin/wd-kaynak:399
+msgid "will change"
+msgstr ""
+
+#: templates/list_gecmis.php:130
+msgid "With"
+msgstr ""
+
+#: bin/wd-kaynak:72
+msgid "WordPress / business site"
+msgstr ""
+
+#: templates/list_kur.php:107
+msgid "WordPress / others (Quick Install)"
+msgstr ""
+
+#: templates/list_klon.php:29
+msgid "WordPress configuration was updated automatically."
+msgstr ""
+
+#: bin/wd-wp:305
+#: bin/wd-wp:330
+#: bin/wd-wp:344
+#: bin/wd-wp:359
+#: bin/wd-wp:371
+#: bin/wd-wp:393
+#: bin/wd-wp:430
+msgid "WordPress installation not found."
+msgstr ""
+
+#: templates/list_wp.php:47
+msgid "WORDPRESS SITES"
+msgstr ""
+
+#: inc/wd-modul.php:185
+#: templates/list_wp.php:31
+msgid "WordPress Tools"
+msgstr ""
+
+#: bin/wd-node:259
+msgid "Working directory does not exist: %s"
+msgstr ""
+
+#: bin/wd-guvenlik:453
+msgid "World-writable files"
+msgstr ""
+
+#: bin/wd-wp:433
+msgid "WP object cache: %s"
+msgstr ""
+
+#: templates/list_kur.php:62
+msgid "WP Tools"
+msgstr ""
+
+#: bin/wd-wp:199
+msgid "wp-cli is not installed"
+msgstr ""
+
+#: bin/wd-wp:307
+msgid "wp-cli is not installed."
+msgstr ""
+
+#: bin/wd-klon:186
+msgid "wp-cli missing"
+msgstr ""
+
+#: templates/list_wp.php:155
+msgid "wp-cli runs as the site user; taking a backup from the Backups page before updating is recommended."
+msgstr ""
+
+#: templates/list_wp.php:43
+msgid "wp-cli was not found on the server; the admin should install it by running kur-modul.sh. The list still shows but actions will not work."
+msgstr ""
+
+#: bin/wd-tarama:84
+msgid "Writes a file then immediately includes it"
+msgstr ""
+
+#: bin/wd-kaynak:76
+msgid "XL"
+msgstr ""
+
+#: bin/wd-cloudflare:476
+msgid "yes"
+msgstr ""
+
+#: bin/wd-bayi:334
+msgid "You are not allowed to assign this package."
+msgstr ""
+
+#: bin/wd-bayi:284
+msgid "You are not allowed to create this package."
+msgstr ""
+
+#: templates/list_phpayar.php:190
+msgid "You can place a file with"
+msgstr ""
+
+#: templates/list_health.php:75
+msgid "You cannot fix this record from the panel"
+msgstr ""
+
+#: templates/list_git.php:56
+#: templates/list_phpayar.php:42
+#: templates/list_waf.php:29
+msgid "You do not have any web domains yet."
+msgstr ""
+
+#: templates/list_kur.php:46
+msgid "You do not have any web domains yet. Add a domain first."
+msgstr ""
+
+#: templates/list_bayi.php:76
+msgid "You have no customers yet."
+msgstr ""
+
+#: templates/list_klon.php:62
+msgid "You have no domains to clone."
+msgstr ""
+
+#: templates/list_errorpages.php:49
+#: templates/list_yonlendirme.php:42
+msgid "You have no web domains yet."
+msgstr ""
+
+#: templates/list_httpauth.php:56
+msgid "You have no web domains yet. After you add a domain it appears here."
+msgstr ""
+
+#: bin/wd-bayi:269
+msgid "You have reached your customer limit (%d)."
+msgstr ""
+
+#: templates/list_bayi.php:138
+msgid "You have reached your customer limit. Ask the admin to raise it."
+msgstr ""
+
+#: templates/list_phpayar.php:186
+msgid "Your account resource tier sets upper bounds for memory and time; values above the tier silently fail. This page shows the ceiling and lowers anything that exceeds it."
+msgstr ""
+
+#: templates/list_kur.php:75
+msgid "Your admin has not added any apps yet."
+msgstr ""
+
+#: templates/list_node.php:105
+msgid "Your app receives a"
+msgstr ""
+
+#: templates/list_node.php:24
+msgid "Your app runs as a service under your account, restarts on crash, and is bound to your domain."
+msgstr ""
+
+#: templates/list_waf.php:58
+msgid "Your office IP — 203.0.113.7"
+msgstr ""
+
+#: templates/list_erisim.php:35
+msgid "Your sites are checked from outside every 5 minutes; you get a panel notification when they go down."
+msgstr ""
+
+#: templates/list_kur.php:131
+msgid "Zip inner root"
+msgstr ""
+
+#: list-kur/index.php:57
+msgid "ZIP upload failed (error code %d). Check the server upload_max_filesize limit."
+msgstr ""
+
+#: templates/wd-sidebar.php:140
+msgid "Zones"
+msgstr ""
+
+#: list-kur/index.php:116
+msgid "{d} added to catalog."
+msgstr ""
+
+#: list-erisim/index.php:42
+msgid "{d} checked now; result updated below."
+msgstr ""
+
+#: list-bayi/index.php:120
+msgid "{d} deleted."
+msgstr ""
+
+#: list-bayi/index.php:115
+msgid "{d} linked to reseller."
+msgstr ""
+
+#: list-kur/index.php:117
+msgid "{d} removed from catalog."
+msgstr ""
+
+#: list-klon/index.php:66
+msgid "{d} removed."
+msgstr ""
+
+#: list-node/index.php:56
+msgid "{d} restarted."
+msgstr ""
+
+#: list-bayi/index.php:118
+msgid "{d} suspended."
+msgstr ""
+
+#: list-bayi/index.php:116
+msgid "{d} unlinked from reseller."
+msgstr ""
+
+#: list-bayi/index.php:119
+msgid "{d} unsuspended."
+msgstr ""
+

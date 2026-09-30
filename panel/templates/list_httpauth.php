@@ -1,12 +1,12 @@
 <?php
 /**
- * WebDanışmanı — "Dizin Şifre Koruma" sayfa şablonu
- * Kurulum yeri: /usr/local/hestia/web/templates/pages/list_httpauth.php
+ * WebDanışmanı — "Directory Password Protection" page template
+ * Installs to: /usr/local/hestia/web/templates/pages/list_httpauth.php
  */
 
 $tok = $_SESSION["token"] ?? "";
 
-/** AUTH_USER alanı iki nokta ile ayrılmış bir listedir: "ali:veli" */
+/** AUTH_USER is a colon-separated list: "ali:veli" */
 $wd_auth_kullanicilar = function ($rec) {
 	$ham = trim((string) ($rec["AUTH_USER"] ?? ""));
 	if ($ham === "") {
@@ -30,10 +30,9 @@ foreach ($wd_doms as $rec) {
 
 			<div class="wd-page-head">
 				<div>
-					<h1 class="wd-title">Dizin Şifre Koruma</h1>
+					<h1 class="wd-title"><?= wd_esc__("Directory Password Protection") ?></h1>
 					<p class="wd-subtitle">
-						Siteyi ziyaret edenlerden tarayıcı üzerinden kullanıcı adı ve parola ister.
-						Yayına almadan önceki siteler ve iç kullanıma açık alanlar için.
+						<?= wd_esc__("Asks visitors for a username and password in the browser. For sites not yet live and areas meant for internal use.") ?>
 					</p>
 				</div>
 			</div>
@@ -54,7 +53,7 @@ foreach ($wd_doms as $rec) {
 
 				<div class="wd-note">
 					<i class="fas fa-circle-info"></i>
-					<span>Henüz web alan adınız yok. Alan adı ekledikten sonra burada görünür.</span>
+					<span><?= wd_esc__("You have no web domains yet. After you add a domain it appears here.") ?></span>
 				</div>
 
 			<?php } else {
@@ -67,9 +66,9 @@ foreach ($wd_doms as $rec) {
 						<span class="wd-group-icon"><i class="fas <?= $acik ? "fa-lock" : "fa-lock-open" ?>"></i></span>
 						<span class="wd-group-title"><?= wd_e($dad) ?></span>
 						<?php if ($acik) { ?>
-							<span class="wd-hs-badge wd-hs-ok">Korumalı</span>
+							<span class="wd-hs-badge wd-hs-ok"><?= wd_esc__("Protected") ?></span>
 						<?php } else { ?>
-							<span class="wd-group-count">koruma yok</span>
+							<span class="wd-group-count"><?= wd_esc__("no protection") ?></span>
 						<?php } ?>
 						<i class="fas fa-chevron-down wd-group-chevron"></i>
 					</summary>
@@ -92,16 +91,16 @@ foreach ($wd_doms as $rec) {
 												<input type="hidden" name="v_domain" value="<?= wd_e($dad) ?>">
 												<input type="hidden" name="v_auth_user" value="<?= wd_e($au) ?>">
 												<input type="hidden" name="v_password" value="">
-												<button type="submit" class="wd-mini-btn">Parolayı değiştir</button>
+												<button type="submit" class="wd-mini-btn"><?= wd_esc__("Change password") ?></button>
 											</form>
 											<form method="post" class="wd-inline-form"
-												onsubmit="return confirm('<?= wd_e($au) ?> kullanıcısı silinsin mi? Bu kullanıcı artık siteye giremez.');">
+												onsubmit="return confirm(<?= htmlspecialchars(json_encode(sprintf(wd__("Delete user %s? They will no longer be able to access the site."), $au)), ENT_QUOTES, "UTF-8") ?>);">
 												<input type="hidden" name="token" value="<?= wd_e($tok) ?>">
 												<input type="hidden" name="ok" value="1">
 												<input type="hidden" name="islem" value="sil">
 												<input type="hidden" name="v_domain" value="<?= wd_e($dad) ?>">
 												<input type="hidden" name="v_auth_user" value="<?= wd_e($au) ?>">
-												<button type="submit" class="wd-mini-btn wd-mini-btn-danger">Sil</button>
+												<button type="submit" class="wd-mini-btn wd-mini-btn-danger"><?= wd_esc__("Delete") ?></button>
 											</form>
 										</div>
 									</div>
@@ -109,7 +108,7 @@ foreach ($wd_doms as $rec) {
 							</div>
 						<?php } else { ?>
 							<p class="wd-empty">
-								Bu site herkese açık. Aşağıdan kullanıcı ekleyerek parola koruması başlatabilirsiniz.
+								<?= wd_esc__("This site is public. Add a user below to enable password protection.") ?>
 							</p>
 						<?php } ?>
 
@@ -119,19 +118,19 @@ foreach ($wd_doms as $rec) {
 							<input type="hidden" name="islem" value="ekle">
 							<input type="hidden" name="v_domain" value="<?= wd_e($dad) ?>">
 							<div class="wd-auth-field">
-								<label class="form-label" for="au_<?= wd_e($dad) ?>">Kullanıcı adı</label>
+								<label class="form-label" for="au_<?= wd_e($dad) ?>"><?= wd_esc__("Username") ?></label>
 								<input class="form-control" type="text" id="au_<?= wd_e($dad) ?>"
 									name="v_auth_user" autocomplete="off" required
 									pattern="[A-Za-z0-9._\-]{2,32}"
-									title="2-32 karakter; harf, rakam, nokta, alt çizgi veya tire">
+									title="<?= wd_esc__("2–32 characters; letters, digits, period, underscore, or hyphen") ?>">
 							</div>
 							<div class="wd-auth-field">
-								<label class="form-label" for="ap_<?= wd_e($dad) ?>">Parola</label>
+								<label class="form-label" for="ap_<?= wd_e($dad) ?>"><?= wd_esc__("Password") ?></label>
 								<input class="form-control" type="password" id="ap_<?= wd_e($dad) ?>"
 									name="v_password" autocomplete="new-password" required minlength="8"
-									title="En az 8 karakter">
+									title="<?= wd_esc__("At least 8 characters") ?>">
 							</div>
-							<button type="submit" class="button">Koruma Ekle</button>
+							<button type="submit" class="button"><?= wd_esc__("Add Protection") ?></button>
 						</form>
 
 					</div>
@@ -142,52 +141,51 @@ foreach ($wd_doms as $rec) {
 
 		</div>
 
-		<!-- ================= SAĞ PANEL ================= -->
+		<!-- ================= RIGHT RAIL ================= -->
 		<aside class="wd-rail">
 
 			<div class="wd-card">
-				<div class="wd-card-head">Özet</div>
+				<div class="wd-card-head"><?= wd_esc__("Summary") ?></div>
 				<div class="wd-card-body">
 					<div class="wd-kv">
-						<span class="wd-k">Alan Adı</span>
+						<span class="wd-k"><?= wd_esc__("Domain") ?></span>
 						<span class="wd-v"><?= count($wd_doms) ?></span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Korumalı</span>
+						<span class="wd-k"><?= wd_esc__("Protected") ?></span>
 						<span class="wd-v"><?= (int) $wd_korumali ?></span>
 					</div>
 				</div>
 			</div>
 
 			<div class="wd-card">
-				<div class="wd-card-head">Bilmeniz Gerekenler</div>
+				<div class="wd-card-head"><?= wd_esc__("Things to Know") ?></div>
 				<div class="wd-card-body">
 					<div class="wd-kv">
-						<span class="wd-k">Neyi korur</span>
+						<span class="wd-k"><?= wd_esc__("What it protects") ?></span>
 						<span class="wd-v-small">
-							Sitenin <b>tamamını</b>. Tarayıcı, sayfa açılmadan önce kullanıcı adı ve
-							parola sorar.
+							<?= wd_esc__("The") ?> <b><?= wd_esc__("entire") ?></b>
+							<?= wd_esc__("site. The browser asks for username and password before any page loads.") ?>
 						</span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Arama motorları</span>
+						<span class="wd-k"><?= wd_esc__("Search engines") ?></span>
 						<span class="wd-v-small">
-							Korumalı site taranamaz ve dizine eklenmez. Yayına aldığınızda
-							korumayı kaldırmayı unutmayın.
+							<?= wd_esc__("A protected site cannot be crawled or indexed. Remember to remove protection when you go live.") ?>
 						</span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Şifreleme</span>
+						<span class="wd-k"><?= wd_esc__("Encryption") ?></span>
 						<span class="wd-v-small">
-							Bu yöntem parolayı her istekte gönderir; <b>HTTPS olmadan</b>
-							ağda okunabilir. Sitenizde SSL etkin olsun.
+							<?= wd_esc__("This method sends the password with every request; without") ?>
+							<b>HTTPS</b>
+							<?= wd_esc__("it can be read on the network. Keep SSL enabled on the site.") ?>
 						</span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Yeterli mi</span>
+						<span class="wd-k"><?= wd_esc__("Is it enough?") ?></span>
 						<span class="wd-v-small">
-							Hassas veri için tek başına yeterli değildir — uygulama içi
-							oturum açma yerine geçmez.
+							<?= wd_esc__("Not enough alone for sensitive data — it does not replace in-app sign-in.") ?>
 						</span>
 					</div>
 				</div>
@@ -198,14 +196,13 @@ foreach ($wd_doms as $rec) {
 </div>
 
 <script>
-	// Parola değiştirme: satır içi form gizli bir alan taşır, parola sorulur.
-	// prompt() kullanılmasının sebebi tek alanlık bir işlem için ayrı bir sayfa
-	// veya kip açmanın gereksiz olması.
+	// Password change: the inline form carries a hidden field; password is prompted.
+	// prompt() is used because a separate page or modal is overkill for one field.
 	function wdParolaSor(form) {
-		var p = window.prompt("Yeni parola (en az 8 karakter):");
+		var p = window.prompt(<?= json_encode(wd__("New password (at least 8 characters):"), JSON_UNESCAPED_UNICODE) ?>);
 		if (p === null) { return false; }
 		if (p.length < 8) {
-			window.alert("Parola en az 8 karakter olmalı.");
+			window.alert(<?= json_encode(wd__("Password must be at least 8 characters."), JSON_UNESCAPED_UNICODE) ?>);
 			return false;
 		}
 		form.elements["v_password"].value = p;

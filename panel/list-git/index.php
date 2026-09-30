@@ -1,7 +1,7 @@
 <?php
 /**
- * WebDanışmanı — "Git Dağıtım" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/git/index.php
+ * WebDanışmanı — "Git Deploy" page
+ * Installs to: /usr/local/hestia/web/list/git/index.php
  */
 
 ob_start();
@@ -23,9 +23,9 @@ if (!empty($_POST["ok"])) {
 	$dom = strtolower(trim((string) ($_POST["v_domain"] ?? "")));
 	$alt = trim((string) ($_POST["v_alt"] ?? ""), "/ ");
 	if (!isset($wd_doms[$dom])) {
-		$wd_hata = "Geçersiz alan adı.";
+		$wd_hata = wd__("Invalid domain.");
 	} elseif ($alt !== "" && !preg_match('/^[A-Za-z0-9._-]{1,60}$/', $alt)) {
-		$wd_hata = "Alt dizin geçersiz.";
+		$wd_hata = wd__("Invalid subdirectory.");
 	} elseif ($islem === "klonla") {
 		$secenek = ["repo" => trim((string) ($_POST["v_repo"] ?? "")), "dal" => trim((string) ($_POST["v_dal"] ?? "")), "alt_dizin" => $alt];
 		$d = wd_modul_json("wd-git", ["klonla", $wd_user, $dom], json_encode($secenek), 900);
@@ -33,7 +33,7 @@ if (!empty($_POST["ok"])) {
 			header("Location: /list/git/?durum=klonlandi&d=" . urlencode($dom . ($alt !== "" ? "/" . $alt : "")));
 			exit();
 		}
-		$wd_hata = $d["hata"] ?? "Klonlanamadı.";
+		$wd_hata = $d["hata"] ?? wd__("Could not clone.");
 	} elseif ($islem === "cek") {
 		$args = ["cek", $wd_user, $dom];
 		if ($alt !== "") {
@@ -44,7 +44,7 @@ if (!empty($_POST["ok"])) {
 			header("Location: /list/git/?durum=cekildi&d=" . urlencode((string) ($d["mesaj"] ?? "")));
 			exit();
 		}
-		$wd_hata = "Çekilemedi: " . ($d["hata"] ?? "");
+		$wd_hata = sprintf(wd__("Pull failed: %s"), $d["hata"] ?? "");
 	} elseif ($islem === "otomatik") {
 		$deger = ($_POST["v_deger"] ?? "on") === "on" ? "on" : "off";
 		$args = ["otomatik", $wd_user, $dom];
@@ -68,12 +68,12 @@ if (!empty($_POST["ok"])) {
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"klonlandi" => "Depo klonlandı: {d}",
-		"cekildi" => "Çekildi — {d}",
-		"otomatik-on" => "Otomatik çekme açıldı; her 5 dakikada bir denenir.",
-		"otomatik-off" => "Otomatik çekme kapatıldı.",
-		"kaldirildi" => "Kayıt kaldırıldı; dosyalar yerinde duruyor.",
-		"hata" => "İşlem yapılamadı.",
+		"klonlandi" => wd__("Repository cloned: {d}"),
+		"cekildi" => wd__("Pulled — {d}"),
+		"otomatik-on" => wd__("Auto-pull enabled; tried every 5 minutes."),
+		"otomatik-off" => wd__("Auto-pull disabled."),
+		"kaldirildi" => wd__("Record removed; files left in place."),
+		"hata" => wd__("Action could not be completed."),
 	]);
 }
 

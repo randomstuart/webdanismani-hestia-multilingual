@@ -1,17 +1,18 @@
 <?php
 /**
- * WebDanışmanı — "Cloudflare" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/cloudflare/index.php
+ * WebDanışmanı — "Cloudflare" page
+ * Installs to: /usr/local/hestia/web/list/cloudflare/index.php
  *
- * YENİ dosyadır; HestiaCP güncellemelerinden etkilenmez.
+ * NEW file; unaffected by HestiaCP updates.
  *
- * YALNIZCA YÖNETİCİ. Cloudflare jetonu hesaptaki TÜM bölgeleri yönetebilir;
- * bu tek bir müşteriye açılamaz.
+ * ADMIN ONLY. The Cloudflare token can manage ALL zones on the account;
+ * it must not be exposed to a single customer.
  *
- * JETON GÜVENLİĞİ
- * Jeton hiçbir zaman komut satırına yazılmaz — `ps` çıktısında görünürdü.
- * proc_open ile alt sürecin STDIN'ine verilir. Panel jeton dosyasını okumaz;
- * dosya 0600 root'tur ve tüm işlemler sudo'lu wd-cloudflare üzerinden geçer.
+ * TOKEN SECURITY
+ * The token is never written on the command line — it would show in `ps`.
+ * It is passed to the child process STDIN via proc_open. The panel does not
+ * read the token file; the file is 0600 root and all actions go through
+ * sudo'd wd-cloudflare.
  */
 
 use function Hestiacp\quoteshellarg\quoteshellarg;
@@ -41,7 +42,7 @@ function wd_cf_calistir(string $args, ?string $stdin = null): array {
 	$desc = [0 => ["pipe", "r"], 1 => ["pipe", "w"], 2 => ["pipe", "w"]];
 	$p = proc_open($cmd, $desc, $boru);
 	if (!is_resource($p)) {
-		return [1, "", "süreç başlatılamadı"];
+		return [1, "", wd__("could not start process")];
 	}
 	if ($stdin !== null) {
 		fwrite($boru[0], $stdin);
@@ -61,7 +62,7 @@ if (!empty($_POST["ok"])) {
 	if ($islem === "jeton") {
 		$jeton = trim((string) ($_POST["v_token"] ?? ""));
 		if (strlen($jeton) < 20) {
-			$wd_hata = "Jeton çok kısa görünüyor.";
+			$wd_hata = wd__("Token looks too short.");
 		} else {
 			[$rc, $out] = wd_cf_calistir("jeton-kaydet", $jeton);
 			$d = json_decode($out, true);
@@ -69,7 +70,7 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/cloudflare/?durum=jeton-ok");
 				exit();
 			}
-			$wd_hata = "Jeton doğrulanamadı: " . ($d["hata"] ?? "bilinmeyen hata");
+			$wd_hata = sprintf(wd__("Token could not be verified: %s"), $d["hata"] ?? wd__("unknown error"));
 		}
 	} elseif ($islem === "jeton-sil") {
 		wd_cf_calistir("jeton-sil");
@@ -82,12 +83,12 @@ if (!empty($_POST["ok"])) {
 			header("Location: /list/cloudflare/?durum=ip-ok&v4=" . (int) $d["v4"]);
 			exit();
 		}
-		$wd_hata = "IP listesi güncellenemedi: " . trim($err ?: $out);
+		$wd_hata = sprintf(wd__("Could not update IP list: %s"), trim($err ?: $out));
 	} elseif ($islem === "onbellek" || $islem === "gelistirme" || $islem === "dns") {
 		// Alan adı yalnızca Cloudflare'den gelen bölge listesinden seçilebilir.
 		$dom = trim((string) ($_POST["v_zone"] ?? ""));
 		if (!preg_match('/^[a-z0-9.-]{3,253}$/i', $dom)) {
-			$wd_hata = "Geçersiz bölge.";
+			$wd_hata = wd__("Invalid zone.");
 		} elseif ($islem === "onbellek") {
 			[$rc, $out] = wd_cf_calistir("onbellek-temizle " . quoteshellarg($dom));
 			$d = json_decode($out, true);
@@ -95,7 +96,7 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/cloudflare/?durum=onbellek&d=" . urlencode($dom));
 				exit();
 			}
-			$wd_hata = "Önbellek temizlenemedi: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not purge cache: %s"), $d["hata"] ?? "");
 		} elseif ($islem === "gelistirme") {
 			$deger = ($_POST["v_deger"] ?? "off") === "on" ? "on" : "off";
 			[$rc, $out] = wd_cf_calistir(
@@ -106,7 +107,7 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/cloudflare/?durum=gelistirme-" . $deger . "&d=" . urlencode($dom));
 				exit();
 			}
-			$wd_hata = "Geliştirme modu değiştirilemedi: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not change development mode: %s"), $d["hata"] ?? "");
 		} else {
 			// DNS gönderimi: hangi Hestia kullanıcısının bölgesi olduğu bulunur.
 			$sahip = "";
@@ -117,7 +118,7 @@ if (!empty($_POST["ok"])) {
 				}
 			}
 			if ($sahip === "") {
-				$wd_hata = "Bu alan adı için panelde bir DNS bölgesi yok.";
+				$wd_hata = wd__("No DNS zone for this domain in the panel.");
 			} else {
 				[$rc, $out] = wd_cf_calistir(
 					"dns-gonder " . quoteshellarg($sahip) . " " . quoteshellarg($dom),
@@ -133,8 +134,10 @@ if (!empty($_POST["ok"])) {
 					exit();
 				}
 				$wd_hata =
-					"DNS gönderilemedi: " .
-					implode("; ", array_slice($d["hatalar"] ?? ["bilinmeyen hata"], 0, 3));
+					sprintf(
+						wd__("Could not push DNS: %s"),
+						implode("; ", array_slice($d["hatalar"] ?? [wd__("unknown error")], 0, 3)),
+					);
 			}
 		}
 	}
@@ -144,31 +147,33 @@ if ($wd_hata === "" && isset($_GET["durum"])) {
 	$d = htmlspecialchars((string) ($_GET["d"] ?? ""), ENT_QUOTES, "UTF-8");
 	switch ($_GET["durum"]) {
 		case "jeton-ok":
-			$wd_bilgi = "Cloudflare jetonu doğrulandı ve kaydedildi.";
+			$wd_bilgi = wd__("Cloudflare token verified and saved.");
 			break;
 		case "jeton-silindi":
-			$wd_bilgi = "Jeton silindi.";
+			$wd_bilgi = wd__("Token deleted.");
 			break;
 		case "ip-ok":
-			$wd_bilgi =
-				"Cloudflare IP listesi güncellendi (" .
-				(int) ($_GET["v4"] ?? 0) .
-				" IPv4 aralığı). Gerçek ziyaretçi IP'si yeniden doğru okunuyor.";
+			$wd_bilgi = sprintf(
+				wd__("Cloudflare IP list updated (%d IPv4 ranges). Real visitor IPs are being read correctly again."),
+				(int) ($_GET["v4"] ?? 0),
+			);
 			break;
 		case "onbellek":
-			$wd_bilgi = "Önbellek temizlendi: " . $d;
+			$wd_bilgi = sprintf(wd__("Cache purged: %s"), $d);
 			break;
 		case "gelistirme-on":
-			$wd_bilgi = "Geliştirme modu açıldı (3 saat): " . $d;
+			$wd_bilgi = sprintf(wd__("Development mode enabled (3 hours): %s"), $d);
 			break;
 		case "gelistirme-off":
-			$wd_bilgi = "Geliştirme modu kapatıldı: " . $d;
+			$wd_bilgi = sprintf(wd__("Development mode disabled: %s"), $d);
 			break;
 		case "dns":
-			$wd_bilgi =
-				"DNS gönderildi: " . $d .
-				" — " . (int) ($_GET["e"] ?? 0) . " eklendi, " .
-				(int) ($_GET["g"] ?? 0) . " güncellendi.";
+			$wd_bilgi = sprintf(
+				wd__("DNS pushed: %s — %d added, %d updated."),
+				$d,
+				(int) ($_GET["e"] ?? 0),
+				(int) ($_GET["g"] ?? 0),
+			);
 			break;
 	}
 }

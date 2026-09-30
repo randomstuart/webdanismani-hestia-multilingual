@@ -10,9 +10,14 @@ Free, MIT-licensed. Install it on any server you like.
 **Theme & modules:** <https://webdanismani.com>
 **Support, bug reports, feature requests:** <https://oblifex.com>
 
-> **The UI is in Turkish.** Labels are written directly into the templates
-> rather than into HestiaCP's i18n system. Translation contributions are very
-> welcome. Turkish documentation: [BENIOKU.md](BENIOKU.md).
+> **English UI with gettext translations.** Source strings are English
+> (`wd__('…')`). Language follows the HestiaCP user language. Catalogs:
+> `panel/locale/{lang}/LC_MESSAGES/webdanismani.po` — see
+> [panel/locale/README.md](panel/locale/README.md). Turkish catalog included
+> (partial seed; contributions welcome). Upstream docs: [BENIOKU.md](BENIOKU.md).
+
+This repository is the **English / i18n fork** of
+[webdanismani/webdanismani-hestia](https://github.com/webdanismani/webdanismani-hestia).
 
 ---
 
@@ -182,7 +187,11 @@ moves resource-limited sites back to stock php-fpm templates. User settings
 
 ## Known limits
 
-- Turkish UI only.
+- After install/upgrade, refresh health/disk/security caches so findings use English msgids (`wd-*-refresh`).
+- No "Type" column in the file manager (FileGator limitation); type is shown with a coloured icon instead.
+- Resource metering counts PHP workers only; nginx, Apache and MariaDB are shared.
+- The App Installer ships with an empty catalog — you upload your own packages.
+- No commercial support commitment.
 - No "Type" column in the file manager (FileGator's table breaks when columns
   are injected); type is shown with a coloured icon instead.
 - Resource metering counts PHP workers only; nginx, Apache and MariaDB are
@@ -195,6 +204,10 @@ moves resource-limited sites back to stock php-fpm templates. User settings
 - Edit `tema/_govde.css`; `tema/derle.ps1` (Windows PowerShell) builds
   `tema/webdanismani.css`. Do not edit the generated file.
 - Module pattern and catalog manifest format: `panel/MODULLER.md` (Turkish).
+- **i18n:** wrap UI strings with `wd__('English')` (PHP), `_("English")` /
+  `N_("English")` (Python), `wdt("English")` (FM JS). Run
+  `python3 panel/locale/extract-po.py` to refresh `.pot` / `.po` / `.mo`.
+  Details: [panel/locale/README.md](panel/locale/README.md).
 - PHP is linted with `php -l` on the server during install, Python with
   `ast.parse`; a file that fails is not installed.
 

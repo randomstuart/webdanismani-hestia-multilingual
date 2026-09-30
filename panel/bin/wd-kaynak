@@ -45,6 +45,15 @@ import re
 import subprocess
 import sys
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 TPLDIR = HESTIA + "/data/templates/web/php-fpm"
 AYAR = HESTIA + "/wd/kaynak.json"
@@ -58,13 +67,13 @@ AYAR = HESTIA + "/wd/kaynak.json"
 VARSAYILAN = {
     "kademeler": {
         "kucuk": {"bellek": "128M", "sure": 60, "surec": 5,
-                  "ad": "Küçük", "aciklama": "Tanıtım / küçük site"},
+                  "ad": _("Small"), "aciklama": _("Brochure / small site")},
         "orta": {"bellek": "256M", "sure": 120, "surec": 8,
-                 "ad": "Orta", "aciklama": "WordPress / kurumsal site"},
+                 "ad": _("Medium"), "aciklama": _("WordPress / business site")},
         "buyuk": {"bellek": "384M", "sure": 180, "surec": 12,
-                  "ad": "Büyük", "aciklama": "E-ticaret / yoğun site"},
+                  "ad": _("Large"), "aciklama": _("E-commerce / busy site")},
         "genis": {"bellek": "512M", "sure": 300, "surec": 16,
-                  "ad": "Geniş", "aciklama": "Ağır uygulama"},
+                  "ad": _("XL"), "aciklama": _("Heavy application")},
     },
     # Paket -> kademe. Burada olmayan paket "varsayilan" kademesini alır.
     "paketler": {
@@ -102,7 +111,7 @@ def ayar_yukle():
                 d.setdefault(k, v)
             return d
         except Exception as e:
-            sys.stderr.write("kaynak.json okunamadi (%s), varsayilan kullaniliyor\n" % e)
+            sys.stderr.write(_("could not read kaynak.json (%s), using defaults\n") % e)
         return json.loads(json.dumps(VARSAYILAN))
 
     d = json.loads(json.dumps(VARSAYILAN))
@@ -112,7 +121,7 @@ def ayar_yukle():
             json.dump(d, fh, ensure_ascii=False, indent=2)
         os.chmod(AYAR, 0o644)
     except Exception as e:
-        sys.stderr.write("kaynak.json yazilamadi: %s\n" % e)
+        sys.stderr.write(_("could not write kaynak.json: %s\n") % e)
     return d
 
 
@@ -210,7 +219,7 @@ def sablon_adi(kademe, surum):
 def sablonlar_uret(ayar, sessiz=False):
     surumler = php_surumleri()
     if not surumler:
-        sys.stderr.write("HATA: stok PHP sablonu bulunamadi: %s\n" % TPLDIR)
+        sys.stderr.write(_("ERROR: no stock PHP template found: %s\n") % TPLDIR)
         return 1
     yazilan = 0
     for kademe, k in ayar["kademeler"].items():
@@ -234,12 +243,12 @@ def sablonlar_uret(ayar, sessiz=False):
                 os.chmod(yol, 0o644)
                 yazilan += 1
                 if not sessiz:
-                    print("  yazildi  %s.tpl  (%s, %s islem, %ss)"
+                    print(_("  wrote    %s.tpl  (%s, %s workers, %ss)")
                           % (ad, k["bellek"], k["surec"], k["sure"]))
             elif not sessiz:
-                print("  guncel   %s.tpl" % ad)
+                print(_("  current  %s.tpl") % ad)
     if not sessiz:
-        print("%d sablon guncellendi, %d PHP surumu icin."
+        print(_("%d templates updated for %d PHP versions.")
               % (yazilan, len(surumler)))
     return 0
 
@@ -319,31 +328,31 @@ def tavan_ozeti(liste, ayar):
 def durum_yaz(ayar):
     liste = alan_adlari(ayar)
     if not liste:
-        print("Denetlenecek web alan adi yok.")
+        print(_("No web domains to check."))
         return 0
     print("%-34s %-10s %-10s %-22s %s"
-          % ("ALAN ADI", "KULLANICI", "PAKET", "KADEME", "DURUM"))
+          % (_("DOMAIN"), _("USER"), _("PACKAGE"), _("TIER"), _("STATUS")))
     for d in liste:
         if d["hedef"] is None:
-            durum = "atlanir (backend taninmadi: %s)" % (d["mevcut"] or "-")
+            durum = _("skipped (unknown backend: %s)") % (d["mevcut"] or "-")
         elif d["uyumlu"]:
-            durum = "uygun"
+            durum = _("ok")
         else:
             durum = "%s -> %s" % (d["mevcut"] or "-", d["hedef"])
         k = d["limit"]
-        kad = "%s (%s/%s islem)" % (d["kademe"], k.get("bellek", "?"),
+        kad = _("%s (%s/%s workers)") % (d["kademe"], k.get("bellek", "?"),
                                     k.get("surec", "?"))
         print("%-34s %-10s %-10s %-22s %s"
               % (d["domain"][:34], d["user"][:10], d["paket"][:10], kad, durum))
 
     o = tavan_ozeti(liste, ayar)
     print()
-    print("Teorik bellek tavani: %d MB / sunucu RAM %d MB"
+    print(_("Theoretical memory ceiling: %d MB / server RAM %d MB")
           % (o["tavan_mb"], o["ram_mb"]))
     if o["asiyor"]:
-        print("  UYARI: tavan RAM'i asiyor. `pm = ondemand` oldugu icin bu")
-        print("  bellek AYRILMIS degildir, ama tum siteler ayni anda dolarsa")
-        print("  takas/OOM riski vardir. Kademeleri kucultmeyi degerlendirin.")
+        print(_("  WARNING: ceiling exceeds RAM. With `pm = ondemand` this"))
+        print(_("  memory is NOT reserved, but if all sites fill at once"))
+        print(_("  there is swap/OOM risk. Consider lowering tiers."))
     return 0
 
 
@@ -370,7 +379,7 @@ def uygula(ayar, kuru=False, yalniz_yeni=False):
             atlanan += 1
             continue
         if kuru:
-            print("  [kuru] %s: %s -> %s"
+            print(_("  [dry-run] %s: %s -> %s")
                   % (d["domain"], d["mevcut"] or "-", d["hedef"]))
             degisen += 1
             continue
@@ -382,12 +391,12 @@ def uygula(ayar, kuru=False, yalniz_yeni=False):
             print("  %s -> %s" % (d["domain"], d["hedef"]))
             degisen += 1
         else:
-            print("  HATA %s: %s" % (d["domain"], (err or out).strip()))
+            print(_("  ERROR %s: %s") % (d["domain"], (err or out).strip()))
             hata += 1
 
     print()
-    print("%d alan adi %s, %d hata, %d atlandi."
-          % (degisen, "degisecek" if kuru else "guncellendi", hata, atlanan))
+    print(_("%d domains %s, %d errors, %d skipped.")
+          % (degisen, _("will change") if kuru else _("updated"), hata, atlanan))
     return 1 if hata else 0
 
 
@@ -407,7 +416,7 @@ def main():
         yeni = "--yeni" in sys.argv
         # `--yeni` cron tarafindan cagrilir; ayar kapaliysa hicbir sey yapilmaz.
         if yeni and not ayar.get("otomatik", False):
-            print("otomatik atama kapali (kaynak.json > otomatik: true yapin)")
+            print(_("automatic assignment off (set otomatik: true in kaynak.json)"))
             return 0
         if not kuru:
             # Sablonlar yoksa atama basarisiz olurdu; once uret.
@@ -427,7 +436,7 @@ def main():
                     continue
                 m = re.search(r"PHP-(\d_\d)$", mevcut)
                 if not m:
-                    print("  ATLANDI %s: surum cozulemedi (%s)" % (d, mevcut))
+                    print(_("  SKIPPED %s: could not resolve version (%s)") % (d, mevcut))
                     hata += 1
                     continue
                 stok = "PHP-" + m.group(1)
@@ -438,7 +447,7 @@ def main():
                 if rc == 0:
                     print("  %s -> %s" % (d, stok))
                 else:
-                    print("  HATA %s: %s" % (d, (err or out).strip()))
+                    print(_("  ERROR %s: %s") % (d, (err or out).strip()))
                     hata += 1
         # Sablonlari sil
         silinen = 0
@@ -446,7 +455,7 @@ def main():
             if f.startswith(ONEK) and f.endswith(".tpl"):
                 os.unlink(os.path.join(TPLDIR, f))
                 silinen += 1
-        print("%d sablon silindi." % silinen)
+        print(_("%d templates deleted.") % silinen)
         return 1 if hata else 0
 
     if mod in ("json", "onbellek"):
@@ -474,7 +483,7 @@ def main():
             os.replace(gecici, yol)
             os.chmod(yol, 0o644)
         except Exception as e:
-            sys.stderr.write("onbellek yazilamadi: %s\n" % e)
+            sys.stderr.write(_("could not write cache: %s\n") % e)
             return 1
         print(json.dumps({"ok": True, "site": len(liste)}))
         return 0

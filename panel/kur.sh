@@ -9,7 +9,8 @@
 #
 # Ne kurulur:
 #   YENİ dosyalar (HestiaCP güncellemesi bunları SİLMEZ):
-#     web/inc/wd-helpers.php
+#     web/inc/wd-helpers.php, web/inc/wd-i18n.php
+#     web/locale/{en,tr}/LC_MESSAGES/webdanismani.mo
 #     web/list/tools/index.php
 #     web/list/health/index.php
 #     web/templates/pages/list_tools.php
@@ -57,6 +58,11 @@ if [ "$MODE" = "--kaldir" ]; then
 	fi
 	[ -f "$W/fm/dist/css/wd-fm.css" ] && unlink "$W/fm/dist/css/wd-fm.css"
 	[ -f "$W/fm/dist/js/wd-fm.js" ] && unlink "$W/fm/dist/js/wd-fm.js"
+	[ -f "$W/fm/dist/js/wd-fm-i18n.js" ] && unlink "$W/fm/dist/js/wd-fm-i18n.js"
+	[ -f "$W/fm/dist/js/wd-fm-i18n.tr.json" ] && unlink "$W/fm/dist/js/wd-fm-i18n.tr.json"
+	[ -f "$W/fm/wd-fm-i18n.php" ] && unlink "$W/fm/wd-fm-i18n.php"
+	[ -f "$WD/lib/wd_i18n.py" ] && unlink "$WD/lib/wd_i18n.py"
+	rmdir "$WD/lib" 2>/dev/null
 	# Kaynak sablonlarini silmeden ONCE onlara bagli siteleri stok sablona
 	# dondur; ters sirada yapilirsa siteler havuzsuz kalir.
 	if [ -x "$WD/bin/wd-kaynak" ]; then
@@ -65,6 +71,7 @@ if [ "$MODE" = "--kaldir" ]; then
 	fi
 	for f in \
 		"$W/inc/wd-helpers.php" \
+		"$W/inc/wd-i18n.php" \
 		"$W/list/tools/index.php" \
 		"$W/list/health/index.php" \
 		"$W/list/disk/index.php" \
@@ -98,6 +105,13 @@ if [ "$MODE" = "--kaldir" ]; then
 		"/etc/cron.d/wd-panel"; do
 		[ -e "$f" ] && unlink "$f" && inf "silindi: $f"
 	done
+	# Gettext catalogs
+	for lang in en tr; do
+		for ext in mo po; do
+			f="$W/locale/$lang/LC_MESSAGES/webdanismani.$ext"
+			[ -e "$f" ] && unlink "$f" && inf "silindi: $f"
+		done
+	done
 	rmdir "$W/list/tools" "$W/list/health" "$W/list/disk" "$W/list/httpauth" \
 		"$W/list/errorpages" "$WD/bin" "$WD/cache" 2>/dev/null
 	[ -d "$WD/skel" ] && rm -rf "$WD/skel"
@@ -115,6 +129,9 @@ if [ "$MODE" = "--durum" ]; then
 	say "WebDanismani panel eklentisi durumu:"
 	for f in \
 		"$W/inc/wd-helpers.php" \
+		"$W/inc/wd-i18n.php" \
+		"$W/locale/en/LC_MESSAGES/webdanismani.mo" \
+		"$W/locale/tr/LC_MESSAGES/webdanismani.mo" \
 		"$W/list/tools/index.php" \
 		"$W/list/health/index.php" \
 		"$W/list/disk/index.php" \
@@ -205,7 +222,43 @@ install_file() {
 }
 
 FAIL=0
+install_file "$S/inc/wd-i18n.php"           "$W/inc/wd-i18n.php"                           || FAIL=1
 install_file "$S/inc/wd-helpers.php"        "$W/inc/wd-helpers.php"                        || FAIL=1
+
+# Gettext catalogs (WordPress-style .po/.mo) — language follows Hestia user language
+install_locales() {
+	local lang mo_src mo_dst
+	for lang in en tr; do
+		mo_src="$S/locale/$lang/LC_MESSAGES/webdanismani.mo"
+		mo_dst="$W/locale/$lang/LC_MESSAGES/webdanismani.mo"
+		if [ -f "$mo_src" ]; then
+			install_file "$mo_src" "$mo_dst" || return 1
+		else
+			err "locale eksik: $mo_src (python3 panel/locale/extract-po.py)"
+			return 1
+		fi
+		# Keep .po next to .mo for translators editing on the server
+		if [ -f "$S/locale/$lang/LC_MESSAGES/webdanismani.po" ]; then
+			install_file "$S/locale/$lang/LC_MESSAGES/webdanismani.po" \
+				"$W/locale/$lang/LC_MESSAGES/webdanismani.po" || true
+		fi
+	done
+	return 0
+}
+install_locales || FAIL=1
+
+# Python gettext helper for root scripts
+mkdir -p "$WD/lib"
+if [ -f "$S/lib/wd_i18n.py" ]; then
+	cp -f "$S/lib/wd_i18n.py" "$WD/lib/wd_i18n.py"
+	chown root:root "$WD/lib/wd_i18n.py" 2>/dev/null
+	chmod 644 "$WD/lib/wd_i18n.py"
+	ok "wd_i18n.py"
+else
+	err "wd_i18n.py yok"
+	FAIL=1
+fi
+
 install_file "$S/list-tools/index.php"      "$W/list/tools/index.php"                      || FAIL=1
 install_file "$S/list-health/index.php"     "$W/list/health/index.php"                     || FAIL=1
 install_file "$S/list-disk/index.php"       "$W/list/disk/index.php"                       || FAIL=1
@@ -306,6 +359,7 @@ if [ -n "$PHPBIN" ]; then
 	LINTFAIL=0
 	for f in \
 		"$W/inc/wd-helpers.php" \
+		"$W/inc/wd-i18n.php" \
 		"$W/list/tools/index.php" \
 		"$W/list/health/index.php" \
 		"$W/list/disk/index.php" \
@@ -368,6 +422,23 @@ if [ -d "$W/fm/dist/css" ]; then
 			cp -f "$FMJS" "$W/fm/dist/js/wd-fm.js"
 			chown "$OWN" "$W/fm/dist/js/wd-fm.js" 2>/dev/null
 			chmod 644 "$W/fm/dist/js/wd-fm.js"
+			# Per-user FM i18n: PHP endpoint reads session language
+			FMI18N_PHP="$(dirname "$FMCSS")/wd-fm-i18n.php"
+			FMI18N_TR_JSON="$(dirname "$FMCSS")/wd-fm-i18n.tr.json"
+			if [ -f "$FMI18N_PHP" ]; then
+				cp -f "$FMI18N_PHP" "$W/fm/wd-fm-i18n.php"
+				chown "$OWN" "$W/fm/wd-fm-i18n.php" 2>/dev/null
+				chmod 644 "$W/fm/wd-fm-i18n.php"
+			fi
+			if [ -f "$FMI18N_TR_JSON" ]; then
+				cp -f "$FMI18N_TR_JSON" "$W/fm/dist/js/wd-fm-i18n.tr.json"
+				chown "$OWN" "$W/fm/dist/js/wd-fm-i18n.tr.json" 2>/dev/null
+				chmod 644 "$W/fm/dist/js/wd-fm-i18n.tr.json"
+			fi
+			# Keep legacy empty JS as harmless fallback if something still requests it
+			printf '%s\n' 'window.WDFM_I18N = window.WDFM_I18N || {};' > "$W/fm/dist/js/wd-fm-i18n.js"
+			chown "$OWN" "$W/fm/dist/js/wd-fm-i18n.js" 2>/dev/null
+			chmod 644 "$W/fm/dist/js/wd-fm-i18n.js"
 		else
 			err "wd-fm.js bulunamadi - sol menu eklenmeyecek"
 		fi

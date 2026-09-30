@@ -1,32 +1,32 @@
 #!/usr/bin/env python3
 """
-WebDanışmanı — Sağlık Merkezi toplayıcısı
+WebDanışmanı — Health Center collector
 
-Kurulum yeri: /usr/local/hestia/wd/bin/wd-health
-Panelden sudo ile çağrılır (/etc/sudoers.d/wd-panel).
+Installs to: /usr/local/hestia/wd/bin/wd-health
+Called from the panel via sudo (/etc/sudoers.d/wd-panel).
 
-NE YAPAR?
-  Panelin İÇİNDEKİ kayıtlarla DIŞARIDAN gerçekten görünen DNS'i karşılaştırır.
-  HestiaCP "DKIM açık" der ama kayıt DNS'e yazılmamışsa mail yine gitmez —
-  bu fark tam olarak buradaki kontrollerin yakaladığı şeydir.
+WHAT IT DOES
+  Compares records INSIDE the panel with what DNS actually shows from OUTSIDE.
+  If HestiaCP says "DKIM on" but the record was never published, mail still
+  fails — that gap is exactly what these checks catch.
 
-KONTROLLER
-  Sunucu : PTR (rDNS), Exim kuyruğu, donmuş mail, kara liste (RBL)
+CHECKS
+  Server : PTR (rDNS), Exim queue, frozen mail, blacklists (RBL)
   Mail   : SPF, DKIM, DMARC, MX
-  Web    : A kaydı, SSL sertifika bitişi
+  Web    : A record, SSL certificate expiry
 
-TASARIM NOTLARI
-  * Her kontrol {durum, deger, not, cozum} döner. "cozum" kullanıcıya ne
-    yapacağını söyler — sadece sorun bildirmek yetmez.
-  * Spamhaus 127.255.255.x = "sorgu reddedildi" (genel çözümleyici engeli),
-    KARA LİSTE DEĞİL. Naif kontrol burada yanlış alarm verir.
-  * Sonuç önbelleğe yazılır; panel önbelleği okur, cron tazeler. DNS
-    sorguları yavaş olduğu için sayfa açılışında canlı sorgu yapılmaz.
+DESIGN NOTES
+  * Each check returns {durum, deger, not, cozum}. "cozum" tells the user what
+    to do — reporting a problem alone is not enough.
+  * Spamhaus 127.255.255.x = "query refused" (public resolver block),
+    NOT a blacklist hit. A naive check false-alarms here.
+  * Results are written to cache; the panel reads cache, cron refreshes.
+    DNS queries are slow, so live queries are not done on page open.
 
-Kullanım:
-  wd-health json [azami_yas_sn]   önbellekten oku, bayatsa tazele
-  wd-health refresh               zorla tazele (cron)
-  wd-health plain                 kısa metin özet
+Usage:
+  wd-health json [max_age_sec]   read cache, refresh if stale
+  wd-health refresh              force refresh (cron)
+  wd-health plain                short text summary
 """
 
 import json
@@ -36,6 +36,16 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+N_ = lambda s: s  # mark for .po extract; translate in PHP (cached JSON)
 
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache/health.json"
@@ -104,18 +114,18 @@ def ptr_kontrol(ip, hostname):
     ptr = dig("-x", ip).rstrip(".")
     if not ptr:
         return kontrol(
-            "ptr", "Ters DNS (PTR)", "fail", "—",
-            "PTR kaydı yok.",
-            "Sunucu saglayicinizin konsolundan ters DNS (rDNS/PTR) tanimlayin: "
-            "%s -> %s" % (ip, hostname),
+            "ptr", N_("Reverse DNS (PTR)"), "fail", "—",
+            N_("No PTR record."),
+            N_("Set reverse DNS (rDNS/PTR) in your provider console: "
+              "%s -> %s") % (ip, hostname),
         )
     if ptr.lower() == hostname.lower():
-        return kontrol("ptr", "Ters DNS (PTR)", "ok", ptr)
+        return kontrol("ptr", N_("Reverse DNS (PTR)"), "ok", ptr)
     return kontrol(
-        "ptr", "Ters DNS (PTR)", "fail", ptr,
-        "PTR sunucu adıyla eşleşmiyor; birçok sağlayıcı bu maili reddeder.",
-        "Sunucu saglayicinizin konsolundan ters DNS (rDNS/PTR) tanimlayin: "
-        "%s -> %s" % (ip, hostname),
+        "ptr", N_("Reverse DNS (PTR)"), "fail", ptr,
+        N_("PTR does not match the server hostname; many providers reject this mail."),
+        N_("Set reverse DNS (rDNS/PTR) in your provider console: "
+          "%s -> %s") % (ip, hostname),
     )
 
 
@@ -154,32 +164,31 @@ def rbl_kontrol(ip):
 
     ek = ""
     if engellenen:
-        ek = (" %s sorgulanamadı (çözümleyici engeli) — listede olunduğu "
-              "anlamına gelmez." % ", ".join(engellenen))
+        ek = N_(" %s could not be queried (resolver block) — does not mean you are listed.") % ", ".join(engellenen)
 
     if listelenen:
         return kontrol(
-            "rbl", "Kara liste (RBL)", "fail", ", ".join(listelenen),
-            "Sunucu IP'si kara listede; bu listeleri kullanan sağlayıcılar "
-            "maillerinizi reddeder." + ek,
-            ("Çıkarma (delisting) talebi açın. " + " · ".join(kanit))
-            if kanit else "İlgili listenin sitesinden çıkarma talebi açın.",
+            "rbl", N_("Blacklist (RBL)"), "fail", ", ".join(listelenen),
+            N_("Server IP is on a blacklist; providers that use these lists "
+              "will reject your mail.") + ek,
+            (N_("Open a delisting request. ") + " · ".join(kanit))
+            if kanit else N_("Open a delisting request on the list's website."),
         )
 
     if engellenen and not temiz:
         return kontrol(
-            "rbl", "Kara liste (RBL)", "bilinmiyor", "sorgulanamadı",
-            "Çözümleyici bu listelere sorgu yapamıyor (genel DNS engeli). "
-            "Bu, listede olunduğu anlamına GELMEZ.",
-            "Kesin sonuç için sunucuya yerel bir çözümleyici kurun ya da "
-            "listenin kendi sorgu sayfasını kullanın.",
+            "rbl", N_("Blacklist (RBL)"), "bilinmiyor", N_("could not query"),
+            N_("The resolver cannot query these lists (public DNS block). "
+              "This does NOT mean you are listed."),
+            N_("For a definitive result, install a local resolver on the server "
+              "or use the list's own lookup page."),
         )
 
     return kontrol(
-        "rbl", "Kara liste (RBL)",
+        "rbl", N_("Blacklist (RBL)"),
         "warn" if engellenen else "ok",
-        "temiz: " + ", ".join(temiz),
-        ("Kontrol edilenler temiz." + ek) if engellenen else "",
+        N_("clean: ") + ", ".join(temiz),
+        (N_("Checked lists are clean.") + ek) if engellenen else "",
     )
 
 
@@ -197,17 +206,20 @@ def kuyruk_kontrol():
         except ValueError:
             donmus = 0
 
-    ck = [kontrol("kuyruk", "Mail kuyruğu", "ok", "%d bekleyen" % bekleyen)]
+    ck = [kontrol("kuyruk", N_("Mail queue"), "ok",
+                  ngettext("%d waiting", "%d waiting", bekleyen) % bekleyen)]
     if bekleyen > 50:
         ck[0] = kontrol(
-            "kuyruk", "Mail kuyruğu", "warn", "%d bekleyen" % bekleyen,
-            "Kuyruk birikiyor; teslim sorunu olabilir.",
+            "kuyruk", N_("Mail queue"), "warn",
+            ngettext("%d waiting", "%d waiting", bekleyen) % bekleyen,
+            N_("Queue is building up; there may be a delivery problem."),
         )
     if donmus:
         ck.append(kontrol(
-            "donmus", "Donmuş mail", "warn", "%d adet" % donmus,
-            "Teslim edilemeyip donan mailler var.",
-            "Sunucuda: exim4 -bpru | awk '{print $3}' | xargs -r exim4 -Mrm",
+            "donmus", N_("Frozen mail"), "warn",
+            ngettext("%d message", "%d messages", donmus) % donmus,
+            N_("There are frozen messages that could not be delivered."),
+            N_("On the server: exim4 -bpru | awk '{print $3}' | xargs -r exim4 -Mrm"),
         ))
     return ck
 
@@ -219,22 +231,23 @@ def spf_kontrol(domain, ip):
     if not kayitlar:
         return kontrol(
             "spf", "SPF", "fail", "—",
-            "SPF kaydı yok; mailleriniz spam'e düşer.",
-            'DNS\'e TXT ekleyin: "v=spf1 +a +mx +ip4:%s ~all"' % ip,
+            N_("No SPF record; your mail will go to spam."),
+            N_('Add a TXT record in DNS: "v=spf1 +a +mx +ip4:%s ~all"') % ip,
         )
     if len(kayitlar) > 1:
         return kontrol(
-            "spf", "SPF", "fail", "%d kayıt" % len(kayitlar),
-            "Birden fazla SPF kaydı geçersizdir; hepsi yok sayılır.",
-            "Tek bir SPF TXT kaydı bırakın.",
+            "spf", "SPF", "fail",
+            ngettext("%d record", "%d records", len(kayitlar)) % len(kayitlar),
+            N_("Multiple SPF records are invalid; all are ignored."),
+            N_("Leave only one SPF TXT record."),
         )
     kayit = kayitlar[0]
     yetkili = ("ip4:" + ip) in kayit or re.search(r"[+ ]a\b", kayit) or re.search(r"[+ ]mx\b", kayit)
     if not yetkili:
         return kontrol(
             "spf", "SPF", "warn", kayit,
-            "SPF bu sunucuyu yetkilendirmiyor gibi görünüyor.",
-            "Kayda ip4:%s ekleyin." % ip,
+            N_("SPF does not appear to authorize this server."),
+            N_("Add ip4:%s to the record.") % ip,
         )
     return kontrol("spf", "SPF", "ok", kayit)
 
@@ -251,26 +264,27 @@ def dkim_kontrol(user, domain):
     if not beklenen:
         return kontrol(
             "dkim", "DKIM", "warn", "—",
-            "Bu alan adı için DKIM anahtarı üretilmemiş.",
-            "Panel > Mail > alan adını düzenle > DKIM'i etkinleştir.",
+            N_("No DKIM key has been generated for this domain."),
+            N_("Panel > Mail > edit domain > enable DKIM."),
         )
     if not yayinda:
         return kontrol(
             "dkim", "DKIM", "fail", "—",
-            "Panelde DKIM açık ama kayıt DNS'te YOK; imza doğrulanamaz.",
-            "mail._domainkey.%s TXT kaydını DNS'e ekleyin "
-            "(Panel > Mail > DKIM ile aynı değer)." % domain,
+            N_("DKIM is enabled in the panel but the record is MISSING in DNS; "
+              "signatures cannot be verified."),
+            N_("Add the mail._domainkey.%s TXT record to DNS "
+              "(same value as Panel > Mail > DKIM).") % domain,
         )
     m2 = re.search(r'p=([A-Za-z0-9+/=]+)', yayinda[0])
     canli = m2.group(1) if m2 else ""
     if canli != beklenen:
         return kontrol(
-            "dkim", "DKIM", "fail", "eşleşmiyor",
-            "DNS'teki DKIM anahtarı paneldekinden farklı; imza doğrulanamaz.",
-            "DNS'teki mail._domainkey.%s kaydını panelin verdiği değerle "
-            "değiştirin." % domain,
+            "dkim", "DKIM", "fail", N_("mismatch"),
+            N_("The DKIM key in DNS differs from the panel; signatures cannot be verified."),
+            N_("Replace the mail._domainkey.%s record in DNS with the value "
+              "from the panel.") % domain,
         )
-    return kontrol("dkim", "DKIM", "ok", "yayında ve eşleşiyor")
+    return kontrol("dkim", "DKIM", "ok", N_("published and matching"))
 
 
 def dmarc_kontrol(domain):
@@ -279,7 +293,7 @@ def dmarc_kontrol(domain):
     if not kayitlar:
         return kontrol(
             "dmarc", "DMARC", "warn", "—",
-            "DMARC kaydı yok; alan adınız adına sahte mail atılabilir.",
+            N_("No DMARC record; spoofed mail can be sent in your domain's name."),
             '_dmarc.%s TXT: "v=DMARC1; p=quarantine; pct=100"' % domain,
         )
     return kontrol("dmarc", "DMARC", "ok", kayitlar[0])
@@ -290,8 +304,8 @@ def mx_kontrol(domain, ip):
     if not satirlar:
         return kontrol(
             "mx", "MX", "fail", "—",
-            "MX kaydı yok; bu alan adına dışarıdan mail GELMEZ.",
-            "DNS'e MX ekleyin: 10 mail.%s" % domain,
+            N_("No MX record; external mail will NOT arrive for this domain."),
+            N_("Add an MX record in DNS: 10 mail.%s") % domain,
         )
     hedefler = []
     bizde = False
@@ -305,21 +319,21 @@ def mx_kontrol(domain, ip):
         if ip in adres:
             bizde = True
     if not hedefler:
-        return kontrol("mx", "MX", "fail", "—", "MX çözümlenemedi.")
+        return kontrol("mx", "MX", "fail", "—", N_("MX could not be resolved."))
     if not bizde:
         cozulmeyen = [h for h in hedefler if not dig_satirlar("A", h)]
         if cozulmeyen:
             return kontrol(
                 "mx", "MX", "fail", ", ".join(hedefler),
-                "MX hedefi çözümlenmiyor (%s); mail teslim edilemez."
+                N_("MX target does not resolve (%s); mail cannot be delivered.")
                 % ", ".join(cozulmeyen),
-                "MX kaydını düzeltin: 10 mail.%s (alan adını iki kez "
-                "yazmayın)." % domain,
+                N_("Fix the MX record: 10 mail.%s (do not write the domain twice).")
+                % domain,
             )
         return kontrol(
             "mx", "MX", "warn", ", ".join(hedefler),
-            "MX bu sunucuyu göstermiyor; mail başka yere gidiyor.",
-            "Mail bu sunucuda tutulacaksa MX'i mail.%s yapın." % domain,
+            N_("MX does not point to this server; mail is going elsewhere."),
+            N_("If mail should stay on this server, set MX to mail.%s.") % domain,
         )
     return kontrol("mx", "MX", "ok", ", ".join(hedefler))
 
@@ -343,9 +357,9 @@ def yedek_kontrol(user):
     kayit = v("v-list-user-backups", user)
     if not isinstance(kayit, dict) or not kayit:
         return [kontrol(
-            "yedek_yok", "Yedek", "fail", "—",
-            "Bu hesabın hiç yedeği yok.",
-            "Panel > Yedekler > Yedek Oluştur; ya da sunucuda: v-backup-user %s" % user,
+            "yedek_yok", N_("Backup"), "fail", "—",
+            N_("This account has no backups."),
+            N_("Panel > Backups > Create Backup; or on the server: v-backup-user %s") % user,
         )]
 
     # Tarihe göre sırala (en yeni önce)
@@ -369,24 +383,24 @@ def yedek_kontrol(user):
 
     tarih_str = "%s %s" % (en_yeni.get("DATE", "?"), en_yeni.get("TIME", "?")[:5])
     if yas_saat is None:
-        ck.append(kontrol("yedek_yas", "Son yedek", "bilinmiyor", tarih_str,
-                          "Yedek tarihi okunamadı."))
+        ck.append(kontrol("yedek_yas", N_("Latest backup"), "bilinmiyor", tarih_str,
+                          N_("Backup date could not be read.")))
     elif yas_saat > 48:
         ck.append(kontrol(
-            "yedek_yas", "Son yedek", "fail",
-            "%s (%d saat önce)" % (tarih_str, int(yas_saat)),
-            "Yedek 48 saatten eski; günlük yedekleme çalışmıyor olabilir.",
-            "Sunucuda kontrol edin: grep backup /etc/cron.d/hestia",
+            "yedek_yas", N_("Latest backup"), "fail",
+            N_("%s (%d hours ago)") % (tarih_str, int(yas_saat)),
+            N_("Backup is older than 48 hours; daily backups may not be running."),
+            N_("Check on the server: grep backup /etc/cron.d/hestia"),
         ))
     elif yas_saat > 26:
         ck.append(kontrol(
-            "yedek_yas", "Son yedek", "warn",
-            "%s (%d saat önce)" % (tarih_str, int(yas_saat)),
-            "Son yedek bir günden eski.",
+            "yedek_yas", N_("Latest backup"), "warn",
+            N_("%s (%d hours ago)") % (tarih_str, int(yas_saat)),
+            N_("Latest backup is more than a day old."),
         ))
     else:
-        ck.append(kontrol("yedek_yas", "Son yedek", "ok",
-                          "%s (%d saat önce)" % (tarih_str, int(yas_saat))))
+        ck.append(kontrol("yedek_yas", N_("Latest backup"), "ok",
+                          N_("%s (%d hours ago)") % (tarih_str, int(yas_saat))))
 
     # --- 2) Arşiv okunabiliyor mu ---
     # `tar -tf` arşivi AÇMADAN içindekileri listeler; bozuk arşiv burada
@@ -394,9 +408,9 @@ def yedek_kontrol(user):
     yol = os.path.join(YEDEK_DIZIN, en_yeni_ad)
     if not os.path.isfile(yol):
         ck.append(kontrol(
-            "yedek_dosya", "Arşiv dosyası", "warn", en_yeni_ad,
-            "Yedek kaydı var ama dosya %s altında bulunamadı "
-            "(uzak depolamaya taşınmış olabilir)." % YEDEK_DIZIN,
+            "yedek_dosya", N_("Archive file"), "warn", en_yeni_ad,
+            N_("Backup record exists but the file was not found under %s "
+              "(it may have been moved to remote storage).") % YEDEK_DIZIN,
         ))
     else:
         rc, out, err = 1, "", ""
@@ -410,19 +424,19 @@ def yedek_kontrol(user):
             rc, err = 1, str(e)
 
         if rc == 124:
-            ck.append(kontrol("yedek_butunluk", "Arşiv bütünlüğü", "bilinmiyor",
-                              "zaman aşımı",
-                              "Arşiv 120 saniyede listelenemedi; çok büyük olabilir."))
+            ck.append(kontrol("yedek_butunluk", N_("Archive integrity"), "bilinmiyor",
+                              N_("timeout"),
+                              N_("Archive could not be listed within 120 seconds; it may be very large.")))
         elif rc != 0:
             ck.append(kontrol(
-                "yedek_butunluk", "Arşiv bütünlüğü", "fail", "BOZUK",
-                "Yedek arşivi okunamıyor: %s" % (err.strip()[:120] or "tar hatası"),
-                "Bu yedek geri yüklenemez. Yeni bir yedek alın ve bozuk olanı silin.",
+                "yedek_butunluk", N_("Archive integrity"), "fail", N_("CORRUPT"),
+                N_("Backup archive cannot be read: %s") % (err.strip()[:120] or N_("tar error")),
+                N_("This backup cannot be restored. Take a new backup and delete the corrupt one."),
             ))
         else:
             adet = len([s for s in out.splitlines() if s.strip()])
-            ck.append(kontrol("yedek_butunluk", "Arşiv bütünlüğü", "ok",
-                              "%d bileşen" % adet))
+            ck.append(kontrol("yedek_butunluk", N_("Archive integrity"), "ok",
+                              ngettext("%d entry", "%d entries", adet) % adet))
 
     # --- 3) Boyut düşüşü ---
     # Bir müşterinin yedeği aniden küçüldüyse ya veri silinmiştir ya da
@@ -433,14 +447,14 @@ def yedek_kontrol(user):
             onceki_mb = float(sirali[1][1].get("SIZE", 0))
             if onceki_mb >= 5 and yeni_mb < onceki_mb * 0.5:
                 ck.append(kontrol(
-                    "yedek_boyut", "Yedek boyutu", "warn",
-                    "%.0f MB (önceki %.0f MB)" % (yeni_mb, onceki_mb),
-                    "Son yedek bir öncekinin yarısından küçük; veri kaybı ya da "
-                    "yarım kalmış yedekleme olabilir.",
-                    "Yedek içeriğini karşılaştırın; gerekiyorsa elle yedek alın.",
+                    "yedek_boyut", N_("Backup size"), "warn",
+                    N_("%.0f MB (previous %.0f MB)") % (yeni_mb, onceki_mb),
+                    N_("Latest backup is less than half the previous one; data loss "
+                      "or an incomplete backup is possible."),
+                    N_("Compare backup contents; take a manual backup if needed."),
                 ))
             else:
-                ck.append(kontrol("yedek_boyut", "Yedek boyutu", "ok",
+                ck.append(kontrol("yedek_boyut", N_("Backup size"), "ok",
                                   "%.0f MB" % yeni_mb))
         except (TypeError, ValueError):
             pass
@@ -480,16 +494,16 @@ def a_kontrol(domain, ip):
     adres = dig_satirlar("A", domain)
     if not adres:
         return kontrol(
-            "a", "A kaydı", "fail", "—",
-            "Alan adı hiçbir IP'ye çözümlenmiyor.",
-            "DNS'e A kaydı ekleyin: %s -> %s" % (domain, ip),
+            "a", N_("A record"), "fail", "—",
+            N_("Domain does not resolve to any IP."),
+            N_("Add an A record in DNS: %s -> %s") % (domain, ip),
         )
     if ip in adres:
-        return kontrol("a", "A kaydı", "ok", ", ".join(adres))
+        return kontrol("a", N_("A record"), "ok", ", ".join(adres))
     return kontrol(
-        "a", "A kaydı", "warn", ", ".join(adres),
-        "Alan adı başka bir sunucuyu gösteriyor; site buradan yayınlanmıyor.",
-        "Alan adını buraya taşıyacaksanız A kaydını %s yapın." % ip,
+        "a", N_("A record"), "warn", ", ".join(adres),
+        N_("Domain points to another server; the site is not published from here."),
+        N_("If you will host the domain here, set the A record to %s.") % ip,
     )
 
 
@@ -499,18 +513,18 @@ def ssl_kontrol(user, domain, le_acik):
         if le_acik:
             return kontrol(
                 "ssl", "SSL", "fail", "—",
-                "SSL açık görünüyor ama sertifika dosyası yok.",
-                "Panel > Web > alan adını düzenle > SSL'i yeniden kaydedin.",
+                N_("SSL appears enabled but the certificate file is missing."),
+                N_("Panel > Web > edit domain > save SSL again."),
             )
         return kontrol(
-            "ssl", "SSL", "warn", "kapalı",
-            "Sertifika yok; site https:// ile açılmaz.",
-            "Panel > Web > alan adını düzenle > Let's Encrypt'i etkinleştirin.",
+            "ssl", "SSL", "warn", N_("off"),
+            N_("No certificate; the site will not open over https://."),
+            N_("Panel > Web > edit domain > enable Let's Encrypt."),
         )
     son = kabuk(["openssl", "x509", "-enddate", "-noout", "-in", yol])
     m = re.search(r"notAfter=(.+)", son)
     if not m:
-        return kontrol("ssl", "SSL", "bilinmiyor", "okunamadı")
+        return kontrol("ssl", "SSL", "bilinmiyor", N_("could not read"))
     try:
         bitis = time.mktime(time.strptime(m.group(1).strip(), "%b %d %H:%M:%S %Y %Z"))
     except ValueError:
@@ -519,17 +533,17 @@ def ssl_kontrol(user, domain, le_acik):
     tarih = time.strftime("%d.%m.%Y", time.localtime(bitis))
     if kalan < 0:
         return kontrol(
-            "ssl", "SSL", "fail", "süresi doldu (%s)" % tarih,
-            "Sertifika süresi dolmuş; tarayıcı uyarı gösterir.",
-            "Panel > Web > alan adını düzenle > SSL'i yeniden kaydedin.",
+            "ssl", "SSL", "fail", N_("expired (%s)") % tarih,
+            N_("Certificate has expired; browsers will show a warning."),
+            N_("Panel > Web > edit domain > save SSL again."),
         )
     if kalan < 14:
         return kontrol(
-            "ssl", "SSL", "warn", "%d gün (%s)" % (kalan, tarih),
-            "Otomatik yenileme çalışmamış olabilir.",
-            "Yenilemeyi elle tetikleyin: v-update-letsencrypt-ssl",
+            "ssl", "SSL", "warn", N_("%d days (%s)") % (kalan, tarih),
+            N_("Automatic renewal may not have run."),
+            N_("Trigger renewal manually: v-update-letsencrypt-ssl"),
         )
-    return kontrol("ssl", "SSL", "ok", "%d gün (%s)" % (kalan, tarih))
+    return kontrol("ssl", "SSL", "ok", N_("%d days (%s)") % (kalan, tarih))
 
 
 # ------------------------------------------------------------------- toplayıcı
@@ -675,7 +689,7 @@ def main():
 
     if mod == "plain":
         o = data["ozet"]
-        print("sorun: %d hata, %d uyari  (son kontrol %s)"
+        print(N_("issues: %d errors, %d warnings  (last check %s)")
               % (o.get("fail", 0), o.get("warn", 0),
                  time.strftime("%d.%m.%Y %H:%M", time.localtime(data["ts"]))))
         for c in data["sunucu"]:
@@ -690,7 +704,7 @@ def main():
         for y in data.get("yedek", []):
             for c in y["checks"]:
                 if c["durum"] in ("fail", "warn"):
-                    print("  [%s] yedek %s %s: %s"
+                    print(N_("  [%s] backup %s %s: %s")
                           % (c["durum"], y["user"], c["label"], c["deger"]))
         return
 

@@ -1,10 +1,10 @@
 <?php
 /**
- * WebDanışmanı — "Mail Raporu" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/mailrapor/index.php
+ * WebDanışmanı — "Mail Report" page
+ * Installs to: /usr/local/hestia/web/list/mailrapor/index.php
  *
- * YALNIZCA YÖNETİCİ. Rapor sunucudaki TÜM göndericileri içerir; tek bir
- * müşteriye açılamaz.
+ * ADMIN ONLY. The report covers ALL senders on the server; it must not be
+ * exposed to a single customer.
  */
 
 ob_start();

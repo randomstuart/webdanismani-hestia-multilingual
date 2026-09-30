@@ -39,6 +39,15 @@ import sys
 import time
 from collections import defaultdict
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache/mailrapor.json"
 LOGLAR = ["/var/log/exim4/mainlog", "/var/log/exim4/mainlog.1"]
@@ -100,7 +109,7 @@ def topla(gun=7):
         if m:
             gonderen = m.group(1).strip("<>").lower()
             if gonderen in ("", "<>"):
-                gonderen = "(sistem)"
+                gonderen = _("(system)")
             # Exim satırı: [0]tarih [1]saat [2]ileti-kimliği [3]işaret [4]adres
             parcalar = s.split()
             kimlik = parcalar[2] if len(parcalar) > 2 else ""
@@ -230,12 +239,12 @@ def main():
         except Exception:
             d = topla(gun)
         t = d["toplam"]
-        print("son %d gun: %d kabul, %d teslim, %d sekme, %d ertelenen"
+        print(_("last %d days: %d accepted, %d delivered, %d bounced, %d deferred")
               % (d["gun"], t["kabul"], t["teslim"], t["sekme"], t["ertelenen"]))
-        print("kuyruk: %d bekleyen, %d donmus | reddedilen baglanti: %d"
+        print(_("queue: %d pending, %d frozen | rejected connections: %d")
               % (d["kuyruk"]["bekleyen"], d["kuyruk"]["donmus"], d["reddedilen"]))
         for g in d["gonderenler"][:10]:
-            print("  [%-4s] %-38s %5d ileti  %%%.1f sekme"
+            print(_("  [%-4s] %-38s %5d messages  %%%.1f bounce")
                   % (g["durum"], g["gonderen"][:38], g["ileti"], g["sekme_orani"]))
         return 0
 

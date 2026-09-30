@@ -1,38 +1,37 @@
 <?php
 /**
- * WebDanışmanı — "Özel Hata Sayfaları" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/errorpages/index.php
+ * WebDanışmanı — "Custom Error Pages" page
+ * Installs to: /usr/local/hestia/web/list/errorpages/index.php
  *
- * YENİ dosyadır; HestiaCP güncellemelerinden etkilenmez.
+ * NEW file; unaffected by HestiaCP updates.
  *
- * NE İŞE YARAR?
- * Ziyaretçi olmayan bir adrese girdiğinde ya da sitede hata oluştuğunda
- * görünen sayfayı düzenler. cPanel'deki "Error Pages" karşılığıdır.
+ * WHAT IT DOES
+ * Edits the page shown when a visitor hits a missing URL or when an error
+ * occurs on the site. Counterpart to cPanel "Error Pages".
  *
- * BU GERÇEKTEN ÇALIŞIYOR MU?
- * Evet, ölçüldü. /etc/nginx/nginx.conf genelinde:
+ * DOES THIS ACTUALLY WORK?
+ * Yes — verified. Globally in /etc/nginx/nginx.conf:
  *     error_page 403 /error/403.html;  404 -> /error/404.html;
  *     410 -> /error/410.html;  500..505 -> /error/50x.html
- * ve her alan adının kendi yapılandırmasında:
+ * and in each domain's own config:
  *     location /error/ { alias <home>/web/<domain>/document_errors/; }
- * Yani buradaki dosyayı değiştirmek canlı hata sayfasını değiştirir.
+ * So changing the file here changes the live error page.
  *
- * YAZMA NASIL YAPILIYOR?
- * Panel `hestiaweb` olarak çalışır ve site sahibinin dosyalarına yazamaz.
- * İçerik önce /tmp altında geçici bir dosyaya yazılır, sonra
- * `v-copy-fs-file USER KAYNAK HEDEF` ile kopyalanır. Bu komut:
- *   - hedefi `readlink -f` ile çözer ve kullanıcının ev dizini (ya da /tmp)
- *     dışına yazmayı reddeder — yol kaçışı burada kapanır,
- *   - kopyalamayı SİTE SAHİBİ olarak çalıştırır, yani dosya sahipliği doğru
- *     kalır ve işletim sistemi izinleri de ayrıca uygulanır.
- * Test edildi: /etc/ altına yazma denemesi "invalid destination path" ile
- * reddediliyor.
+ * HOW WRITES WORK
+ * The panel runs as `hestiaweb` and cannot write the site owner's files.
+ * Content is written to a temp file under /tmp, then copied with
+ * `v-copy-fs-file USER SOURCE DEST`. That command:
+ *   - resolves the destination with `readlink -f` and refuses writes outside
+ *     the user's home (or /tmp) — path escape is closed here,
+ *   - runs the copy as the SITE OWNER, so ownership stays correct and OS
+ *     permissions still apply.
+ * Tested: a write attempt under /etc/ is rejected with "invalid destination path".
  *
- * EK DOĞRULAMALAR (savunma tek katmana bırakılmaz)
- *   - Kullanıcı adı DAİMA oturumdan alınır, istekten değil.
- *   - Alan adı, kullanıcının kendi alan adları arasında olmalıdır.
- *   - Dosya adı sabit bir listeden seçilir; istekten gelen ad kullanılmaz.
- *   - İçerik boyutu sınırlıdır.
+ * EXTRA CHECKS (defense is not left to one layer)
+ *   - Username ALWAYS comes from the session, never the request.
+ *   - Domain must be among the user's own domains.
+ *   - Filename is chosen from a fixed list; the request name is not used.
+ *   - Content size is limited.
  */
 
 use function Hestiacp\quoteshellarg\quoteshellarg;
@@ -48,10 +47,10 @@ $wd_user = empty($_SESSION["look"]) ? $_SESSION["user"] : $_SESSION["look"];
 /* Düzenlenebilecek dosyalar SABİTTİR. İstekten gelen bir dosya adı asla
    yola konmaz; yalnızca bu listedeki anahtar kabul edilir. */
 $WD_SAYFALAR = [
-	"404.html" => ["kod" => "404", "ad" => "Sayfa Bulunamadı", "aciklama" => "İstenen adres yok"],
-	"403.html" => ["kod" => "403", "ad" => "Erişim Reddedildi", "aciklama" => "Dosyaya erişim izni yok"],
-	"410.html" => ["kod" => "410", "ad" => "Kaldırıldı", "aciklama" => "İçerik kalıcı olarak silindi"],
-	"50x.html" => ["kod" => "5xx", "ad" => "Sunucu Hatası", "aciklama" => "500, 502, 503, 504"],
+	"404.html" => ["kod" => "404", "ad" => wd__("Page Not Found"), "aciklama" => wd__("Requested address does not exist")],
+	"403.html" => ["kod" => "403", "ad" => wd__("Access Denied"), "aciklama" => wd__("No permission to access the file")],
+	"410.html" => ["kod" => "410", "ad" => wd__("Gone"), "aciklama" => wd__("Content permanently removed")],
+	"50x.html" => ["kod" => "5xx", "ad" => wd__("Server Error"), "aciklama" => "500, 502, 503, 504"],
 ];
 
 const WD_AZAMI_BOYUT = 262144; // 256 KB
@@ -118,9 +117,9 @@ if (!empty($_POST["ok"]) && $wd_home !== null) {
 
 	// HAM değerler doğrulanır — geri düşülmüş değerler DEĞİL.
 	if ($wd_ham_domain === "" || !isset($wd_doms[$wd_ham_domain])) {
-		$wd_hata = "Geçersiz alan adı: " . wd_e($wd_ham_domain);
+		$wd_hata = sprintf(wd__("Invalid domain: %s"), wd_e($wd_ham_domain));
 	} elseif (!isset($WD_SAYFALAR[$wd_ham_dosya])) {
-		$wd_hata = "Geçersiz sayfa: " . wd_e($wd_ham_dosya);
+		$wd_hata = sprintf(wd__("Invalid page: %s"), wd_e($wd_ham_dosya));
 	} else {
 		// Buradan sonra ikisi de doğrulanmıştır.
 		$wd_domain = $wd_ham_domain;
@@ -128,7 +127,7 @@ if (!empty($_POST["ok"]) && $wd_home !== null) {
 		if ($islem === "varsayilan") {
 			$kaynak = "/usr/local/hestia/wd/skel/document_errors/" . $wd_dosya;
 			if (!is_readable($kaynak)) {
-				$wd_hata = "Varsayılan şablon bulunamadı: " . wd_e($wd_dosya);
+				$wd_hata = sprintf(wd__("Default template not found: %s"), wd_e($wd_dosya));
 				$icerik = null;
 			} else {
 				$icerik = (string) file_get_contents($kaynak);
@@ -139,18 +138,17 @@ if (!empty($_POST["ok"]) && $wd_home !== null) {
 
 		if ($wd_hata === "" && $icerik !== null) {
 			if (strlen($icerik) > WD_AZAMI_BOYUT) {
-				$wd_hata =
-					"İçerik çok büyük (" .
-					number_format(strlen($icerik) / 1024, 0, ",", ".") .
-					" KB). En fazla " .
-					WD_AZAMI_BOYUT / 1024 .
-					" KB olabilir.";
+				$wd_hata = sprintf(
+					wd__("Content too large (%s KB). Maximum is %d KB."),
+					number_format(strlen($icerik) / 1024, 0, ".", ","),
+					WD_AZAMI_BOYUT / 1024,
+				);
 			} else {
 				// v-copy-fs-file kaynağın /tmp ya da ev dizini altında olmasını
 				// şart koşar; bu yüzden geçici dosya bilerek /tmp'e yazılır.
 				$gecici = tempnam("/tmp", "wd-err-");
 				if ($gecici === false) {
-					$wd_hata = "Geçici dosya oluşturulamadı.";
+					$wd_hata = wd__("Could not create temporary file.");
 				} else {
 					file_put_contents($gecici, $icerik);
 					// Kopyalama SİTE SAHİBİ olarak çalışır; kaynağı okuyabilmesi
@@ -176,7 +174,7 @@ if (!empty($_POST["ok"]) && $wd_home !== null) {
 					if ($rc !== 0) {
 						$wd_hata = trim(implode(" ", $out));
 						if ($wd_hata === "") {
-							$wd_hata = "Kaydedilemedi (kod " . (int) $rc . ").";
+							$wd_hata = sprintf(wd__("Could not save (code %d)."), (int) $rc);
 						}
 					} else {
 						header(
@@ -198,8 +196,8 @@ if (!empty($_POST["ok"]) && $wd_home !== null) {
 if ($wd_hata === "" && isset($_GET["durum"])) {
 	$wd_bilgi =
 		$_GET["durum"] === "sifirlandi"
-			? "Sayfa varsayılan içeriğe döndürüldü."
-			: "Sayfa kaydedildi. Değişiklik hemen yayında.";
+			? wd__("Page restored to default content.")
+			: wd__("Page saved. Change is live immediately.");
 }
 
 // --- Mevcut içerik ---
@@ -215,7 +213,7 @@ if ($wd_domain !== "" && $wd_home !== null) {
 }
 
 if ($wd_home === null) {
-	$wd_hata = "Kullanıcı ev dizini okunamadı.";
+	$wd_hata = wd__("Could not read user home directory.");
 }
 
 render_page($user, $TAB, "list_errorpages");

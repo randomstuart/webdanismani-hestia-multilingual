@@ -1,11 +1,11 @@
 <?php
 /**
- * WebDanışmanı — "Uygulama Kurucu" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/kur/index.php
+ * WebDanışmanı — "App Installer" page
+ * Installs to: /usr/local/hestia/web/list/kur/index.php
  *
- * Katalogdaki uygulama paketlerini seçilen alan adına kurar.
- * Katalog yönetimi (zip yükleme) yalnız yönetici. Yükleme PHP'nin geçici
- * dosyasıyla gelir; root betiği dosyayı kataloğa taşır.
+ * Installs catalog app packages onto the selected domain.
+ * Catalog management (zip upload) is admin-only. Uploads arrive via PHP's
+ * temp file; the root script moves them into the catalog.
  */
 
 ob_start();
@@ -48,13 +48,13 @@ if (!empty($_POST["ok"])) {
 			}
 			$zip = tempnam($dizin, "wdkur-");
 			if ($zip === false || !move_uploaded_file($_FILES["v_zip"]["tmp_name"], $zip)) {
-				$wd_hata = "Yüklenen dosya geçici alana alınamadı.";
+				$wd_hata = wd__("Uploaded file could not be moved to temporary storage.");
 				$zip = "-";
 			} else {
 				chmod($zip, 0644);
 			}
 		} elseif (!empty($_FILES["v_zip"]["error"]) && (int) $_FILES["v_zip"]["error"] !== UPLOAD_ERR_NO_FILE) {
-			$wd_hata = "ZIP yüklenemedi (hata kodu " . (int) $_FILES["v_zip"]["error"] . "). Sunucunun upload_max_filesize sınırını kontrol edin.";
+			$wd_hata = sprintf(wd__("ZIP upload failed (error code %d). Check the server upload_max_filesize limit."), (int) $_FILES["v_zip"]["error"]);
 		}
 		if ($wd_hata === "") {
 			$manifest = [
@@ -81,7 +81,7 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/kur/?durum=katalog-ok&d=" . urlencode($kod));
 				exit();
 			}
-			$wd_hata = "Kataloğa eklenemedi: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not add to catalog: %s"), $d["hata"] ?? "");
 		}
 	} elseif ($islem === "katalog-sil" && $wd_is_admin) {
 		$kod = strtoupper(trim((string) ($_POST["v_kod"] ?? "")));
@@ -90,7 +90,7 @@ if (!empty($_POST["ok"])) {
 		exit();
 	} elseif ($islem === "kur") {
 		if ($wd_ham_domain === "" || !isset($wd_doms[$wd_ham_domain])) {
-			$wd_hata = "Geçersiz alan adı.";
+			$wd_hata = wd__("Invalid domain.");
 		} else {
 			$wd_domain = $wd_ham_domain;
 			$kod = strtoupper(trim((string) ($_POST["v_kod"] ?? "")));
@@ -106,16 +106,16 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/kur/?domain=" . urlencode($wd_domain) . "&durum=kuruldu");
 				exit();
 			}
-			$wd_hata = "Kurulum yapılamadı: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Installation failed: %s"), $d["hata"] ?? "");
 		}
 	}
 }
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"katalog-ok" => "{d} kataloğa eklendi.",
-		"katalog-silindi" => "{d} katalogdan kaldırıldı.",
-		"hata" => "İşlem yapılamadı.",
+		"katalog-ok" => wd__("{d} added to catalog."),
+		"katalog-silindi" => wd__("{d} removed from catalog."),
+		"hata" => wd__("Action could not be completed."),
 	]);
 	if (($_GET["durum"] ?? "") === "kuruldu" && !empty($_SESSION["wd_kur_sonuc"])) {
 		$wd_sonuc = $_SESSION["wd_kur_sonuc"];

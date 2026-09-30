@@ -1,17 +1,17 @@
 <?php
 /**
- * WebDanışmanı — "Node.js Uygulamaları" sayfa şablonu
- * Kurulum yeri: /usr/local/hestia/web/templates/pages/list_node.php
+ * WebDanışmanı — "Node.js Apps" page template
+ * Installs to: /usr/local/hestia/web/templates/pages/list_node.php
  */
 wd_modul_css();
 $tok = $_SESSION["token"] ?? "";
 $bos_doms = array_filter(array_keys($wd_doms), fn($d) => !in_array($d, $wd_kullanilan, true));
 $durum_rozet = function (string $d): string {
 	if ($d === "active") {
-		return '<span class="wdm-rozet wdm-rozet-ok"><span class="wdm-nokta wdm-nokta-ok"></span>çalışıyor</span>';
+		return '<span class="wdm-rozet wdm-rozet-ok"><span class="wdm-nokta wdm-nokta-ok"></span>' . wd_esc__("running") . '</span>';
 	}
 	if ($d === "activating") {
-		return '<span class="wdm-rozet wdm-rozet-warn">başlıyor</span>';
+		return '<span class="wdm-rozet wdm-rozet-warn">' . wd_esc__("starting") . '</span>';
 	}
 	return '<span class="wdm-rozet wdm-rozet-err"><span class="wdm-nokta wdm-nokta-err"></span>' . wd_e($d) . "</span>";
 };
@@ -21,7 +21,7 @@ $durum_rozet = function (string $d): string {
 	<div class="wd-page">
 		<div class="wd-main">
 
-			<?php wd_modul_baslik("Node.js Uygulamaları", "Uygulamanız kendi hesabınızla servis olarak çalışır, çökünce yeniden başlar ve alan adınıza bağlanır."); ?>
+			<?php wd_modul_baslik(wd__("Node.js Apps"), wd__("Your app runs as a service under your account, restarts on crash, and is bound to your domain.")); ?>
 
 			<?php if ($wd_hata !== "") {
 				wd_modul_not($wd_hata, "err");
@@ -29,23 +29,23 @@ $durum_rozet = function (string $d): string {
 				wd_modul_not($wd_bilgi, "ok");
 			} ?>
 			<?php if ($wd_node === "") {
-				wd_modul_not("Sunucuda Node.js kurulu değil. Yönetici NodeSource deposundan nodejs kurduğunda bu sayfa etkinleşir.", "warn");
+				wd_modul_not(wd__("Node.js is not installed on the server. This page activates when the admin installs nodejs from the NodeSource repository."), "warn");
 			} ?>
 
 			<?php if ($wd_gunluk !== null) { ?>
 				<div class="wd-card">
-					<div class="wd-card-head">Günlük · <?= wd_e($wd_gunluk["domain"]) ?> <?= $durum_rozet((string) ($wd_gunluk["durum"] ?? "")) ?></div>
+					<div class="wd-card-head"><?= wd_esc__("Log") ?> · <?= wd_e($wd_gunluk["domain"]) ?> <?= $durum_rozet((string) ($wd_gunluk["durum"] ?? "")) ?></div>
 					<div class="wd-card-body wd-card-body-pad">
 						<?php if (!empty($wd_gunluk["journal"])) { ?><p class="wdm-ipucu">systemd:</p><pre class="wdm-kod wdm-kod-kucuk"><?= wd_e(implode("\n", (array) $wd_gunluk["journal"])) ?></pre><?php } ?>
-						<p class="wdm-ipucu" style="margin-top:6px">Uygulama çıktısı (private/node.log):</p>
-						<pre class="wdm-kod"><?= wd_e(implode("\n", (array) ($wd_gunluk["satirlar"] ?? [])) ?: "(boş)") ?></pre>
+						<p class="wdm-ipucu" style="margin-top:6px"><?= wd_esc__("App output (private/node.log):") ?></p>
+						<pre class="wdm-kod"><?= wd_e(implode("\n", (array) ($wd_gunluk["satirlar"] ?? [])) ?: "(" . wd__("empty") . ")") ?></pre>
 					</div>
 				</div>
 			<?php } ?>
 
 			<?php if (!empty($wd_uygulamalar)) { ?>
 				<div class="wd-card">
-					<div class="wd-card-head">Çalışan uygulamalar</div>
+					<div class="wd-card-head"><?= wd_esc__("Running apps") ?></div>
 					<div class="wdm-liste">
 						<?php foreach ($wd_uygulamalar as $a) { ?>
 							<div class="wdm-oge">
@@ -54,9 +54,9 @@ $durum_rozet = function (string $d): string {
 									<span class="wdm-oge-alt"><span class="wdm-mono"><?= wd_e(($a["alt_dizin"] ? $a["alt_dizin"] . "/" : "") . $a["giris"]) ?></span> · 127.0.0.1:<?= (int) $a["port"] ?> · <?= wd_e(wd_modul_tarih($a["ts"] ?? null)) ?></span>
 								</div>
 								<div class="wdm-oge-eylem">
-									<form method="post"><?= wd_modul_form_gizli("gunluk", $a["domain"]) ?><button type="submit" class="wd-mini-btn">Günlük</button></form>
-									<form method="post"><?= wd_modul_form_gizli("yeniden", $a["domain"]) ?><button type="submit" class="wd-mini-btn"><i class="fas fa-rotate-right"></i> Yeniden başlat</button></form>
-									<form method="post" onsubmit="return confirm('<?= wd_e($a["domain"]) ?> için servis durdurulup kaldırılacak; alan adı stok PHP şablonuna döner. Dosyalar silinmez. Devam?');"><?= wd_modul_form_gizli("kaldir", $a["domain"]) ?><button type="submit" class="wd-mini-btn wd-mini-btn-danger">Kaldır</button></form>
+									<form method="post"><?= wd_modul_form_gizli("gunluk", $a["domain"]) ?><button type="submit" class="wd-mini-btn"><?= wd_esc__("Log") ?></button></form>
+									<form method="post"><?= wd_modul_form_gizli("yeniden", $a["domain"]) ?><button type="submit" class="wd-mini-btn"><i class="fas fa-rotate-right"></i> <?= wd_esc__("Restart") ?></button></form>
+									<form method="post" onsubmit="return confirm('<?= wd_e(sprintf(wd__("The service for %s will be stopped and removed; the domain returns to the stock PHP template. Files are not deleted. Continue?"), $a["domain"])) ?>');"><?= wd_modul_form_gizli("kaldir", $a["domain"]) ?><button type="submit" class="wd-mini-btn wd-mini-btn-danger"><?= wd_esc__("Remove") ?></button></form>
 								</div>
 							</div>
 						<?php } ?>
@@ -68,45 +68,45 @@ $durum_rozet = function (string $d): string {
 				<form method="post" class="wdm-form">
 					<?= wd_modul_form_gizli("ekle") ?>
 					<div class="wd-card">
-						<div class="wd-card-head">Yeni uygulama</div>
+						<div class="wd-card-head"><?= wd_esc__("New app") ?></div>
 						<div class="wd-card-body wd-card-body-pad">
 							<div class="wdm-satir">
 								<div class="wdm-alan">
-									<label class="form-label" for="v_domain">Alan adı</label>
+									<label class="form-label" for="v_domain"><?= wd_esc__("Domain") ?></label>
 									<select class="form-select" id="v_domain" name="v_domain">
 										<?php foreach ($bos_doms as $d) { ?><option value="<?= wd_e($d) ?>"><?= wd_e($d) ?></option><?php } ?>
 									</select>
-									<span class="wdm-ipucu">Bu alan adının tüm istekleri uygulamaya gider; PHP çalışmaz.</span>
+									<span class="wdm-ipucu"><?= wd_esc__("All requests for this domain go to the app; PHP will not run.") ?></span>
 								</div>
 								<div class="wdm-alan">
-									<label class="form-label" for="v_giris">Giriş dosyası</label>
+									<label class="form-label" for="v_giris"><?= wd_esc__("Entry file") ?></label>
 									<input class="form-control wdm-mono" id="v_giris" name="v_giris" value="app.js" pattern="[A-Za-z0-9._/-]{1,120}">
 									<span class="wdm-ipucu">server.js, index.js, dist/main.js …</span>
 								</div>
 								<div class="wdm-alan">
-									<label class="form-label" for="v_alt">Alt dizin <span class="wdm-ipucu">boş = public_html</span></label>
+									<label class="form-label" for="v_alt"><?= wd_esc__("Subdirectory") ?> <span class="wdm-ipucu"><?= wd_esc__("empty = public_html") ?></span></label>
 									<input class="form-control wdm-mono" id="v_alt" name="v_alt" placeholder="api">
 								</div>
 							</div>
-							<label class="wd-secim" style="margin-top:8px"><input type="checkbox" name="v_npm" value="1" checked><span><b>package.json varsa bağımlılıkları kur</b><span class="wd-v-small">npm install --omit=dev (node_modules yoksa)</span></span></label>
+							<label class="wd-secim" style="margin-top:8px"><input type="checkbox" name="v_npm" value="1" checked><span><b><?= wd_esc__("Install dependencies if package.json exists") ?></b><span class="wd-v-small">npm install --omit=dev (<?= wd_esc__("when node_modules is missing") ?>)</span></span></label>
 						</div>
 					</div>
-					<div class="wdm-dugmeler"><button type="submit" class="button"><i class="fas fa-play"></i> Başlat</button></div>
+					<div class="wdm-dugmeler"><button type="submit" class="button"><i class="fas fa-play"></i> <?= wd_esc__("Start") ?></button></div>
 				</form>
 			<?php } elseif ($wd_node !== "" && empty($bos_doms)) { ?>
-				<?php wd_modul_not("Tüm alan adlarınızda uygulama tanımlı ya da alan adınız yok."); ?>
+				<?php wd_modul_not(wd__("All your domains already have an app defined, or you have no domains.")); ?>
 			<?php } ?>
 		</div>
 
 		<aside class="wd-rail">
 			<div class="wd-card">
-				<div class="wd-card-head">Nasıl Çalışır?</div>
+				<div class="wd-card-head"><?= wd_esc__("How It Works") ?></div>
 				<div class="wd-card-body">
-					<div class="wd-kv"><span class="wd-k">Port</span><span class="wd-v-small">Uygulamanıza <span class="wd-mono">PORT</span> ortam değişkeni verilir (3000-3999 arası, otomatik). Kodunuz <span class="wd-mono">process.env.PORT</span>'u dinlemeli ve <span class="wd-mono">127.0.0.1</span>'e bağlanmalı.</span></div>
-					<div class="wd-kv"><span class="wd-k">Servis</span><span class="wd-v-small">systemd birimi olarak, hesabınızın kullanıcısıyla çalışır; çökerse 5 saniyede yeniden başlar; sunucu açılışında otomatik başlar.</span></div>
-					<div class="wd-kv"><span class="wd-k">Nginx</span><span class="wd-v-small">Alan adı "wd-node" şablonuna alınır; WebSocket dahil tüm istekler uygulamaya proxylenir. SSL ve Let's Encrypt aynen çalışır.</span></div>
-					<div class="wd-kv"><span class="wd-k">Günlük</span><span class="wd-v-small"><span class="wd-mono">private/node.log</span> — Dosya Yöneticisi'nden de okunabilir.</span></div>
-					<div class="wd-kv"><span class="wd-k">Node sürümü</span><span class="wd-v-small"><?= $wd_node !== "" ? wd_e($wd_node) : "kurulu değil" ?></span></div>
+					<div class="wd-kv"><span class="wd-k"><?= wd_esc__("Port") ?></span><span class="wd-v-small"><?= wd_esc__("Your app receives a") ?> <span class="wd-mono">PORT</span> <?= wd_esc__("environment variable (3000–3999, automatic). Your code must listen on") ?> <span class="wd-mono">process.env.PORT</span> <?= wd_esc__("and bind to") ?> <span class="wd-mono">127.0.0.1</span>.</span></div>
+					<div class="wd-kv"><span class="wd-k"><?= wd_esc__("Service") ?></span><span class="wd-v-small"><?= wd_esc__("Runs as a systemd unit under your account user; restarts in 5 seconds on crash; starts automatically on boot.") ?></span></div>
+					<div class="wd-kv"><span class="wd-k">Nginx</span><span class="wd-v-small"><?= wd_esc__('The domain is switched to the "wd-node" template; all requests including WebSocket are proxied to the app. SSL and Let\'s Encrypt keep working.') ?></span></div>
+					<div class="wd-kv"><span class="wd-k"><?= wd_esc__("Log") ?></span><span class="wd-v-small"><span class="wd-mono">private/node.log</span> — <?= wd_esc__("also readable from File Manager.") ?></span></div>
+					<div class="wd-kv"><span class="wd-k"><?= wd_esc__("Node version") ?></span><span class="wd-v-small"><?= $wd_node !== "" ? wd_e($wd_node) : wd_esc__("not installed") ?></span></div>
 				</div>
 			</div>
 		</aside>

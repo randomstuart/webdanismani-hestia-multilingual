@@ -48,6 +48,15 @@ import sys
 import time
 import zipfile
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 KATALOG = HESTIA + "/wd/uygulamalar"
 AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
@@ -138,18 +147,18 @@ def manifest_dogrula(g, kod):
     if isinstance(cfg, dict) and cfg.get("dosya") and cfg.get("sablon"):
         dosya = str(cfg["dosya"]).strip().lstrip("/")
         if ".." in dosya or not re.match(r"^[A-Za-z0-9._/-]{1,160}$", dosya):
-            return None, "config.dosya geçersiz"
+            return None, _("Invalid config.dosya")
         m["config"] = {"dosya": dosya, "sablon": str(cfg["sablon"])[:20000]}
     return m, None
 
 
 def katalog_ekle(kod, zip_yol):
     if not KOD_DESENI.match(kod):
-        return hata("Kod yalnızca A-Z, 0-9, - ve _ içerebilir (2-31 karakter).")
+        return hata(_("Code may only contain A-Z, 0-9, - and _ (2-31 characters)."))
     try:
         g = json.loads(sys.stdin.read() or "{}")
     except ValueError:
-        return hata("Manifest JSON'u çözülemedi.")
+        return hata(_("Could not parse manifest JSON."))
     m, h = manifest_dogrula(g, kod)
     if m is None:
         return hata(h)
@@ -157,7 +166,7 @@ def katalog_ekle(kod, zip_yol):
     os.makedirs(hedef, exist_ok=True)
     if zip_yol and zip_yol != "-":
         if not os.path.isfile(zip_yol) or not zipfile.is_zipfile(zip_yol):
-            return hata("Geçerli bir ZIP dosyası değil.")
+            return hata(_("Not a valid ZIP file."))
         shutil.copyfile(zip_yol, os.path.join(hedef, "paket.zip"))
         try:
             os.unlink(zip_yol)
@@ -175,7 +184,7 @@ def katalog_ekle(kod, zip_yol):
 
 def katalog_sil(kod):
     if not KOD_DESENI.match(kod):
-        return hata("Geçersiz kod.")
+        return hata(_("Invalid code."))
     hedef = os.path.join(KATALOG, kod)
     if os.path.isdir(hedef):
         shutil.rmtree(hedef)
@@ -227,7 +236,7 @@ def zip_ac(zip_yol, hedef, kok_onek):
                 continue
             yol = os.path.realpath(os.path.join(hedef_abs, ad))
             if not yol.startswith(hedef_abs + os.sep) and yol != hedef_abs:
-                raise ValueError("Zip içinde güvensiz yol: " + bilgi.filename)
+                raise ValueError(_("Unsafe path in zip: %s") % bilgi.filename)
             if bilgi.is_dir():
                 os.makedirs(yol, exist_ok=True)
                 continue
@@ -244,42 +253,42 @@ def db_olustur(user, kod):
     sifre = secrets.token_urlsafe(18).replace("-", "a").replace("_", "b")[:20]
     rc, out, err = hestia(["v-add-database", user, sonek, sonek, sifre, "mysql", "localhost", "utf8mb4"])
     if rc != 0:
-        return None, (err or out or "v-add-database başarısız (kod %d)" % rc)
+        return None, (err or out or _("v-add-database failed (code %d)") % rc)
     return {"ad": "%s_%s" % (user, sonek), "kullanici": "%s_%s" % (user, sonek), "sifre": sifre, "sunucu": "localhost"}, None
 
 
 def kur(user, domain, kod, secenek):
     if not KOD_DESENI.match(kod):
-        return hata("Geçersiz uygulama kodu.")
+        return hata(_("Invalid application code."))
     m = manifest_oku(kod)
     if not m:
-        return hata("Uygulama katalogda yok: " + kod)
+        return hata(_("Application not in catalog: %s") % kod)
     if not m.get("paket_var"):
-        return hata("Bu uygulamanın paket dosyası yüklenmemiş.")
+        return hata(_("Package file for this application has not been uploaded."))
     bilgi = domain_bilgi(user, domain)
     if not bilgi:
-        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+        return hata(_("This domain does not belong to user '%s'.") % user)
     home = ev_dizini(user)
     if not home:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
     pw = pwd.getpwnam(user)
 
     alt = str(secenek.get("alt_dizin", "") or "").strip().strip("/")
     if alt and not ALT_DESENI.match(alt):
-        return hata("Alt dizin adı geçersiz (harf, rakam, nokta, tire).")
+        return hata(_("Invalid subdirectory name (letters, digits, dots, hyphens)."))
     lisans = str(secenek.get("lisans", "") or "").strip()
     if m.get("kabuk"):
         if not LISANS_DESENI.match(lisans):
-            return hata("Bu yazılım lisans anahtarı gerektirir; anahtar eksik ya da biçimi hatalı.")
+            return hata(_("This software requires a license key; key is missing or malformed."))
     elif lisans and not LISANS_DESENI.match(lisans):
-        return hata("Lisans anahtarı biçimi hatalı.")
+        return hata(_("License key format is invalid."))
 
     docroot = os.path.join(home, "web", domain, "public_html")
     hedef = os.path.join(docroot, alt) if alt else docroot
     if not os.path.isdir(docroot):
-        return hata("Belge kökü yok: " + docroot)
+        return hata(_("Document root does not exist: %s") % docroot)
     if not dizin_bos_mu(hedef):
-        return hata("Hedef dizin boş değil (%s). Önce mevcut dosyaları taşıyın ya da bir alt dizin seçin." % (("/" + alt) if alt else "/"))
+        return hata(_("Target directory is not empty (%s). Move existing files first or choose a subdirectory.") % (("/" + alt) if alt else "/"))
 
     # PHP sürümü kontrolü (şablon adından)
     php = re.search(r"PHP-(\d)_(\d)", str(bilgi.get("BACKEND", "")))
@@ -290,16 +299,16 @@ def kur(user, domain, kod, secenek):
         except ValueError:
             gerekli = 8.1
         if surum < gerekli:
-            return hata("Bu yazılım PHP %s ister; alan adı PHP %s kullanıyor. Alan adı ayarlarından PHP sürümünü yükseltin." % (m.get("php_min"), surum))
+            return hata(_("This software requires PHP %s; the domain uses PHP %s. Raise the PHP version in domain settings.") % (m.get("php_min"), surum))
 
     os.makedirs(hedef, exist_ok=True)
     zip_yol = os.path.join(KATALOG, kod, "paket.zip")
     try:
         sayi = zip_ac(zip_yol, hedef, m.get("zip_kok", ""))
     except Exception as e:
-        return hata("Paket açılamadı: %s" % e)
+        return hata(_("Could not extract package: %s") % e)
     if sayi == 0:
-        return hata("Paketten dosya çıkmadı; manifest'teki zip_kok değeri yanlış olabilir.")
+        return hata(_("No files extracted from package; zip_kok in the manifest may be wrong."))
 
     # Hestia iskeletindeki varsayılan index.html uygulamanın index.php'sini gölgeler
     if not alt:
@@ -314,7 +323,7 @@ def kur(user, domain, kod, secenek):
     if m.get("db") and secenek.get("db", True):
         db, h = db_olustur(user, kod)
         if db is None:
-            return hata("Veritabanı açılamadı: " + h)
+            return hata(_("Could not create database: %s") % h)
 
     site_url = "https://%s%s" % (domain, ("/" + alt) if alt else "")
     yer = {
@@ -350,7 +359,7 @@ def kur(user, domain, kod, secenek):
     try:
         chown_agac(hedef, pw.pw_uid, pw.pw_gid)
     except Exception as e:
-        return hata("Sahiplik ayarlanamadı: %s" % e)
+        return hata(_("Could not set ownership: %s") % e)
 
     kurulum_url = site_url + (m.get("kurulum_yolu") or "/")
     print(json.dumps({"ok": True, "kod": kod, "ad": m.get("ad"), "surum": m.get("surum"),
@@ -363,7 +372,7 @@ def kur(user, domain, kod, secenek):
 def durum(user, domain):
     home = ev_dizini(user)
     if not home or not domain_bilgi(user, domain):
-        return hata("Alan adı bulunamadı.")
+        return hata(_("Domain not found."))
     docroot = os.path.join(home, "web", domain, "public_html")
     out = []
     adaylar = [docroot]
@@ -403,11 +412,11 @@ def main():
         return liste()
     if mod == "katalog-ekle":
         if len(sys.argv) < 4:
-            return hata("Kullanım: katalog-ekle KOD ZIPYOL")
+            return hata(_("Usage: katalog-ekle CODE ZIPPATH"))
         return katalog_ekle(sys.argv[2], sys.argv[3])
     if mod == "katalog-sil":
         if len(sys.argv) < 3:
-            return hata("Kullanım: katalog-sil KOD")
+            return hata(_("Usage: katalog-sil CODE"))
         return katalog_sil(sys.argv[2])
     if mod in ("kur", "durum"):
         if len(sys.argv) < 4:
@@ -415,18 +424,18 @@ def main():
             return 2
         user, domain = sys.argv[2], sys.argv[3]
         if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
-            return hata("Geçersiz kullanıcı ya da alan adı.")
+            return hata(_("Invalid user or domain."))
         if mod == "durum":
             return durum(user, domain)
         if len(sys.argv) < 5:
-            return hata("Kullanım: kur USER DOMAIN KOD [LISANS] [ALTDIZIN]")
+            return hata(_("Usage: kur USER DOMAIN CODE [LICENSE] [SUBDIR]"))
         kod = sys.argv[4]
         secenek = {}
         if "--stdin" in sys.argv[5:]:
             try:
                 secenek = json.loads(sys.stdin.read() or "{}")
             except ValueError:
-                return hata("JSON çözülemedi.")
+                return hata(_("Could not parse JSON."))
         else:
             ekler = [a for a in sys.argv[5:] if a != "--stdin"]
             if len(ekler) > 0:

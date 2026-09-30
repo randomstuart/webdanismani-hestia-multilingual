@@ -1,19 +1,18 @@
 <?php
 /**
- * WebDanışmanı — "Yönlendirmeler ve Site Kuralları" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/yonlendirme/index.php
+ * WebDanışmanı — "Redirects and Site Rules" page
+ * Installs to: /usr/local/hestia/web/list/yonlendirme/index.php
  *
- * Yol yönlendirmeleri, güvenlik başlıkları, hotlink koruması ve IP engelleme.
- * cPanel "Redirects" + Plesk "Apache & nginx Settings" karşılığı.
+ * Path redirects, security headers, hotlink protection, and IP blocking.
+ * Counterpart to cPanel "Redirects" + Plesk "Apache & nginx Settings".
  *
- * GÜVENLİK
- *  - Kullanıcı adı DAİMA oturumdan; alan adı sahipliği burada ve ayrıca
- *    wd-yonlendirme içinde doğrulanır.
- *  - Kurallar JSON olarak STDIN'den geçirilir; kabuk satırına konmaz.
- *  - Her değer wd-yonlendirme tarafında düzenli ifadelerle süzülür ve
- *    nginx yapılandırması yazıldıktan sonra `nginx -t` ile doğrulanır;
- *    geçersizse eski hâl geri yüklenir. Bozuk bir parça TÜM siteleri
- *    düşüreceği için bu adım atlanamaz.
+ * SECURITY
+ *  - Username ALWAYS from the session; domain ownership is checked here and
+ *    again inside wd-yonlendirme.
+ *  - Rules are passed as JSON on STDIN; never on the shell command line.
+ *  - Each value is filtered with regexes in wd-yonlendirme, and after writing
+ *    nginx config `nginx -t` validates it; on failure the old state is
+ *    restored. A bad fragment would take ALL sites down, so this step is mandatory.
  */
 
 ob_start();
@@ -37,7 +36,7 @@ function wd_yon_calistir(string $mod, string $user, string $domain, ?string $jso
 	$desc = [0 => ["pipe", "r"], 1 => ["pipe", "w"], 2 => ["pipe", "w"]];
 	$p = proc_open($cmd, $desc, $boru);
 	if (!is_resource($p)) {
-		return [1, "", "süreç başlatılamadı"];
+		return [1, "", wd__("could not start process")];
 	}
 	if ($json !== null) {
 		fwrite($boru[0], $json);
@@ -63,7 +62,7 @@ if (!empty($_POST["ok"])) {
 	verify_csrf($_POST);
 
 	if ($wd_ham_domain === "" || !isset($wd_doms[$wd_ham_domain])) {
-		$wd_hata = "Geçersiz alan adı.";
+		$wd_hata = wd__("Invalid domain.");
 	} else {
 		$wd_domain = $wd_ham_domain;
 		$islem = $_POST["islem"] ?? "kaydet";
@@ -75,7 +74,7 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/yonlendirme/?domain=" . urlencode($wd_domain) . "&durum=silindi");
 				exit();
 			}
-			$wd_hata = "Kurallar kaldırılamadı: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not remove rules: %s"), $d["hata"] ?? "");
 		} else {
 			// Formdan gelen satırlar kurallara çevrilir.
 			$yollar = [];
@@ -136,7 +135,7 @@ if (!empty($_POST["ok"])) {
 				);
 				exit();
 			}
-			$wd_hata = $d["hata"] ?? trim($err ?: "Kaydedilemedi.");
+			$wd_hata = $d["hata"] ?? trim($err ?: wd__("Could not save."));
 		}
 	}
 }
@@ -144,10 +143,8 @@ if (!empty($_POST["ok"])) {
 if ($wd_hata === "" && isset($_GET["durum"])) {
 	$wd_bilgi =
 		$_GET["durum"] === "silindi"
-			? "Bu alan adının tüm özel kuralları kaldırıldı."
-			: "Kurallar kaydedildi ve yayına alındı (" .
-				(int) ($_GET["k"] ?? 0) .
-				" yönlendirme).";
+			? wd__("All custom rules for this domain were removed.")
+			: sprintf(wd__("Rules saved and published (%d redirect(s))."), (int) ($_GET["k"] ?? 0));
 }
 
 // --- Mevcut kurallar ---

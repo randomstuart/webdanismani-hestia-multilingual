@@ -1,9 +1,9 @@
 <?php
 /**
- * WebDanışmanı — "Araçlar" kontrol paneli sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/tools/index.php
+ * WebDanışmanı — "Tools" control panel page
+ * Installs to: /usr/local/hestia/web/list/tools/index.php
  *
- * YENİ dosyadır; HestiaCP güncellemelerinden etkilenmez.
+ * NEW file; unaffected by HestiaCP updates.
  */
 
 $TAB = "TOOLS";

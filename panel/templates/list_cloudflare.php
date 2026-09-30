@@ -1,7 +1,7 @@
 <?php
 /**
- * WebDanışmanı — "Cloudflare" sayfa şablonu
- * Kurulum yeri: /usr/local/hestia/web/templates/pages/list_cloudflare.php
+ * WebDanışmanı — "Cloudflare" page template
+ * Installs to: /usr/local/hestia/web/templates/pages/list_cloudflare.php
  */
 
 $tok = $_SESSION["token"] ?? "";
@@ -19,7 +19,7 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 				<div>
 					<h1 class="wd-title">Cloudflare</h1>
 					<p class="wd-subtitle">
-						Gerçek ziyaretçi IP'si, önbellek temizleme ve DNS gönderimi.
+						<?= wd_esc__("Real visitor IP, cache purge, and DNS push.") ?>
 					</p>
 				</div>
 			</div>
@@ -37,33 +37,33 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 			<?php if ($wd_cf === null) { ?>
 				<div class="wd-note wd-note-warn">
 					<i class="fas fa-triangle-exclamation"></i>
-					<span>Cloudflare aracı çalıştırılamadı. Sunucuda
-						<span class="wd-mono">bash /usr/local/hestia/wd/src/kur.sh</span> çalıştırın.</span>
+					<span><?= wd_esc__("Cloudflare tool could not run. On the server run") ?>
+						<span class="wd-mono">bash /usr/local/hestia/wd/src/kur.sh</span>.</span>
 				</div>
 			<?php } else { ?>
 
-			<!-- ============ 1) Gerçek ziyaretçi IP'si ============ -->
+			<!-- ============ 1) Real visitor IP ============ -->
 			<div class="wd-card">
 				<div class="wd-card-head">
-					Gerçek Ziyaretçi IP'si
-					<span class="wd-card-note">jeton gerektirmez</span>
+					<?= wd_esc__("Real Visitor IP") ?>
+					<span class="wd-card-note"><?= wd_esc__("no token required") ?></span>
 				</div>
 				<div class="wd-card-body wd-card-body-pad">
 					<p class="wd-aciklama">
-						Site Cloudflare arkasındayken sunucuya gelen bağlantı Cloudflare'den gelir.
-						Bu liste tanımlı değilse <b>tüm ziyaretçiler Cloudflare IP'si olarak görünür</b> —
-						günlükler işe yaramaz ve fail2ban yanlış adresi engeller, hatta Cloudflare'i
-						engelleyip siteyi tümden kapatabilir.
+						<?= wd_esc__("When the site is behind Cloudflare, connections to the server come from Cloudflare.") ?>
+						<?= wd_esc__("If this list is not configured,") ?>
+						<b><?= wd_esc__("all visitors appear as Cloudflare IPs") ?></b> —
+						<?= wd_esc__("logs are useless and fail2ban bans the wrong address, or even bans Cloudflare and takes the whole site down.") ?>
 					</p>
 
 					<div class="wd-kv-satir">
 						<span class="wd-durum-rozet <?= $gercek_ip ? "wd-hs-ok" : "wd-hs-fail" ?>">
-							<?= $gercek_ip ? "Etkin" : "Pasif" ?>
+							<?= $gercek_ip ? wd_esc__("Enabled") : wd_esc__("Disabled") ?>
 						</span>
 						<span class="wd-v-dim">
-							<?= (int) ($wd_cf["ip_v4"] ?? 0) ?> IPv4 · <?= (int) ($wd_cf["ip_v6"] ?? 0) ?> IPv6 aralığı
+							<?= (int) ($wd_cf["ip_v4"] ?? 0) ?> IPv4 · <?= (int) ($wd_cf["ip_v6"] ?? 0) ?> <?= wd_esc__("IPv6 ranges") ?>
 							<?php if (!empty($wd_cf["ip_guncelleme"])) { ?>
-								· son güncelleme <?= wd_e($wd_cf["ip_guncelleme"]) ?>
+								· <?= wd_esc__("last update") ?> <?= wd_e($wd_cf["ip_guncelleme"]) ?>
 							<?php } ?>
 						</span>
 					</div>
@@ -73,28 +73,30 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 						<input type="hidden" name="ok" value="1">
 						<input type="hidden" name="islem" value="ip">
 						<button type="submit" class="button button-secondary">
-							<i class="fas fa-rotate"></i> IP Listesini Güncelle
+							<i class="fas fa-rotate"></i> <?= wd_esc__("Update IP List") ?>
 						</button>
 					</form>
 					<p class="wd-aciklama wd-aciklama-kucuk">
-						Liste günlük olarak kendiliğinden tazelenir. Güncelleme öncesi nginx ve
-						Apache yapılandırması doğrulanır; geçersizse değişiklik geri alınır.
+						<?= wd_esc__("The list refreshes automatically every day. Before updating, nginx and Apache configs are validated; if invalid, the change is rolled back.") ?>
 					</p>
 				</div>
 			</div>
 
-			<!-- ============ 2) API jetonu ============ -->
+			<!-- ============ 2) API token ============ -->
 			<div class="wd-card">
 				<div class="wd-card-head">
-					API Jetonu
-					<span class="wd-card-note"><?= $jeton_var ? "kayıtlı" : "tanımsız" ?></span>
+					<?= wd_esc__("API Token") ?>
+					<span class="wd-card-note"><?= $jeton_var ? wd_esc__("saved") : wd_esc__("not set") ?></span>
 				</div>
 				<div class="wd-card-body wd-card-body-pad">
 					<?php if ($jeton_var) { ?>
 						<div class="wd-kv-satir">
-							<span class="wd-durum-rozet wd-hs-ok">Doğrulandı</span>
+							<span class="wd-durum-rozet wd-hs-ok"><?= wd_esc__("Verified") ?></span>
 							<span class="wd-v-dim">
-								<?= count($zonlar) ?> bölge görünüyor
+								<?php
+        $zn = count($zonlar);
+        echo wd_e(sprintf(wd_n__("%d zone visible", "%d zones visible", $zn), $zn));
+        ?>
 								<?php if (!empty($wd_cf["dogrulandi"])) { ?>
 									· <?= wd_e(date("d.m.Y H:i", (int) $wd_cf["dogrulandi"])) ?>
 								<?php } ?>
@@ -103,42 +105,44 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 						<?php if (!empty($wd_cf["hata"])) { ?>
 							<div class="wd-note wd-note-warn wd-note-inline">
 								<i class="fas fa-triangle-exclamation"></i>
-								<span>API yanıtı: <?= wd_e($wd_cf["hata"]) ?></span>
+								<span><?= wd_esc__("API response:") ?> <?= wd_e($wd_cf["hata"]) ?></span>
 							</div>
 						<?php } ?>
 						<form method="post" class="wd-inline-form"
-							onsubmit="return confirm('Jeton silinsin mi? API işlemleri kullanılamaz hale gelir.');">
+							onsubmit="return confirm(<?= htmlspecialchars(json_encode(wd__("Delete the token? API actions will become unavailable.")), ENT_QUOTES, "UTF-8") ?>);">
 							<input type="hidden" name="token" value="<?= wd_e($tok) ?>">
 							<input type="hidden" name="ok" value="1">
 							<input type="hidden" name="islem" value="jeton-sil">
-							<button type="submit" class="button button-secondary">Jetonu Sil</button>
+							<button type="submit" class="button button-secondary"><?= wd_esc__("Delete Token") ?></button>
 						</form>
 					<?php } else { ?>
 						<p class="wd-aciklama">
-							Cloudflare panelinde <b>My Profile → API Tokens → Create Token</b> ile
-							bir jeton oluşturun. Gereken yetkiler:
+							<?= wd_esc__("In the Cloudflare panel create a token via") ?>
+							<b>My Profile → API Tokens → Create Token</b>.
+							<?= wd_esc__("Required permissions:") ?>
 							<span class="wd-mono">Zone:Read</span>,
 							<span class="wd-mono">DNS:Edit</span>,
 							<span class="wd-mono">Cache Purge:Purge</span>.
-							Global API Key <b>kullanmayın</b> — o anahtar hesabın tamamına erişir.
+							<?= wd_esc__("Do") ?> <b><?= wd_esc__("not") ?></b>
+							<?= wd_esc__("use a Global API Key — that key has access to the whole account.") ?>
 						</p>
 						<form method="post" class="wd-auth-form">
 							<input type="hidden" name="token" value="<?= wd_e($tok) ?>">
 							<input type="hidden" name="ok" value="1">
 							<input type="hidden" name="islem" value="jeton">
 							<div class="wd-auth-field wd-auth-field-genis">
-								<label class="form-label" for="v_token">API Jetonu</label>
+								<label class="form-label" for="v_token"><?= wd_esc__("API Token") ?></label>
 								<input class="form-control" type="password" id="v_token" name="v_token"
 									autocomplete="off" required minlength="20"
 									placeholder="Cloudflare API token">
 							</div>
-							<button type="submit" class="button">Kaydet ve Doğrula</button>
+							<button type="submit" class="button"><?= wd_esc__("Save and Verify") ?></button>
 						</form>
 					<?php } ?>
 				</div>
 			</div>
 
-			<!-- ============ 3) Bölgeler ============ -->
+			<!-- ============ 3) Zones ============ -->
 			<?php if ($jeton_var && !empty($zonlar)) {
     foreach ($zonlar as $z) {
     	$panelde = isset($wd_dns_bolgeleri[$z["ad"]]); ?>
@@ -156,7 +160,7 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 
 							<?php if (!empty($z["ns"])) { ?>
 								<div class="wd-kv">
-									<span class="wd-k">Cloudflare nameserver</span>
+									<span class="wd-k"><?= wd_esc__("Cloudflare nameserver") ?></span>
 									<span class="wd-v wd-mono"><?= wd_e(implode(", ", $z["ns"])) ?></span>
 								</div>
 							<?php } ?>
@@ -167,7 +171,7 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 									<input type="hidden" name="ok" value="1">
 									<input type="hidden" name="islem" value="onbellek">
 									<input type="hidden" name="v_zone" value="<?= wd_e($z["ad"]) ?>">
-									<button type="submit" class="wd-mini-btn">Önbelleği Temizle</button>
+									<button type="submit" class="wd-mini-btn"><?= wd_esc__("Purge Cache") ?></button>
 								</form>
 
 								<form method="post" class="wd-inline-form">
@@ -176,7 +180,7 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 									<input type="hidden" name="islem" value="gelistirme">
 									<input type="hidden" name="v_zone" value="<?= wd_e($z["ad"]) ?>">
 									<input type="hidden" name="v_deger" value="on">
-									<button type="submit" class="wd-mini-btn">Geliştirme Modu Aç (3 sa)</button>
+									<button type="submit" class="wd-mini-btn"><?= wd_esc__("Enable Development Mode (3 h)") ?></button>
 								</form>
 
 								<form method="post" class="wd-inline-form">
@@ -185,24 +189,24 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 									<input type="hidden" name="islem" value="gelistirme">
 									<input type="hidden" name="v_zone" value="<?= wd_e($z["ad"]) ?>">
 									<input type="hidden" name="v_deger" value="off">
-									<button type="submit" class="wd-mini-btn">Kapat</button>
+									<button type="submit" class="wd-mini-btn"><?= wd_esc__("Disable") ?></button>
 								</form>
 
 								<?php if ($panelde) { ?>
 									<form method="post" class="wd-inline-form"
-										onsubmit="return confirm('Paneldeki DNS kayıtları Cloudflare\'e gönderilecek. Cloudflare\'deki fazladan kayıtlar SİLİNMEZ, yalnızca eksikler eklenir ve farklılar güncellenir. Devam?');">
+										onsubmit="return confirm(<?= htmlspecialchars(json_encode(wd__("Panel DNS records will be pushed to Cloudflare. Extra records already in Cloudflare are NOT deleted; only missing ones are added and differing ones updated. Continue?")), ENT_QUOTES, "UTF-8") ?>);">
 										<input type="hidden" name="token" value="<?= wd_e($tok) ?>">
 										<input type="hidden" name="ok" value="1">
 										<input type="hidden" name="islem" value="dns">
 										<input type="hidden" name="v_zone" value="<?= wd_e($z["ad"]) ?>">
-										<button type="submit" class="wd-mini-btn">Panel DNS'ini Gönder</button>
+										<button type="submit" class="wd-mini-btn"><?= wd_esc__("Push Panel DNS") ?></button>
 									</form>
 								<?php } ?>
 							</div>
 
 							<?php if (!$panelde) { ?>
 								<p class="wd-aciklama wd-aciklama-kucuk">
-									Bu bölgenin panelde bir DNS kaydı yok, bu yüzden gönderim seçeneği kapalı.
+									<?= wd_esc__("This zone has no DNS zone in the panel, so the push option is disabled.") ?>
 								</p>
 							<?php } ?>
 						</div>
@@ -213,38 +217,38 @@ $zonlar = $wd_cf["zonlar"] ?? [];
 			<?php } ?>
 		</div>
 
-		<!-- ================= SAĞ PANEL ================= -->
+		<!-- ================= RIGHT RAIL ================= -->
 		<aside class="wd-rail">
 			<div class="wd-card">
-				<div class="wd-card-head">Bilmeniz Gerekenler</div>
+				<div class="wd-card-head"><?= wd_esc__("Things to Know") ?></div>
 				<div class="wd-card-body">
 					<div class="wd-kv">
-						<span class="wd-k">Turuncu bulut</span>
+						<span class="wd-k"><?= wd_esc__("Orange cloud") ?></span>
 						<span class="wd-v-small">
-							Bir kayıt Cloudflare üzerinden geçiyorsa (proxied), o alan adı için
-							Let's Encrypt <b>HTTP doğrulaması başarısız olabilir</b>. Sertifika
-							alırken bulutu geçici olarak gri yapın.
+							<?= wd_esc__("If a record is proxied through Cloudflare, Let's Encrypt") ?>
+							<b><?= wd_esc__("HTTP validation may fail") ?></b>
+							<?= wd_esc__("for that domain. Temporarily set the cloud to grey while issuing a certificate.") ?>
 						</span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Geliştirme modu</span>
+						<span class="wd-k"><?= wd_esc__("Development mode") ?></span>
 						<span class="wd-v-small">
-							Önbelleği 3 saatliğine devre dışı bırakır. Site üzerinde çalışırken
-							değişikliklerin anında görünmesi için.
+							<?= wd_esc__("Disables cache for 3 hours. Use while working on the site so changes appear immediately.") ?>
 						</span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">DNS gönderimi</span>
+						<span class="wd-k"><?= wd_esc__("DNS push") ?></span>
 						<span class="wd-v-small">
-							Tek yönlüdür: panel → Cloudflare. Cloudflare'deki kayıtlar
-							<b>silinmez</b>; yalnızca eksikler eklenir, farklılar güncellenir.
+							<?= wd_esc__("One-way: panel → Cloudflare. Records in Cloudflare are") ?>
+							<b><?= wd_esc__("not deleted") ?></b>;
+							<?= wd_esc__("only missing ones are added and differing ones updated.") ?>
 						</span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Jeton nerede</span>
+						<span class="wd-k"><?= wd_esc__("Where the token lives") ?></span>
 						<span class="wd-v-small">
-							<span class="wd-mono">wd/cloudflare.json</span>, yalnızca root okuyabilir.
-							Panel dosyayı okumaz; işlemler sudo'lu araç üzerinden yapılır.
+							<span class="wd-mono">wd/cloudflare.json</span>,
+							<?= wd_esc__("readable by root only. The panel does not read the file; actions go through the sudo tool.") ?>
 						</span>
 					</div>
 				</div>

@@ -1,17 +1,17 @@
 <?php
 /**
- * WebDanışmanı — "Güvenlik" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/guvenlik/index.php
+ * WebDanışmanı — "Security" page
+ * Installs to: /usr/local/hestia/web/list/guvenlik/index.php
  *
- * İki bölüm tek sayfada: sunucu güvenlik denetimi + zararlı yazılım taraması.
- * Kavramsal olarak aynı iş oldukları için ayrı sayfalara bölünmedi.
+ * Two sections on one page: server security audit + malware scan.
+ * Kept together because they are the same conceptual job.
  *
- * YALNIZCA YÖNETİCİ. Bulgular sunucu geneline aittir.
+ * ADMIN ONLY. Findings are server-wide.
  *
- * SERTLEŞTİRME İŞLEMLERİ
- * Panel yalnızca "uygula <islem>" çağırır; hangi işlemin güvenli olduğuna
- * wd-guvenlik karar verir ve ön koşul sağlanmıyorsa REDDEDER. Kilitlenme
- * koruması burada değil, kök betikte yaşar — panel atlatılabilir.
+ * HARDENING ACTIONS
+ * The panel only calls "uygula <islem>"; wd-guvenlik decides whether an
+ * action is safe and REFUSES if a precondition is missing. Lockout
+ * protection lives in the root script, not here — the panel can be bypassed.
  */
 
 ob_start();
@@ -61,15 +61,15 @@ if (!empty($_POST["ok"])) {
 		}
 		$wd_hata = $d["hata"] ?? trim(implode(" ", $out));
 	} elseif ($islem !== "") {
-		$wd_hata = "Bilinmeyen işlem.";
+		$wd_hata = wd__("Unknown action.");
 	}
 }
 
 if ($wd_hata === "" && isset($_GET["durum"])) {
 	$mesaj = [
-		"tarandi" => "Zararlı yazılım taraması yeniden çalıştırıldı.",
-		"denetlendi" => "Güvenlik denetimi yeniden çalıştırıldı.",
-		"uygulandi" => "İşlem uygulandı: " . htmlspecialchars((string) ($_GET["i"] ?? ""), ENT_QUOTES, "UTF-8"),
+		"tarandi" => wd__("Malware scan re-run."),
+		"denetlendi" => wd__("Security audit re-run."),
+		"uygulandi" => sprintf(wd__("Action applied: %s"), htmlspecialchars((string) ($_GET["i"] ?? ""), ENT_QUOTES, "UTF-8")),
 	];
 	$wd_bilgi = $mesaj[$_GET["durum"]] ?? "";
 }

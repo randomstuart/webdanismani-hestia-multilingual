@@ -15,6 +15,10 @@ if (!defined("WD_PANEL_VERSION")) {
 	define("WD_PANEL_VERSION", "1.0");
 }
 
+require_once __DIR__ . "/wd-i18n.php";
+wd_i18n_ensure_locale();
+wd_i18n_boot();
+
 /** İşlemci kullanım yüzdesi. İki örnekleme arası fark alınır. */
 function wd_cpu_percent(int $sample_us = 120000): ?float {
 	$read = static function (): ?array {
@@ -118,7 +122,7 @@ function wd_uptime_seconds(): ?int {
 	return isset($p[0]) ? (int) (float) $p[0] : null;
 }
 
-/** Saniyeyi Türkçe okunur süreye çevirir. */
+/** Human-readable uptime. */
 function wd_human_uptime(?int $sec): string {
 	if ($sec === null) {
 		return "—";
@@ -127,12 +131,13 @@ function wd_human_uptime(?int $sec): string {
 	$h = intdiv($sec % 86400, 3600);
 	$m = intdiv($sec % 3600, 60);
 	if ($d > 0) {
-		return $d . " gün" . ($h > 0 ? " " . $h . " saat" : "");
+		return $d . " " . wd_n__("day", "days", $d) . ($h > 0 ? " " . $h . " " . wd_n__("hour", "hours", $h) : "");
 	}
 	if ($h > 0) {
-		return $h . " saat" . ($m > 0 ? " " . $m . " dk" : "");
+		return $h . " " . wd_n__("hour", "hours", $h) . ($m > 0 ? " " . $m . " " . wd__("min") : "");
 	}
-	return max(1, $m) . " dakika";
+	$m = max(1, $m);
+	return $m . " " . wd_n__("minute", "minutes", $m);
 }
 
 /**
@@ -721,17 +726,17 @@ function wd_health_sinif(string $durum): string {
 	}
 }
 
-/** Sağlık durumunun Türkçe etiketi. */
+/** Health status label. */
 function wd_health_etiket(string $durum): string {
 	switch ($durum) {
 		case "ok":
-			return "Sorunsuz";
+			return wd__("OK");
 		case "warn":
-			return "Uyarı";
+			return wd__("Warning");
 		case "fail":
-			return "Sorun";
+			return wd__("Issue");
 		default:
-			return "Kontrol edilemedi";
+			return wd__("Could not check");
 	}
 }
 

@@ -1,22 +1,23 @@
 <?php
 /**
- * WebDanışmanı — "Disk Kullanımı" sayfa şablonu
- * Kurulum yeri: /usr/local/hestia/web/templates/pages/list_disk.php
+ * WebDanışmanı — "Disk Usage" page template
+ * Installs to: /usr/local/hestia/web/templates/pages/list_disk.php
  *
- * $panel, $user -> render_page() tarafından sağlanır
- * $wd_*         -> list/disk/index.php tarafından sağlanır
+ * $panel, $user -> provided by render_page()
+ * $wd_*         -> provided by list/disk/index.php
  */
 
 $tok = $_SESSION["token"] ?? "";
 $kullanicilar = $wd_disk["kullanicilar"] ?? [];
 
-/* Kategori renkleri — yığılı çubukta ayırt etmek için. Tasarım paletinden. */
+/* Category colors — match wd-disk category paths (stable keys). */
 $wd_renk = [
-	"Web siteleri" => "var(--wd-green)",
-	"E-posta" => "#2f6fb0",
-	"Yedekler" => "var(--wd-amber)",
-	"Geçici dosyalar" => "#7c5cd6",
-	"Diğer" => "var(--wd-sep)",
+	"web" => "var(--wd-green)",
+	"mail" => "#2f6fb0",
+	"backup" => "var(--wd-amber)",
+	"tmp" => "#7c5cd6",
+	"other" => "var(--wd-sep)",
+	"" => "var(--wd-sep)",
 ];
 
 $wd_toplam_hepsi = 0;
@@ -32,14 +33,14 @@ foreach ($kullanicilar as $k) {
 
 			<div class="wd-page-head">
 				<div>
-					<h1 class="wd-title">Disk Kullanımı</h1>
+					<h1 class="wd-title"><?= wd_esc__("Disk Usage") ?></h1>
 					<p class="wd-subtitle">
-						Yerin nereye gittiğini gösterir — alan adı, dizin ve dosya kırılımıyla.
+						<?= wd_esc__("Shows where space went — broken down by domain, directory, and file.") ?>
 					</p>
 				</div>
 				<div class="wd-page-actions">
 					<a class="button button-secondary" href="/list/disk/?yenile=1&amp;token=<?= wd_e($tok) ?>">
-						<i class="fas fa-rotate"></i> Yeniden Tara
+						<i class="fas fa-rotate"></i> <?= wd_esc__("Rescan") ?>
 					</a>
 				</div>
 			</div>
@@ -47,7 +48,7 @@ foreach ($kullanicilar as $k) {
 			<?php if (!empty($wd_yenilendi)) { ?>
 				<div class="wd-note wd-note-ok">
 					<i class="fas fa-circle-check"></i>
-					<span>Tarama yeniden çalıştırıldı; aşağıdaki değerler az önce ölçüldü.</span>
+					<span><?= wd_esc__("Scan re-run; the values below were just measured.") ?></span>
 				</div>
 			<?php } ?>
 
@@ -56,9 +57,9 @@ foreach ($kullanicilar as $k) {
 				<div class="wd-note wd-note-warn">
 					<i class="fas fa-triangle-exclamation"></i>
 					<span>
-						Disk analizi aracı henüz çalışmamış.
-						Sunucuda <span class="wd-mono">bash /usr/local/hestia/wd/src/kur.sh</span> komutunu çalıştırın
-						ya da yukarıdan "Yeniden Tara" deyin.
+						<?= wd_esc__("The disk analysis tool has not run yet.") ?>
+						<?= wd_esc__("On the server run") ?> <span class="wd-mono">bash /usr/local/hestia/wd/src/kur.sh</span>
+						<?= wd_esc__("or click Rescan above.") ?>
 					</span>
 				</div>
 
@@ -66,7 +67,7 @@ foreach ($kullanicilar as $k) {
 
 				<div class="wd-note">
 					<i class="fas fa-circle-info"></i>
-					<span>Görüntülenecek hesap yok.</span>
+					<span><?= wd_esc__("No accounts to display.") ?></span>
 				</div>
 
 			<?php } else {
@@ -88,7 +89,7 @@ foreach ($kullanicilar as $k) {
 							<?php if ($kota_b) { ?>
 								<span class="wd-v-dim">/ <?= wd_e(wd_bayt($kota_b)) ?></span>
 							<?php } else { ?>
-								<span class="wd-v-dim">/ sınırsız</span>
+								<span class="wd-v-dim">/ <?= wd_esc__("unlimited") ?></span>
 							<?php } ?>
 						</span>
 					</div>
@@ -99,34 +100,38 @@ foreach ($kullanicilar as $k) {
 							<div class="wd-note wd-note-warn wd-note-inline">
 								<i class="fas fa-triangle-exclamation"></i>
 								<span>
-									Bu hesabın taraması süre sınırına takıldı; aşağıdaki değerler
-									<b>eksik olabilir</b>. Tam sonuç için sunucuda
-									<span class="wd-mono">wd-disk refresh</span> çalıştırın.
+									<?= wd_esc__("This account's scan hit the time limit; values below") ?>
+									<b><?= wd_esc__("may be incomplete") ?></b>.
+									<?= wd_esc__("For a full result run") ?>
+									<span class="wd-mono">wd-disk refresh</span>
+									<?= wd_esc__("on the server.") ?>
 								</span>
 							</div>
 						<?php } ?>
 
-						<?php // --- Yığılı kategori çubuğu ---
+						<?php // --- Stacked category bar ---
       if (!empty($k["kategoriler"])) { ?>
 							<div class="wd-stack" role="img"
-								aria-label="Disk dağılımı: <?= wd_e(implode(", ", array_map(function ($c) {
-        	return $c["etiket"] . " " . wd_bayt((int) $c["bayt"]);
+								aria-label="<?= wd_esc__("Disk breakdown:") ?> <?= wd_e(implode(", ", array_map(function ($c) {
+        	return wd__($c["etiket"] ?? "") . " " . wd_bayt((int) $c["bayt"]);
         }, $k["kategoriler"]))) ?>">
 								<?php foreach ($k["kategoriler"] as $c) {
          	$w = $c["bayt"] / $toplam * 100;
          	if ($w < 0.4) {
          		continue;
-         	} ?>
-									<span style="width: <?= round($w, 2) ?>%; background: <?= $wd_renk[$c["etiket"]] ?? "var(--wd-sep)" ?>"
-										title="<?= wd_e($c["etiket"] . " — " . wd_bayt((int) $c["bayt"])) ?>"></span>
+         	}
+         	$renk = $wd_renk[$c["yol"] ?? ""] ?? "var(--wd-sep)"; ?>
+									<span style="width: <?= round($w, 2) ?>%; background: <?= $renk ?>"
+										title="<?= wd_e(wd__($c["etiket"] ?? "") . " — " . wd_bayt((int) $c["bayt"])) ?>"></span>
 								<?php } ?>
 							</div>
 
 							<div class="wd-legend">
-								<?php foreach ($k["kategoriler"] as $c) { ?>
-									<span class="wd-legend-item" title="<?= wd_e($c["ipucu"] ?? "") ?>">
-										<span class="wd-legend-dot" style="background: <?= $wd_renk[$c["etiket"]] ?? "var(--wd-sep)" ?>"></span>
-										<?= wd_e($c["etiket"]) ?>
+								<?php foreach ($k["kategoriler"] as $c) {
+									$renk = $wd_renk[$c["yol"] ?? ""] ?? "var(--wd-sep)"; ?>
+									<span class="wd-legend-item" title="<?= wd_e(wd__($c["ipucu"] ?? "")) ?>">
+										<span class="wd-legend-dot" style="background: <?= $renk ?>"></span>
+										<?= wd_e(wd__($c["etiket"] ?? "")) ?>
 										<b><?= wd_e(wd_bayt((int) $c["bayt"])) ?></b>
 									</span>
 								<?php } ?>
@@ -136,8 +141,8 @@ foreach ($kullanicilar as $k) {
       if ($kota_pct !== null) { ?>
 							<div class="wd-usage">
 								<div class="wd-usage-top">
-									<span class="wd-usage-label">Kota kullanımı</span>
-									<span class="wd-usage-num">%<?= wd_e(number_format($kota_pct, 1, ",", ".")) ?></span>
+									<span class="wd-usage-label"><?= wd_esc__("Quota usage") ?></span>
+									<span class="wd-usage-num"><?= wd_e(number_format($kota_pct, 1, ".", ",")) ?>%</span>
 								</div>
 								<div class="wd-bar <?= wd_level((float) $kota_pct) ?>">
 									<span style="width: <?= max(2, $kota_pct) ?>%"></span>
@@ -145,10 +150,10 @@ foreach ($kullanicilar as $k) {
 							</div>
 						<?php } ?>
 
-						<?php // --- Alan adı kırılımı ---
+						<?php // --- Per-domain breakdown ---
       if (!empty($k["alanlar"])) { ?>
 							<div class="wd-disk-sec">
-								<div class="wd-disk-sec-head">Alan adına göre</div>
+								<div class="wd-disk-sec-head"><?= wd_esc__("By domain") ?></div>
 								<?php foreach ($k["alanlar"] as $d) { ?>
 									<div class="wd-disk-row">
 										<div class="wd-disk-row-top">
@@ -172,10 +177,10 @@ foreach ($kullanicilar as $k) {
 							</div>
 						<?php } ?>
 
-						<?php // --- Posta kutuları ---
+						<?php // --- Mailboxes ---
       if (!empty($k["postalar"])) { ?>
 							<div class="wd-disk-sec">
-								<div class="wd-disk-sec-head">Posta kutuları</div>
+								<div class="wd-disk-sec-head"><?= wd_esc__("Mailboxes") ?></div>
 								<?php foreach ($k["postalar"] as $m) { ?>
 									<div class="wd-disk-line">
 										<span class="wd-disk-name"><?= wd_e($m["domain"]) ?></span>
@@ -185,12 +190,12 @@ foreach ($kullanicilar as $k) {
 							</div>
 						<?php } ?>
 
-						<?php // --- En büyük dosyalar ---
+						<?php // --- Largest files ---
       if (!empty($k["dosyalar"])) { ?>
 							<div class="wd-disk-sec">
 								<div class="wd-disk-sec-head">
-									En büyük dosyalar
-									<span class="wd-card-note">yer açmak için önce buraya bakın</span>
+									<?= wd_esc__("Largest files") ?>
+									<span class="wd-card-note"><?= wd_esc__("look here first to free space") ?></span>
 								</div>
 								<?php foreach ($k["dosyalar"] as $f) {
          	$kisa = preg_replace("#^" . preg_quote($k["home"], "#") . "#", "~", $f["yol"]); ?>
@@ -202,10 +207,10 @@ foreach ($kullanicilar as $k) {
 							</div>
 						<?php } ?>
 
-						<?php // --- En büyük dizinler ---
+						<?php // --- Largest directories ---
       if (!empty($k["dizinler"])) { ?>
 							<div class="wd-disk-sec">
-								<div class="wd-disk-sec-head">En büyük dizinler</div>
+								<div class="wd-disk-sec-head"><?= wd_esc__("Largest directories") ?></div>
 								<?php foreach ($k["dizinler"] as $d) { ?>
 									<div class="wd-disk-line">
 										<span class="wd-disk-path wd-mono" title="<?= wd_e($d["yol"]) ?>"><?= wd_e(wd_yol_kisalt($d["yol"])) ?></span>
@@ -223,32 +228,32 @@ foreach ($kullanicilar as $k) {
 
 		</div>
 
-		<!-- ================= SAĞ PANEL ================= -->
+		<!-- ================= RIGHT RAIL ================= -->
 		<aside class="wd-rail">
 
 			<?php if ($wd_disk !== null) { ?>
 				<div class="wd-card">
-					<div class="wd-card-head">Tarama</div>
+					<div class="wd-card-head"><?= wd_esc__("Scan") ?></div>
 					<div class="wd-card-body">
 						<div class="wd-kv">
-							<span class="wd-k">Son Tarama</span>
+							<span class="wd-k"><?= wd_esc__("Last Scan") ?></span>
 							<span class="wd-v">
 								<?php $ts = (int) ($wd_disk["ts"] ?? 0);
         if ($ts > 0) {
         	echo wd_e(date("d.m.Y H:i", $ts));
-        	echo '<span class="wd-v-dim"> · ' . wd_e(wd_human_uptime(max(0, time() - $ts))) . " önce</span>";
+        	echo '<span class="wd-v-dim"> · ' . wd_e(wd_human_uptime(max(0, time() - $ts))) . " " . wd__("ago") . "</span>";
         } else {
         	echo "—";
         } ?>
 							</span>
 						</div>
 						<div class="wd-kv">
-							<span class="wd-k">Hesap</span>
+							<span class="wd-k"><?= wd_esc__("Accounts") ?></span>
 							<span class="wd-v"><?= count($kullanicilar) ?></span>
 						</div>
 						<?php if ($wd_is_admin && count($kullanicilar) > 1) { ?>
 							<div class="wd-kv">
-								<span class="wd-k">Toplam</span>
+								<span class="wd-k"><?= wd_esc__("Total") ?></span>
 								<span class="wd-v"><?= wd_e(wd_bayt($wd_toplam_hepsi)) ?></span>
 							</div>
 						<?php } ?>
@@ -257,29 +262,28 @@ foreach ($kullanicilar as $k) {
 			<?php } ?>
 
 			<div class="wd-card">
-				<div class="wd-card-head">Yer Nasıl Açılır?</div>
+				<div class="wd-card-head"><?= wd_esc__("How to Free Space?") ?></div>
 				<div class="wd-card-body">
 					<div class="wd-kv">
 						<span class="wd-k">logs</span>
-						<span class="wd-v-small">Web günlükleri. Silinebilir; sunucu yenilerini üretir. Genelde en hızlı kazanç buradadır.</span>
+						<span class="wd-v-small"><?= wd_esc__("Web logs. Safe to delete; the server creates new ones. Usually the fastest win.") ?></span>
 					</div>
 					<div class="wd-kv">
 						<span class="wd-k">tmp</span>
-						<span class="wd-v-small">Oturum ve yükleme geçici dosyaları. Güvenle boşaltılabilir.</span>
+						<span class="wd-v-small"><?= wd_esc__("Session and upload temp files. Safe to empty.") ?></span>
 					</div>
 					<div class="wd-kv">
 						<span class="wd-k">backup</span>
-						<span class="wd-v-small">Eski yedek arşivleri. Dışarı indirdikten sonra silinebilir.</span>
+						<span class="wd-v-small"><?= wd_esc__("Old backup archives. Can be deleted after downloading them elsewhere.") ?></span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Posta</span>
-						<span class="wd-v-small">Büyük posta kutuları kotayı hızla doldurur. Eski ekleri temizleyin.</span>
+						<span class="wd-k"><?= wd_esc__("Mail") ?></span>
+						<span class="wd-v-small"><?= wd_esc__("Large mailboxes fill the quota quickly. Clean old attachments.") ?></span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Dikkat</span>
+						<span class="wd-k"><?= wd_esc__("Caution") ?></span>
 						<span class="wd-v-small">
-							<b>public_html</b> içindeki dosyalar sitenizin kendisidir — silmeden önce
-							yedek alın.
+							<?= wd_esc__("Files under") ?> <b>public_html</b> <?= wd_esc__("are your site itself — take a backup before deleting.") ?>
 						</span>
 					</div>
 				</div>

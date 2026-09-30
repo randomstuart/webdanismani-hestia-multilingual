@@ -1,10 +1,10 @@
 <?php
 /**
- * WebDanışmanı — "Araçlar" sayfası şablonu
- * Kurulum yeri: /usr/local/hestia/web/templates/pages/list_tools.php
+ * WebDanışmanı — "Tools" page template
+ * Install path: /usr/local/hestia/web/templates/pages/list_tools.php
  *
- * $panel, $user  -> render_page() tarafından sağlanır
- * $wd_*          -> list/tools/index.php tarafından sağlanır
+ * $panel, $user  -> provided by render_page()
+ * $wd_*          -> provided by list/tools/index.php
  */
 
 $p = $panel[$wd_user] ?? ($panel[$user] ?? []);
@@ -16,143 +16,143 @@ $primary = $wd_primary["domain"] ?? null;
 $pmail = $wd_primary_mail ?? null;
 
 /* ---------------------------------------------------------------------------
-   Araç grupları. Yalnızca GERÇEKTEN var olan sayfalara bağlantı verilir;
-   HestiaCP'de karşılığı olmayan bir özellik için kutu üretilmez.
+   Tool groups. Only link to pages that actually exist;
+   no box is produced for a feature with no HestiaCP counterpart.
    --------------------------------------------------------------------------- */
 $groups = [];
 
 /* --- WEB --- */
 if (!empty($_SESSION["WEB_SYSTEM"]) && ($p["WEB_DOMAINS"] ?? "0") !== "0") {
 	$t = [
-		["Web Alan Adları", "/list/web/", "fa-globe"],
-		["Yeni Alan Adı Ekle", "/add/web/", "fa-circle-plus"],
+		[wd__("Web Domains"), "/list/web/", "fa-globe"],
+		[wd__("Add New Domain"), "/add/web/", "fa-circle-plus"],
 	];
 	if ($primary) {
-		$t[] = ["Alan Adı Ayarları", "/edit/web/?domain=" . urlencode($primary) . "&token=" . $tok, "fa-sliders"];
-		$t[] = ["SSL / Let's Encrypt", "/edit/web/?domain=" . urlencode($primary) . "&token=" . $tok, "fa-lock"];
+		$t[] = [wd__("Domain Settings"), "/edit/web/?domain=" . urlencode($primary) . "&token=" . $tok, "fa-sliders"];
+		$t[] = [wd__("SSL / Let's Encrypt"), "/edit/web/?domain=" . urlencode($primary) . "&token=" . $tok, "fa-lock"];
 		if (($_SESSION["PLUGIN_APP_INSTALLER"] ?? "") === "true") {
-			$t[] = ["Hızlı Kurulum", "/add/webapp/?domain=" . urlencode($primary) . "&token=" . $tok, "fa-wand-magic-sparkles"];
+			$t[] = [wd__("Quick Install"), "/add/webapp/?domain=" . urlencode($primary) . "&token=" . $tok, "fa-wand-magic-sparkles"];
 		}
 	}
-	// web-log ZORUNLU ?domain= ister; parametresiz açılırsa 500 verir
-	// (quoteshellarg tanımsız anahtarla patlar). Alan adı yoksa bağlantı konmaz.
+	// web-log REQUIRES ?domain=; opening without it returns 500
+	// (quoteshellarg crashes on an undefined key). No link if no domain.
 	if ($primary) {
-		$t[] = ["Web Günlükleri", "/list/web-log/?domain=" . urlencode($primary) . "&type=access", "fa-file-lines"];
+		$t[] = [wd__("Web Logs"), "/list/web-log/?domain=" . urlencode($primary) . "&type=access", "fa-file-lines"];
 	}
-	$t[] = ["Web İstatistikleri", "/list/stats/", "fa-chart-line"];
-	// Panelde stok karşılığı OLMAYAN, bu eklentiyle gelen araçlar
-	$t[] = ["Dizin Şifre Koruma", "/list/httpauth/", "fa-lock"];
-	$t[] = ["Özel Hata Sayfaları", "/list/errorpages/", "fa-triangle-exclamation"];
-	$t[] = ["Yönlendirmeler", "/list/yonlendirme/", "fa-right-left"];
+	$t[] = [wd__("Web Statistics"), "/list/stats/", "fa-chart-line"];
+	// Tools with NO stock panel counterpart, provided by this plugin
+	$t[] = [wd__("Directory Password Protection"), "/list/httpauth/", "fa-lock"];
+	$t[] = [wd__("Custom Error Pages"), "/list/errorpages/", "fa-triangle-exclamation"];
+	$t[] = [wd__("Redirects"), "/list/yonlendirme/", "fa-right-left"];
 	if (($_SESSION["FILE_MANAGER"] ?? "") === "true") {
-		$t[] = ["Dosya Yöneticisi", "/fm/", "fa-folder-open"];
+		$t[] = [wd__("File Manager"), "/fm/", "fa-folder-open"];
 	}
-	$groups[] = ["key" => "web", "title" => "WEB — Alan Adları", "icon" => "fa-earth-americas", "tools" => $t];
+	$groups[] = ["key" => "web", "title" => wd__("WEB — Domains"), "icon" => "fa-earth-americas", "tools" => $t];
 }
 
 /* --- MAIL --- */
 if (!empty($_SESSION["MAIL_SYSTEM"]) && ($p["MAIL_DOMAINS"] ?? "0") !== "0") {
 	$t = [
-		["Mail Alan Adları", "/list/mail/", "fa-envelopes-bulk"],
-		["Yeni Mail Alan Adı", "/add/mail/", "fa-circle-plus"],
+		[wd__("Mail Domains"), "/list/mail/", "fa-envelopes-bulk"],
+		[wd__("New Mail Domain"), "/add/mail/", "fa-circle-plus"],
 	];
 	if ($pmail) {
-		$t[] = ["Mail Hesapları", "/list/mail/?domain=" . urlencode($pmail), "fa-at"];
-		$t[] = ["Yeni Mail Hesabı", "/add/mail/?domain=" . urlencode($pmail), "fa-user-plus"];
-		$t[] = ["Mail Ayarları", "/edit/mail/?domain=" . urlencode($pmail) . "&token=" . $tok, "fa-shield-halved"];
+		$t[] = [wd__("Mail Accounts"), "/list/mail/?domain=" . urlencode($pmail), "fa-at"];
+		$t[] = [wd__("New Mail Account"), "/add/mail/?domain=" . urlencode($pmail), "fa-user-plus"];
+		$t[] = [wd__("Mail Settings"), "/edit/mail/?domain=" . urlencode($pmail) . "&token=" . $tok, "fa-shield-halved"];
 		if (($_SESSION["WEBMAIL_SYSTEM"] ?? "") !== "") {
-			$t[] = ["Webmail", "https://" . $wma . "." . $pmail . "/", "fa-inbox", true];
+			$t[] = [wd__("Webmail"), "https://" . $wma . "." . $pmail . "/", "fa-inbox", true];
 		}
 	}
-	// SPF/DKIM/DMARC/MX denetimi — mail teslim sorunlarının kaynağı
-	// çoğunlukla DNS'tir, bu yüzden mail grubundan da erişilebilir.
-	$t[] = ["Mail Sağlık Denetimi", "/list/health/", "fa-stethoscope"];
+	// SPF/DKIM/DMARC/MX check — mail delivery issues often come from DNS,
+	// so this is also reachable from the mail group.
+	$t[] = [wd__("Mail Health Check"), "/list/health/", "fa-stethoscope"];
 	if ($wd_is_admin) {
-		$t[] = ["Mail Raporu", "/list/mailrapor/", "fa-chart-column"];
+		$t[] = [wd__("Mail Report"), "/list/mailrapor/", "fa-chart-column"];
 	}
-	$groups[] = ["key" => "mail", "title" => "MAIL — E-posta", "icon" => "fa-envelopes-bulk", "tools" => $t];
+	$groups[] = ["key" => "mail", "title" => wd__("MAIL — Email"), "icon" => "fa-envelopes-bulk", "tools" => $t];
 }
 
 /* --- DNS --- */
 if (!empty($_SESSION["DNS_SYSTEM"]) && ($p["DNS_DOMAINS"] ?? "0") !== "0") {
 	$t = [
-		["DNS Bölgeleri", "/list/dns/", "fa-book-atlas"],
-		["Yeni Bölge Ekle", "/add/dns/", "fa-circle-plus"],
+		[wd__("DNS Zones"), "/list/dns/", "fa-book-atlas"],
+		[wd__("Add New Zone"), "/add/dns/", "fa-circle-plus"],
 	];
 	if ($wd_primary_dns) {
-		$t[] = ["DNS Kayıtları", "/list/dns/?domain=" . urlencode($wd_primary_dns), "fa-list-ul"];
-		$t[] = ["Yeni DNS Kaydı", "/add/dns/?domain=" . urlencode($wd_primary_dns), "fa-plus"];
+		$t[] = [wd__("DNS Records"), "/list/dns/?domain=" . urlencode($wd_primary_dns), "fa-list-ul"];
+		$t[] = [wd__("New DNS Record"), "/add/dns/?domain=" . urlencode($wd_primary_dns), "fa-plus"];
 	}
-	$groups[] = ["key" => "dns", "title" => "DNS", "icon" => "fa-book-atlas", "tools" => $t];
+	$groups[] = ["key" => "dns", "title" => wd__("DNS"), "icon" => "fa-book-atlas", "tools" => $t];
 }
 
-/* --- VERİTABANI --- */
+/* --- DATABASE --- */
 if (!empty($_SESSION["DB_SYSTEM"]) && ($p["DATABASES"] ?? "0") !== "0") {
 	$t = [
-		["Veritabanları", "/list/db/", "fa-database"],
-		["Yeni Veritabanı", "/add/db/", "fa-circle-plus"],
+		[wd__("Databases"), "/list/db/", "fa-database"],
+		[wd__("New Database"), "/add/db/", "fa-circle-plus"],
 	];
 	if ($primary && strpos($_SESSION["DB_SYSTEM"], "mysql") !== false) {
-		$t[] = ["phpMyAdmin", "https://" . $primary . "/" . $pma . "/", "fa-table", true];
+		$t[] = [wd__("phpMyAdmin"), "https://" . $primary . "/" . $pma . "/", "fa-table", true];
 	}
-	$groups[] = ["key" => "db", "title" => "VERİTABANI", "icon" => "fa-database", "tools" => $t];
+	$groups[] = ["key" => "db", "title" => wd__("DATABASE"), "icon" => "fa-database", "tools" => $t];
 }
 
 /* --- CRON --- */
 if (!empty($_SESSION["CRON_SYSTEM"]) && ($p["CRON_JOBS"] ?? "0") !== "0") {
 	$groups[] = [
 		"key" => "cron",
-		"title" => "CRON — Zamanlanmış Görevler",
+		"title" => wd__("CRON — Scheduled Jobs"),
 		"icon" => "fa-clock",
-		"tools" => [["Cron Görevleri", "/list/cron/", "fa-clock"], ["Yeni Görev Ekle", "/add/cron/", "fa-circle-plus"]],
+		"tools" => [[wd__("Cron Jobs"), "/list/cron/", "fa-clock"], [wd__("Add New Job"), "/add/cron/", "fa-circle-plus"]],
 	];
 }
 
-/* --- YEDEK --- */
+/* --- BACKUP --- */
 if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 	$groups[] = [
 		"key" => "backup",
-		"title" => "YEDEKLER",
+		"title" => wd__("BACKUPS"),
 		"icon" => "fa-file-zipper",
-		"tools" => [["Yedekler", "/list/backup/", "fa-file-zipper"]],
+		"tools" => [[wd__("Backups"), "/list/backup/", "fa-file-zipper"]],
 	];
 }
 
-/* --- HESAP --- */
-$t = [["Sağlık Merkezi", "/list/health/", "fa-stethoscope"]];
-$t[] = ["Hesap Ayarları", "/edit/user/?user=" . urlencode($wd_user) . "&token=" . $tok, "fa-circle-user"];
-$t[] = ["SSH Anahtarları", "/list/access-key/", "fa-key"];
-$t[] = ["İstatistikler", "/list/stats/", "fa-chart-line"];
-$t[] = ["Kaynak Geçmişi", "/list/gecmis/", "fa-chart-area"];
-// NOT: /list/notifications/ bir SAYFA değil, yalnızca AJAX uç noktasıdır
-// (HestiaCP 1.10.4'te list_notifications.php şablonu yoktur). Doğrudan
-// açılırsa boş sayfa üretir; bildirimlere üst çubuktaki zil ikonundan
-// erişilir, bu yüzden buraya bağlantı konmaz.
+/* --- ACCOUNT --- */
+$t = [[wd__("Health Center"), "/list/health/", "fa-stethoscope"]];
+$t[] = [wd__("Account Settings"), "/edit/user/?user=" . urlencode($wd_user) . "&token=" . $tok, "fa-circle-user"];
+$t[] = [wd__("SSH Keys"), "/list/access-key/", "fa-key"];
+$t[] = [wd__("Statistics"), "/list/stats/", "fa-chart-line"];
+$t[] = [wd__("Resource History"), "/list/gecmis/", "fa-chart-area"];
+// NOTE: /list/notifications/ is NOT a page, only an AJAX endpoint
+// (HestiaCP 1.10.4 has no list_notifications.php template). Opening it
+// directly yields a blank page; notifications are reached from the bell
+// icon in the top bar, so no link is placed here.
 if ($wd_is_admin) {
-	$t[] = ["Günlükler", "/list/log/", "fa-clock-rotate-left"];
+	$t[] = [wd__("Logs"), "/list/log/", "fa-clock-rotate-left"];
 }
-$groups[] = ["key" => "account", "title" => "HESAP", "icon" => "fa-circle-user", "tools" => $t];
+$groups[] = ["key" => "account", "title" => wd__("ACCOUNT"), "icon" => "fa-circle-user", "tools" => $t];
 
-/* --- SUNUCU (yalnızca yönetici) --- */
+/* --- SERVER (admin only) --- */
 if ($wd_is_admin) {
 	$t = [
-		["Sunucu Ayarları", "/list/server/", "fa-gear"],
-		["Kullanıcılar", "/list/user/", "fa-users"],
-		["Hosting Paketleri", "/list/package/", "fa-box-open"],
-		["Güvenlik Duvarı", "/list/firewall/", "fa-shield-halved"],
-		["IP Adresleri", "/list/ip/", "fa-network-wired"],
-		["Güncellemeler", "/list/updates/", "fa-rotate"],
-		["Grafikler", "/list/rrd/", "fa-chart-area"],
-		["Cloudflare", "/list/cloudflare/", "fa-cloud"],
-		["Güvenlik", "/list/guvenlik/", "fa-shield-halved"],
+		[wd__("Server Settings"), "/list/server/", "fa-gear"],
+		[wd__("Users"), "/list/user/", "fa-users"],
+		[wd__("Hosting Packages"), "/list/package/", "fa-box-open"],
+		[wd__("Firewall"), "/list/firewall/", "fa-shield-halved"],
+		[wd__("IP Addresses"), "/list/ip/", "fa-network-wired"],
+		[wd__("Updates"), "/list/updates/", "fa-rotate"],
+		[wd__("Graphs"), "/list/rrd/", "fa-chart-area"],
+		[wd__("Cloudflare"), "/list/cloudflare/", "fa-cloud"],
+		[wd__("Security"), "/list/guvenlik/", "fa-shield-halved"],
 	];
 	if (($_SESSION["WEB_TERMINAL"] ?? "") === "true" && ($_SESSION["login_shell"] ?? "") !== "nologin") {
-		$t[] = ["Web Terminali", "/list/terminal/", "fa-terminal"];
+		$t[] = [wd__("Web Terminal"), "/list/terminal/", "fa-terminal"];
 	}
-	$groups[] = ["key" => "server", "title" => "SUNUCU YÖNETİMİ", "icon" => "fa-server", "tools" => $t];
+	$groups[] = ["key" => "server", "title" => wd__("SERVER MANAGEMENT"), "icon" => "fa-server", "tools" => $t];
 }
 
-/* --- Ek modüller (inc/wd-modul.php kayıt dizisi): kurulu olanlar ilgili gruba eklenir --- */
+/* --- Extra modules (inc/wd-modul.php registry): installed ones are added to the matching group --- */
 if (is_file($_SERVER["DOCUMENT_ROOT"] . "/inc/wd-modul.php")) {
 	require_once $_SERVER["DOCUMENT_ROOT"] . "/inc/wd-modul.php";
 	foreach (wd_modul_listesi($wd_is_admin, $wd_user) as $wd_m) {
@@ -164,7 +164,7 @@ if (is_file($_SERVER["DOCUMENT_ROOT"] . "/inc/wd-modul.php")) {
 			}
 		}
 		unset($wd_g);
-		// Grup yoksa (ör. bayinin "server" grubu) hesap grubuna düşer
+		// If group is missing (e.g. reseller has no "server" group) fall back to account
 		if (!$wd_grup_var) {
 			foreach ($groups as &$wd_g) {
 				if ($wd_g["key"] === "account") {
@@ -177,52 +177,52 @@ if (is_file($_SERVER["DOCUMENT_ROOT"] . "/inc/wd-modul.php")) {
 }
 
 /* ---------------------------------------------------------------------------
-   İstatistik kartları — yalnızca gerçek veri olan kart çizilir.
+   Stat cards — only draw a card when real data exists.
    --------------------------------------------------------------------------- */
 $cards = [];
 
-/* Tasarımda kart iki satır: ETİKET / <b>değer</b> <small>of</small> + çubuk.
-   "of" ikincil metin — CPU ve BELLEK sunucu geneli olduğu için orada
-   "sunucu ·" öneki taşır; DİSK ve BANT kullanıcının kendi kotasıdır. */
+/* Design: card has two lines: LABEL / <b>value</b> <small>of</small> + bar.
+   "of" is secondary text — CPU and MEMORY are server-wide so they carry a
+   "server ·" prefix there; DISK and BANDWIDTH are the user's own quota. */
 $wd_quota_txt = function ($limit) {
 	return $limit === "unlimited" || $limit === "" || $limit === null
-		? "/ sınırsız"
+		? wd__("/ unlimited")
 		: "/ " . humanize_usage_size($limit) . " " . humanize_usage_measure($limit);
 };
 
 if ($wd_cpu !== null) {
 	$cards[] = [
-		"label" => "CPU",
-		"value" => "%" . number_format($wd_cpu, 1, ",", "."),
+		"label" => wd__("CPU"),
+		"value" => "%" . number_format($wd_cpu, 1, ".", ","),
 		"of" => ($wd_load["cores"] ?? 1) . " vCPU",
-		"tip" => "Sunucu geneli işlemci kullanımı",
+		"tip" => wd__("Server-wide CPU usage"),
 		"pct" => $wd_cpu,
 	];
 }
 if ($wd_mem !== null) {
 	$cards[] = [
-		"label" => "BELLEK",
-		"value" => number_format($wd_mem["used_kb"] / 1048576, 1, ",", ".") . " GB",
-		"of" => "/ " . number_format($wd_mem["total_kb"] / 1048576, 1, ",", ".") . " GB",
-		"tip" => "Sunucu geneli bellek kullanımı",
+		"label" => wd__("MEMORY"),
+		"value" => number_format($wd_mem["used_kb"] / 1048576, 1, ".", ",") . " GB",
+		"of" => "/ " . number_format($wd_mem["total_kb"] / 1048576, 1, ".", ",") . " GB",
+		"tip" => wd__("Server-wide memory usage"),
 		"pct" => $wd_mem["pct"],
 	];
 }
 $cards[] = [
-	"label" => "DISK",
+	"label" => wd__("DISK"),
 	"value" => humanize_usage_size($p["U_DISK"] ?? 0) . " " . humanize_usage_measure($p["U_DISK"] ?? 0),
 	"of" => $wd_quota_txt($p["DISK_QUOTA"] ?? "unlimited"),
 	"pct" => wd_quota_pct($p["U_DISK"] ?? 0, $p["DISK_QUOTA"] ?? "unlimited"),
 ];
 $cards[] = [
-	"label" => "BANT GENİŞLİĞİ",
+	"label" => wd__("BANDWIDTH"),
 	"value" => humanize_usage_size($p["U_BANDWIDTH"] ?? 0) . " " . humanize_usage_measure($p["U_BANDWIDTH"] ?? 0),
 	"of" => $wd_quota_txt($p["BANDWIDTH"] ?? "unlimited"),
 	"pct" => wd_quota_pct($p["U_BANDWIDTH"] ?? 0, $p["BANDWIDTH"] ?? "unlimited"),
 ];
 
 /* ---------------------------------------------------------------------------
-   Paket kullanımı satırları
+   Package usage rows
    --------------------------------------------------------------------------- */
 $usage_rows = [];
 $add_usage = function ($label, $used, $limit) use (&$usage_rows) {
@@ -237,45 +237,45 @@ $add_usage = function ($label, $used, $limit) use (&$usage_rows) {
 	];
 };
 if (!empty($_SESSION["WEB_SYSTEM"])) {
-	$add_usage("Web Alan Adları", $p["U_WEB_DOMAINS"] ?? 0, $p["WEB_DOMAINS"] ?? "unlimited");
+	$add_usage(wd__("Web Domains"), $p["U_WEB_DOMAINS"] ?? 0, $p["WEB_DOMAINS"] ?? "unlimited");
 }
 if (!empty($_SESSION["DNS_SYSTEM"])) {
-	$add_usage("DNS Bölgeleri", $p["U_DNS_DOMAINS"] ?? 0, $p["DNS_DOMAINS"] ?? "unlimited");
+	$add_usage(wd__("DNS Zones"), $p["U_DNS_DOMAINS"] ?? 0, $p["DNS_DOMAINS"] ?? "unlimited");
 }
 if (!empty($_SESSION["MAIL_SYSTEM"])) {
-	$add_usage("Mail Hesapları", $p["U_MAIL_ACCOUNTS"] ?? 0, $p["MAIL_ACCOUNTS"] ?? "unlimited");
+	$add_usage(wd__("Mail Accounts"), $p["U_MAIL_ACCOUNTS"] ?? 0, $p["MAIL_ACCOUNTS"] ?? "unlimited");
 }
 if (!empty($_SESSION["DB_SYSTEM"])) {
-	$add_usage("Veritabanları", $p["U_DATABASES"] ?? 0, $p["DATABASES"] ?? "unlimited");
+	$add_usage(wd__("Databases"), $p["U_DATABASES"] ?? 0, $p["DATABASES"] ?? "unlimited");
 }
 if (!empty($_SESSION["CRON_SYSTEM"])) {
-	$add_usage("Cron Görevleri", $p["U_CRON_JOBS"] ?? 0, $p["CRON_JOBS"] ?? "unlimited");
+	$add_usage(wd__("Cron Jobs"), $p["U_CRON_JOBS"] ?? 0, $p["CRON_JOBS"] ?? "unlimited");
 }
 if (!empty($_SESSION["BACKUP_SYSTEM"])) {
-	$add_usage("Yedekler", $p["U_BACKUPS"] ?? 0, $p["BACKUPS"] ?? "unlimited");
+	$add_usage(wd__("Backups"), $p["U_BACKUPS"] ?? 0, $p["BACKUPS"] ?? "unlimited");
 }
 ?>
 
 <div class="container">
 	<div class="wd-page">
 
-		<!-- ================= ANA SÜTUN ================= -->
+		<!-- ================= MAIN COLUMN ================= -->
 		<div class="wd-main">
 
 			<div class="wd-page-head">
 				<div>
-					<h1 class="wd-title">Araçlar</h1>
+					<h1 class="wd-title"><?= wd_esc__("Tools") ?></h1>
 					<p class="wd-subtitle">
-						Hosting hesabınızın tüm yönetim araçları — HestiaCP <?= wd_e($_SESSION["VERSION"] ?? "") ?>
+						<?= wd_esc__("All management tools for your hosting account — HestiaCP") ?> <?= wd_e($_SESSION["VERSION"] ?? "") ?>
 					</p>
 				</div>
 				<div class="wd-page-actions">
-					<button type="button" class="button button-secondary" data-wd-toggle="close">Tümünü Kapat</button>
-					<button type="button" class="button button-secondary" data-wd-toggle="open">Tümünü Aç</button>
+					<button type="button" class="button button-secondary" data-wd-toggle="close"><?= wd_esc__("Close All") ?></button>
+					<button type="button" class="button button-secondary" data-wd-toggle="open"><?= wd_esc__("Open All") ?></button>
 				</div>
 			</div>
 
-			<!-- İstatistik kartları -->
+			<!-- Stat cards -->
 			<div class="wd-stats">
 				<?php foreach ($cards as $c) { ?>
 					<div class="wd-stat"<?= isset($c["tip"]) ? ' title="' . wd_e($c["tip"]) . '"' : "" ?>>
@@ -285,7 +285,7 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 						</div>
 						<?php if ($c["pct"] !== null) { ?>
 							<div class="wd-bar <?= wd_level($c["pct"]) ?>" role="img"
-								aria-label="<?= wd_e($c["label"]) ?>: %<?= wd_e(number_format($c["pct"], 1, ",", ".")) ?>">
+								aria-label="<?= wd_e($c["label"]) ?>: %<?= wd_e(number_format($c["pct"], 1, ".", ",")) ?>">
 								<span style="width: <?= max(2, min(100, $c["pct"])) ?>%"></span>
 							</div>
 						<?php } else { ?>
@@ -295,13 +295,13 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 				<?php } ?>
 			</div>
 
-			<!-- Araç grupları -->
+			<!-- Tool groups -->
 			<?php foreach ($groups as $g) { ?>
 				<details class="wd-group" data-wd-group="<?= wd_e($g["key"]) ?>" open>
 					<summary class="wd-group-head">
 						<span class="wd-group-icon"><i class="fas <?= wd_e($g["icon"]) ?>"></i></span>
 						<span class="wd-group-title"><?= wd_e($g["title"]) ?></span>
-						<span class="wd-group-count"><?= count($g["tools"]) ?> araç</span>
+						<span class="wd-group-count"><?= wd_e(sprintf(wd_n__("%d tool", "%d tools", count($g["tools"])), count($g["tools"]))) ?></span>
 						<i class="fas fa-chevron-down wd-group-chevron"></i>
 					</summary>
 					<div class="wd-tools">
@@ -321,18 +321,18 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 
 		</div>
 
-		<!-- ================= SAĞ PANEL ================= -->
+		<!-- ================= RIGHT RAIL ================= -->
 		<aside class="wd-rail">
 
 			<div class="wd-card">
-				<div class="wd-card-head">Genel Bilgiler</div>
+				<div class="wd-card-head"><?= wd_esc__("Overview") ?></div>
 				<div class="wd-card-body">
 					<div class="wd-kv">
-						<span class="wd-k">Geçerli Kullanıcı</span>
+						<span class="wd-k"><?= wd_esc__("Current User") ?></span>
 						<span class="wd-v"><?= wd_e($wd_user) ?></span>
 					</div>
 					<div class="wd-kv">
-						<span class="wd-k">Hosting Paketi</span>
+						<span class="wd-k"><?= wd_esc__("Hosting Package") ?></span>
 						<span class="wd-v">
 							<?= wd_e($p["PACKAGE"] ?? "—") ?>
 							<?php if (($p["DISK_QUOTA"] ?? "unlimited") !== "unlimited") { ?>
@@ -342,40 +342,40 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 					</div>
 					<?php if ($primary) { ?>
 						<div class="wd-kv">
-							<span class="wd-k">Birincil Alan Adı</span>
+							<span class="wd-k"><?= wd_esc__("Primary Domain") ?></span>
 							<span class="wd-v"><a href="https://<?= wd_e($primary) ?>/" target="_blank" rel="noopener"><?= wd_e($primary) ?></a></span>
 						</div>
 						<div class="wd-kv">
-							<span class="wd-k">Let's Encrypt SSL</span>
+							<span class="wd-k"><?= wd_esc__("Let's Encrypt SSL") ?></span>
 							<span class="wd-v">
 								<?php if ($wd_primary["letsencrypt"]) { ?>
-									<span class="wd-dot wd-dot-ok"></span> Etkin
+									<span class="wd-dot wd-dot-ok"></span> <?= wd_esc__("Enabled") ?>
 									<?php if ($wd_ssl_days !== null) { ?>
 										<span class="wd-v-dim">· <?= $wd_ssl_days > 0
-      	? wd_e($wd_ssl_days) . " gün sonra yenilenir"
-      	: "süresi doldu" ?></span>
+      	? wd_e(sprintf(wd__("renews in %d days"), $wd_ssl_days))
+      	: wd_esc__("expired") ?></span>
 									<?php } ?>
 								<?php } elseif ($wd_primary["ssl"]) { ?>
-									<span class="wd-dot wd-dot-warn"></span> SSL var (LE değil)
+									<span class="wd-dot wd-dot-warn"></span> <?= wd_esc__("SSL present (not LE)") ?>
 								<?php } else { ?>
-									<span class="wd-dot wd-dot-off"></span> Kapalı
+									<span class="wd-dot wd-dot-off"></span> <?= wd_esc__("Off") ?>
 								<?php } ?>
 							</span>
 						</div>
 						<?php if (!empty($wd_primary["ip"])) { ?>
 							<div class="wd-kv">
-								<span class="wd-k">Paylaşımlı IP</span>
+								<span class="wd-k"><?= wd_esc__("Shared IP") ?></span>
 								<span class="wd-v wd-mono"><?= wd_e($wd_primary["ip"]) ?></span>
 							</div>
 						<?php } ?>
 					<?php } ?>
 					<div class="wd-kv">
-						<span class="wd-k">Giriş Dizini</span>
+						<span class="wd-k"><?= wd_esc__("Home Directory") ?></span>
 						<span class="wd-v wd-mono"><?= wd_e($p["HOME"] ?? "—") ?></span>
 					</div>
 					<?php if ($wd_login) { ?>
 						<div class="wd-kv">
-							<span class="wd-k">Son Giriş</span>
+							<span class="wd-k"><?= wd_esc__("Last Login") ?></span>
 							<span class="wd-v">
 								<?= wd_e(wd_date_tr($wd_login["date"]) . " " . substr($wd_login["time"], 0, 5)) ?>
 								<?php if (!empty($wd_login["ip"])) { ?>
@@ -386,7 +386,7 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 					<?php } ?>
 					<?php if (!empty($p["CONTACT"])) { ?>
 						<div class="wd-kv">
-							<span class="wd-k">E-posta</span>
+							<span class="wd-k"><?= wd_esc__("Email") ?></span>
 							<span class="wd-v"><?= wd_e($p["CONTACT"]) ?></span>
 						</div>
 					<?php } ?>
@@ -395,7 +395,7 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 
 			<?php if (!empty($usage_rows)) { ?>
 				<div class="wd-card">
-					<div class="wd-card-head">Paket Kullanımı</div>
+					<div class="wd-card-head"><?= wd_esc__("Package Usage") ?></div>
 					<div class="wd-card-body">
 						<?php foreach ($usage_rows as $r) { ?>
 							<div class="wd-usage">
@@ -414,16 +414,16 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 				</div>
 			<?php } ?>
 
-			<?php /* --- Site kaynakları: uygulanan limit + anlık kullanım ---
+			<?php /* --- Site resources: applied limit + live usage ---
 			 *
-			 * Limit sitenin KALICI özelliğidir, anlık kullanım ise geçicidir:
-			 * `pm = ondemand` olduğu için boştaki sitenin hiç işçisi olmaz.
-			 * Bu yüzden liste ölçümden değil, kademe eşlemesinden kurulur;
-			 * ölçüm varsa üzerine eklenir. Aksi hâlde site boştayken limitini
-			 * göremezdik.
+			 * The limit is a PERMANENT site property; live usage is temporary:
+			 * with `pm = ondemand` an idle site has no workers.
+			 * So the list is built from the tier map, not from measurements;
+			 * measurements are overlaid when present. Otherwise we could not
+			 * see a site's limit while it is idle.
 			 *
-			 * Ölçüm yalnızca PHP tüketimidir; nginx/MariaDB paylaşımlıdır ve
-			 * site başına ayrıştırılamaz.
+			 * Measurements are PHP consumption only; nginx/MariaDB are shared
+			 * and cannot be attributed per site.
 			 */
    $wd_olcum = ($wd_usage !== null && !empty($wd_usage["sites"])) ? $wd_usage["sites"] : [];
    $wd_satirlar = [];
@@ -433,13 +433,13 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
    	}
    	$wd_satirlar[$dname] = ["kademe" => wd_site_kademe($dname), "olcum" => $wd_olcum[$dname] ?? null];
    }
-   // Eşlemede olmayan ama ölçülen site (henüz önbelleğe girmemiş yeni alan adı)
+   // Measured but not yet in the map (new domain not yet cached)
    foreach ($wd_olcum as $dname => $s) {
    	if (!isset($wd_satirlar[$dname])) {
    		$wd_satirlar[$dname] = ["kademe" => wd_site_kademe((string) $dname), "olcum" => $s];
    	}
    }
-   // Çalışanlar üstte, sonra ada göre
+   // Running sites first, then by name
    uksort($wd_satirlar, function ($a, $b) use ($wd_satirlar) {
    	$ka = $wd_satirlar[$a]["olcum"] === null ? 1 : 0;
    	$kb = $wd_satirlar[$b]["olcum"] === null ? 1 : 0;
@@ -449,8 +449,8 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
    if (!empty($wd_satirlar)) { ?>
 				<div class="wd-card">
 					<div class="wd-card-head">
-						Site Kaynakları
-						<span class="wd-card-note">limit · canlı PHP</span>
+						<?= wd_esc__("Site Resources") ?>
+						<span class="wd-card-note"><?= wd_esc__("limit · live PHP") ?></span>
 					</div>
 					<div class="wd-card-body">
 						<?php foreach ($wd_satirlar as $sname => $row) {
@@ -462,11 +462,11 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 									<span class="wd-usage-label wd-usage-site" title="<?= wd_e($sname) ?>"><?= wd_e($sname) ?></span>
 									<?php if ($kademe !== null) { ?>
 										<span class="wd-limit-tag"
-											title="Kaynak kademesi: <?= wd_e($kademe["ad"]) ?> — en fazla <?= wd_e($kademe["bellek"]) ?> bellek, <?= wd_e($kademe["surec"]) ?> eşzamanlı işlem, istek en çok <?= wd_e($kademe["sure"]) ?> sn">
-											<?= wd_e($kademe["bellek"]) ?> · <?= wd_e($kademe["surec"]) ?> işlem
+											title="<?= wd_e(sprintf(wd__("Resource tier: %s — max %s memory, %s concurrent processes, request up to %s sec"), $kademe["ad"], $kademe["bellek"], $kademe["surec"], $kademe["sure"])) ?>">
+											<?= wd_e($kademe["bellek"]) ?> · <?= wd_e(sprintf(wd__("%s processes"), $kademe["surec"])) ?>
 										</span>
 									<?php } else { ?>
-										<span class="wd-limit-tag" title="Bu siteye kaynak limiti atanmamış; stok şablon kullanılıyor. Sunucuda: wd-kaynak uygula">limitsiz</span>
+										<span class="wd-limit-tag" title="<?= wd_esc__("No resource limit assigned to this site; stock template is used. On the server: wd-kaynak uygula") ?>"><?= wd_esc__("unlimited") ?></span>
 									<?php } ?>
 								</div>
 								<?php if ($s !== null) {
@@ -474,20 +474,20 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 									<div class="wd-site-metrics">
 										<span class="wd-site-metric">
 											<i class="fas fa-microchip"></i>
-											<b>%<?= wd_e(number_format($cpu, 1, ",", ".")) ?></b> cpu
+											<b>%<?= wd_e(number_format($cpu, 1, ".", ",")) ?></b> cpu
 										</span>
 										<span class="wd-site-metric">
 											<i class="fas fa-memory"></i>
 											<b><?= wd_e($mv) ?></b> <?= wd_e($mu) ?>
 										</span>
-										<span class="wd-site-metric"><?= wd_e($s["procs"]) ?> işlem</span>
+										<span class="wd-site-metric"><?= wd_e(sprintf(wd__("%s processes"), $s["procs"])) ?></span>
 									</div>
 									<div class="wd-bar <?= wd_level($cpu) ?>">
 										<span style="width: <?= max(2, min(100, $cpu)) ?>%"></span>
 									</div>
 								<?php } else { ?>
 									<div class="wd-site-metrics">
-										<span class="wd-site-metric wd-site-idle">boşta — çalışan PHP işlemi yok</span>
+										<span class="wd-site-metric wd-site-idle"><?= wd_esc__("idle — no running PHP process") ?></span>
 									</div>
 								<?php } ?>
 							</div>
@@ -498,15 +498,15 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 
 			<?php if ($wd_load !== null) { ?>
 				<div class="wd-card">
-					<div class="wd-card-head">Sunucu</div>
+					<div class="wd-card-head"><?= wd_esc__("Server") ?></div>
 					<div class="wd-card-body">
 						<div class="wd-kv">
-							<span class="wd-k">Sistem Yükü</span>
-							<span class="wd-v wd-mono"><?= wd_e(number_format($wd_load["l1"], 2, ",", ".")) ?>
-								<span class="wd-v-dim">/ <?= wd_e($wd_load["cores"]) ?> çekirdek</span></span>
+							<span class="wd-k"><?= wd_esc__("System Load") ?></span>
+							<span class="wd-v wd-mono"><?= wd_e(number_format($wd_load["l1"], 2, ".", ",")) ?>
+								<span class="wd-v-dim">/ <?= wd_e(sprintf(wd__("%s cores"), $wd_load["cores"])) ?></span></span>
 						</div>
 						<div class="wd-kv">
-							<span class="wd-k">Çalışma Süresi</span>
+							<span class="wd-k"><?= wd_esc__("Uptime") ?></span>
 							<span class="wd-v"><?= wd_e(wd_human_uptime($wd_uptime)) ?></span>
 						</div>
 					</div>
@@ -526,7 +526,7 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 			try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; }
 		}
 		function save(list) {
-			try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { /* özel pencere */ }
+			try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { /* private window */ }
 		}
 
 		var closed = load();

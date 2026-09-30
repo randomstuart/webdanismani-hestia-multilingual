@@ -1,10 +1,10 @@
 <?php
 /**
- * WebDanışmanı — "WordPress Araçları" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/wp/index.php
+ * WebDanışmanı — "WordPress Tools" page
+ * Installs to: /usr/local/hestia/web/list/wp/index.php
  *
- * Site listesi ve güncelleme bilgisi ÖNBELLEKTEN gelir (gecelik tarama);
- * her işlem sonrası yalnızca o site tazelenir.
+ * Site list and update info come from CACHE (nightly scan);
+ * after each action only that site is refreshed.
  */
 
 ob_start();
@@ -44,7 +44,7 @@ if (!empty($_POST["ok"])) {
 		exit();
 	}
 	if (!$wd_sahip($u, $d) || !preg_match('#^/([A-Za-z0-9._-]{1,60}(/[A-Za-z0-9._-]{1,60})?)?$#', $y)) {
-		$wd_hata = "Geçersiz site.";
+		$wd_hata = wd__("Invalid site.");
 	} else {
 		switch ($islem) {
 			case "guncelle":
@@ -55,7 +55,7 @@ if (!empty($_POST["ok"])) {
 					header("Location: " . $geri . "&durum=guncellendi");
 					exit();
 				}
-				$wd_hata = "Güncelleme başarısız: " . ($r["hata"] ?? "");
+				$wd_hata = sprintf(wd__("Update failed: %s"), $r["hata"] ?? "");
 				break;
 			case "eklenti":
 				$ad = (string) ($_POST["v_ad"] ?? "");
@@ -65,7 +65,7 @@ if (!empty($_POST["ok"])) {
 					header("Location: " . $geri . "&durum=eklenti-ok&d=" . urlencode($ad));
 					exit();
 				}
-				$wd_hata = "Eklenti işlemi başarısız: " . ($r["hata"] ?? "");
+				$wd_hata = sprintf(wd__("Plugin action failed: %s"), $r["hata"] ?? "");
 				break;
 			case "otomatik":
 			case "bakim":
@@ -75,7 +75,7 @@ if (!empty($_POST["ok"])) {
 					header("Location: " . $geri . "&durum=" . $islem . "-" . $deger);
 					exit();
 				}
-				$wd_hata = "İşlem başarısız: " . ($r["hata"] ?? "");
+				$wd_hata = sprintf(wd__("Action failed: %s"), $r["hata"] ?? "");
 				break;
 			case "dogrula":
 				$r = wd_modul_json("wd-wp", ["dogrula", $u, $d, $y], null, 300);
@@ -83,7 +83,7 @@ if (!empty($_POST["ok"])) {
 					header("Location: " . $geri . "&durum=" . (!empty($r["dogrulama"]["ok"]) ? "dogru" : "sorunlu"));
 					exit();
 				}
-				$wd_hata = "Doğrulama yapılamadı: " . ($r["hata"] ?? "");
+				$wd_hata = sprintf(wd__("Verification failed: %s"), $r["hata"] ?? "");
 				break;
 			case "giris":
 				$r = wd_modul_json("wd-wp", ["giris", $u, $d, $y], null, 90);
@@ -91,7 +91,7 @@ if (!empty($_POST["ok"])) {
 					header("Location: " . $r["url"]);
 					exit();
 				}
-				$wd_hata = "Giriş bağlantısı üretilemedi: " . ($r["hata"] ?? "");
+				$wd_hata = sprintf(wd__("Could not generate login link: %s"), $r["hata"] ?? "");
 				break;
 			case "onbellek":
 				$r = wd_modul_json("wd-wp", ["onbellek", $u, $d, $y], null, 200);
@@ -100,7 +100,7 @@ if (!empty($_POST["ok"])) {
 					header("Location: " . $geri . "&durum=onbellek");
 					exit();
 				}
-				$wd_hata = "Önbellek temizlenemedi: " . ($r["hata"] ?? "");
+				$wd_hata = sprintf(wd__("Could not clear cache: %s"), $r["hata"] ?? "");
 				break;
 		}
 	}
@@ -108,17 +108,17 @@ if (!empty($_POST["ok"])) {
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"tarandi" => "Tüm siteler yeniden tarandı.",
-		"hata" => "Tarama yapılamadı; wp-cli kurulu mu?",
-		"guncellendi" => "Güncelleme tamamlandı.",
-		"eklenti-ok" => "{d} için işlem yapıldı.",
-		"otomatik-on" => "Otomatik güncelleme açıldı (çekirdek + eklentiler + temalar).",
-		"otomatik-off" => "Otomatik güncelleme kapatıldı (çekirdek yalnız küçük sürümler).",
-		"bakim-on" => "Bakım modu açıldı; ziyaretçiler bakım sayfası görür.",
-		"bakim-off" => "Bakım modu kapatıldı.",
-		"dogru" => "Çekirdek dosyalar resmî sürümle birebir aynı.",
-		"sorunlu" => "Çekirdekte değiştirilmiş ya da fazladan dosya var; aşağıdaki listeyi inceleyin.",
-		"onbellek" => "Önbellek temizlendi.",
+		"tarandi" => wd__("All sites re-scanned."),
+		"hata" => wd__("Scan failed; is wp-cli installed?"),
+		"guncellendi" => wd__("Update completed."),
+		"eklenti-ok" => wd__("Action completed for {d}."),
+		"otomatik-on" => wd__("Auto-updates enabled (core + plugins + themes)."),
+		"otomatik-off" => wd__("Auto-updates disabled (core minor versions only)."),
+		"bakim-on" => wd__("Maintenance mode enabled; visitors see the maintenance page."),
+		"bakim-off" => wd__("Maintenance mode disabled."),
+		"dogru" => wd__("Core files match the official release exactly."),
+		"sorunlu" => wd__("Core has modified or extra files; review the list below."),
+		"onbellek" => wd__("Cache cleared."),
 	]);
 	if (!empty($_SESSION["wd_wp_cikti"])) {
 		$wd_cikti = (array) $_SESSION["wd_wp_cikti"];

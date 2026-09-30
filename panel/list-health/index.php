@@ -1,15 +1,15 @@
 <?php
 /**
- * WebDanışmanı — "Sağlık Merkezi" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/health/index.php
+ * WebDanışmanı — "Health Center" page
+ * Installs to: /usr/local/hestia/web/list/health/index.php
  *
- * YENİ dosyadır; HestiaCP güncellemelerinden etkilenmez.
+ * NEW file; unaffected by HestiaCP updates.
  *
- * NE İŞE YARAR?
- * Panelin İÇİNDEKİ kayıtla DIŞARIDAN gerçekten görünen DNS'i karşılaştırır.
- * HestiaCP "DKIM etkin" der ama kayıt DNS'e yazılmamışsa mail yine imzasız
- * gider — panel bunu kendiliğinden fark etmez. Buradaki kontroller tam olarak
- * o farkı yakalar.
+ * WHAT IT DOES
+ * Compares the record INSIDE the panel with what DNS actually shows from
+ * OUTSIDE. If HestiaCP says "DKIM enabled" but the record was never published,
+ * mail still goes unsigned — the panel does not notice on its own. These
+ * checks catch exactly that gap.
  */
 
 $TAB = "HEALTH";

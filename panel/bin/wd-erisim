@@ -43,6 +43,15 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache"
 DIZIN = CACHE + "/erisim"
@@ -159,16 +168,16 @@ def dene(site, cfg):
             ok = e.code < 500
             return {"ok": ok, "kod": e.code, "ms": ms, "neden": "" if ok else "HTTP %d" % e.code, "sema": sema}
         except ssl.SSLError as e:
-            son = {"ok": False, "kod": 0, "ms": int((time.time() - bas) * 1000), "neden": "SSL hatası", "sema": sema}
+            son = {"ok": False, "kod": 0, "ms": int((time.time() - bas) * 1000), "neden": _("SSL error"), "sema": sema}
             continue  # http ile de dene; ikisi de düşerse DOWN
         except (urllib.error.URLError, socket.timeout, ConnectionError, OSError) as e:
             neden = str(getattr(e, "reason", e))
             if "timed out" in neden or isinstance(e, socket.timeout):
-                neden = "zaman aşımı"
+                neden = _("timeout")
             elif "Name or service not known" in neden or "nodename" in neden:
-                neden = "DNS çözülemedi"
+                neden = _("DNS resolution failed")
             elif "Connection refused" in neden:
-                neden = "bağlantı reddedildi"
+                neden = _("connection refused")
             else:
                 neden = neden[:60]
             son = {"ok": False, "kod": 0, "ms": int((time.time() - bas) * 1000), "neden": neden, "sema": sema}
@@ -176,7 +185,7 @@ def dene(site, cfg):
         except Exception as e:
             son = {"ok": False, "kod": 0, "ms": int((time.time() - bas) * 1000), "neden": str(e)[:60], "sema": sema}
             continue
-    return son or {"ok": False, "kod": 0, "ms": 0, "neden": "bilinmeyen", "sema": semalar[0]}
+    return son or {"ok": False, "kod": 0, "ms": 0, "neden": _("unknown"), "sema": semalar[0]}
 
 
 def gunluk_yaz(kayitlar):
@@ -240,7 +249,7 @@ def kontrol(tek_domain=None):
     if tek_domain:
         liste = [s for s in liste if s["domain"] == tek_domain]
         if not liste:
-            print(json.dumps({"ok": False, "hata": "Alan adı izleme listesinde yok."}, ensure_ascii=False))
+            print(json.dumps({"ok": False, "hata": _("Domain is not on the monitoring list.")}, ensure_ascii=False))
             return 1
     if not liste:
         json_yaz(CIKTI, {"ts": int(time.time()), "siteler": []}, 0o644)
@@ -274,10 +283,11 @@ def kontrol(tek_domain=None):
             if st.get("bildirildi") and st.get("down_since"):
                 sure = ts - int(st["down_since"])
                 dk = max(1, sure // 60)
-                metin = ("<b>%s</b> yeniden erişilebilir. Kesinti süresi yaklaşık %d dakika." % (s["domain"], dk))
-                bildir(s["user"], "Site yeniden erişilebilir", metin, "success")
+                metin = (_("<b>%s</b> is reachable again. Downtime was about %d minutes.")
+                         % (s["domain"], dk))
+                bildir(s["user"], _("Site is reachable again"), metin, "success")
                 if s["user"] != yonetici:
-                    bildir(yonetici, "Site düzeldi: " + s["domain"], metin, "success")
+                    bildir(yonetici, _("Site recovered: ") + s["domain"], metin, "success")
                 o = ozet.get(s["domain"])
                 if o is not None:
                     o.setdefault("kesinti", []).append([int(st["down_since"]), ts])
@@ -288,12 +298,12 @@ def kontrol(tek_domain=None):
             if not st.get("down_since"):
                 st["down_since"] = ts
             if st["ardisik"] >= esik and not st.get("bildirildi"):
-                metin = ("<b>%s</b> yanıt vermiyor: %s. %d ardışık kontrol başarısız. "
-                         "Panel > Erişim İzleme sayfasından ayrıntılara bakın."
-                         % (s["domain"], r["neden"] or "bilinmeyen hata", st["ardisik"]))
-                bildir(s["user"], "Site erişilemiyor", metin, "error")
+                metin = (_("<b>%s</b> is not responding: %s. %d consecutive checks failed. "
+                           "See Panel > Uptime Monitoring for details.")
+                         % (s["domain"], r["neden"] or _("unknown error"), st["ardisik"]))
+                bildir(s["user"], _("Site unreachable"), metin, "error")
                 if s["user"] != yonetici:
-                    bildir(yonetici, "Site çöktü: " + s["domain"], metin, "error")
+                    bildir(yonetici, _("Site down: ") + s["domain"], metin, "error")
                 st["bildirildi"] = True
 
     gunluk_yaz(kayitlar)

@@ -55,23 +55,28 @@
 	}
 	window.__wdFmYuklendi = true;
 
+	var WDFM_I18N = window.WDFM_I18N || {};
+	function wdt(s) {
+		return (WDFM_I18N && WDFM_I18N[s]) || s;
+	}
+
 	/* --- Sol menü öğeleri -----------------------------------------------
 	   Yalnızca HER kullanıcıda bulunan bölümler listelenir. Yönetici-özel
 	   sayfalar (Kullanıcılar, Sunucu Ayarları, Günlükler) bilerek yok:
 	   müşteriye açılmayan bir bağlantı göstermek kötü bir deneyimdir ve
 	   dosya yöneticisi tarafında rolü güvenilir biçimde bilemiyoruz. */
 	var MENU = [
-		["Araçlar", "ARAÇLAR", "grid", "/list/tools/"],
-		["Sağlık Merkezi", "SAĞLIK", "pulse", "/list/health/"],
-		["Disk Kullanımı", "DİSK", "disk", "/list/disk/"],
-		["WEB — Alan Adları", "WEB", "globe", "/list/web/"],
-		["DNS Bölgeleri", "DNS", "book", "/list/dns/"],
-		["MAIL — E-posta", "POSTA", "mail", "/list/mail/"],
-		["DB — Veritabanları", "DB", "db", "/list/db/"],
-		["CRON Görevleri", "CRON", "clock", "/list/cron/"],
-		["Yedekler", "YEDEK", "zip", "/list/backup/"],
-		["Dosya Yöneticisi", "DOSYA", "folder", "/fm/", true],
-		["İstatistikler", "İSTATİSTİK", "chart", "/list/stats/"],
+		[wdt("Tools"), "TOOLS", "grid", "/list/tools/"],
+		[wdt("Health Center"), "HEALTH", "pulse", "/list/health/"],
+		[wdt("Disk Usage"), "DISK", "disk", "/list/disk/"],
+		[wdt("WEB — Domains"), "WEB", "globe", "/list/web/"],
+		[wdt("DNS Zones"), "DNS", "book", "/list/dns/"],
+		[wdt("MAIL — Email"), "MAIL", "mail", "/list/mail/"],
+		[wdt("DB — Databases"), "DB", "db", "/list/db/"],
+		[wdt("CRON Jobs"), "CRON", "clock", "/list/cron/"],
+		[wdt("Backups"), "BACKUP", "zip", "/list/backup/"],
+		[wdt("File Manager"), "FILE", "folder", "/fm/", true],
+		[wdt("Statistics"), "STATS", "chart", "/list/stats/"],
 	];
 
 	/* Satır ikonları. Font Awesome dosya yöneticisinde var ama ikon adları
@@ -147,10 +152,10 @@
 			'<span class="wdfm-mark">H</span>' +
 			'<span class="wdfm-brand-text">' +
 			'<b>Hestia<span>CP</span></b>' +
-			"<small>KONTROL PANELİ</small></span>";
+			"<small>" + wdt("CONTROL PANEL") + "</small></span>";
 		marka.setAttribute("role", "link");
 		marka.setAttribute("tabindex", "0");
-		marka.title = "Kontrol paneline dön";
+		marka.title = wdt("Back to control panel");
 		function anaSayfa() {
 			window.location.href = "/list/tools/";
 		}
@@ -164,7 +169,7 @@
 		yan.appendChild(marka);
 
 		var liste = el("nav", "wdfm-nav");
-		liste.setAttribute("aria-label", "Panel menüsü");
+		liste.setAttribute("aria-label", wdt("Panel menu"));
 		MENU.forEach(function (m) {
 			var a = document.createElement("a");
 			a.className = "wdfm-nav-item" + (m[4] ? " aktif" : "");
@@ -183,8 +188,8 @@
 		// --- Künye: panel sidebar'ındakiyle aynı ---
 		var kunye = el("div", "wdfm-credit");
 		[
-			["Tema & modüller", "webdanismani.com", "https://webdanismani.com"],
-			["Destek & forum", "oblifex.com", "https://oblifex.com"],
+			[wdt("Theme & modules"), "webdanismani.com", "https://webdanismani.com"],
+			[wdt("Support & forum"), "oblifex.com", "https://oblifex.com"],
 		].forEach(function (k) {
 			var a = document.createElement("a");
 			a.href = k[2];
@@ -254,9 +259,9 @@
 	/* ---------------------------------------------------------------- ağaç */
 	function agacCiz(kok, browser) {
 		var pane = el("aside", "wdfm-tree");
-		pane.setAttribute("aria-label", "Klasör ağacı");
+		pane.setAttribute("aria-label", wdt("Folder tree"));
 
-		var bas = el("div", "wdfm-tree-head", "KLASÖRLER");
+		var bas = el("div", "wdfm-tree-head", wdt("FOLDERS"));
 		pane.appendChild(bas);
 
 		var govde = el("div", "wdfm-tree-body");
@@ -295,7 +300,7 @@
 
 			// Ana dizin + üst klasör zinciri
 			var parcalar = konum.split("/").filter(Boolean);
-			govde.appendChild(satir("Ana dizin", "/", 0, konum === "/" ? "aktif" : ""));
+			govde.appendChild(satir(wdt("Home directory"), "/", 0, konum === "/" ? "aktif" : ""));
 
 			var birikim = "";
 			parcalar.forEach(function (p, i) {
@@ -313,7 +318,7 @@
 			});
 
 			if (!alt.length && konum !== "/") {
-				govde.appendChild(el("div", "wdfm-tree-bos", "Alt klasör yok"));
+				govde.appendChild(el("div", "wdfm-tree-bos", wdt("No subfolders")));
 			}
 		}
 
@@ -338,17 +343,17 @@
 	     tekli — tam olarak bir öğe seçili
 	   izin: FileGator'ın can() değeri. */
 	var ARACLAR = [
-		{ ad: "Dosya", ikon: "fileplus", kip: "hep", izin: ["read", "write"], is: "yeniDosya" },
-		{ ad: "Klasör", ikon: "folderplus", kip: "hep", izin: ["read", "write"], is: "yeniKlasor" },
-		{ ad: "Yükle", ikon: "upload", kip: "hep", izin: "upload", is: "yukle", vurgu: true },
-		{ ad: "Kopyala", ikon: "copy", kip: "coklu", izin: "write", is: "kopyala" },
-		{ ad: "Taşı", ikon: "move", kip: "coklu", izin: "write", is: "tasi" },
-		{ ad: "İndir", ikon: "download", kip: "coklu", izin: "batchdownload", is: "indir" },
-		{ ad: "Sil", ikon: "trash", kip: "coklu", izin: "write", is: "sil" },
-		{ ad: "Yeniden Adlandır", ikon: "rename", kip: "tekli", izin: "write", is: "adDegistir" },
-		{ ad: "Düzenle", ikon: "edit", kip: "tekli", izin: ["download"], is: "duzenle" },
-		{ ad: "İzinler", ikon: "lock", kip: "tekli", izin: ["write", "chmod"], is: "izinler" },
-		{ ad: "Sıkıştır", ikon: "archive", kip: "coklu", izin: ["write", "zip"], is: "sikistir" },
+		{ ad: wdt("File"), ikon: "fileplus", kip: "hep", izin: ["read", "write"], is: "yeniDosya" },
+		{ ad: wdt("Folder"), ikon: "folderplus", kip: "hep", izin: ["read", "write"], is: "yeniKlasor" },
+		{ ad: wdt("Upload"), ikon: "upload", kip: "hep", izin: "upload", is: "yukle", vurgu: true },
+		{ ad: wdt("Copy"), ikon: "copy", kip: "coklu", izin: "write", is: "kopyala" },
+		{ ad: wdt("Move"), ikon: "move", kip: "coklu", izin: "write", is: "tasi" },
+		{ ad: wdt("Download"), ikon: "download", kip: "coklu", izin: "batchdownload", is: "indir" },
+		{ ad: wdt("Delete"), ikon: "trash", kip: "coklu", izin: "write", is: "sil" },
+		{ ad: wdt("Rename"), ikon: "rename", kip: "tekli", izin: "write", is: "adDegistir" },
+		{ ad: wdt("Edit"), ikon: "edit", kip: "tekli", izin: ["download"], is: "duzenle" },
+		{ ad: wdt("Permissions"), ikon: "lock", kip: "tekli", izin: ["write", "chmod"], is: "izinler" },
+		{ ad: wdt("Compress"), ikon: "archive", kip: "coklu", izin: ["write", "zip"], is: "sikistir" },
 	];
 
 	/* Her eylem FileGator'ın KENDİ metodunu çağırır; kendi API çağrımızı
@@ -502,7 +507,7 @@
 		}
 
 		gez.appendChild(
-			ikonDugme("up", "Üst dizin", function () {
+			ikonDugme("up", wdt("Parent directory"), function () {
 				var k = konum();
 				if (k === "/") {
 					return;
@@ -512,38 +517,38 @@
 			})
 		);
 		gez.appendChild(
-			ikonDugme("home", "Ana dizin", function () {
+			ikonDugme("home", wdt("Home directory"), function () {
 				browser.goTo("/");
 			})
 		);
 
 		var yol = el("div", "wdfm-yol");
-		yol.setAttribute("aria-label", "Bulunulan yol");
+		yol.setAttribute("aria-label", wdt("Current path"));
 		gez.appendChild(yol);
 
 		// Stok gezinme satırı gizleniyor (bkz. wd-fm.css); oradaki arama ve
 		// klasör-seç düğmeleri işlev kaybı olmasın diye buraya taşınır.
 		if (calisir(browser, "search")) {
 			gez.appendChild(
-				ikonDugme("search", "Dosya ara", function () {
+				ikonDugme("search", wdt("Search files"), function () {
 					browser.search();
 				})
 			);
 		}
 		if (calisir(browser, "selectDir")) {
 			gez.appendChild(
-				ikonDugme("sitemap", "Klasör ağacında seç", function () {
+				ikonDugme("sitemap", wdt("Select in folder tree"), function () {
 					browser.selectDir();
 				})
 			);
 		}
 
 		if (calisir(browser, "loadFiles")) {
-			var yenileDug = ikonDugme("refresh", "Yenile", function () {
+			var yenileDug = ikonDugme("refresh", wdt("Refresh"), function () {
 				browser.loadFiles();
 			});
 			yenileDug.className = "wdfm-ico-btn wdfm-yenile";
-			yenileDug.innerHTML = svg("refresh", 13) + "<span>Yenile</span>";
+			yenileDug.innerHTML = svg("refresh", 13) + "<span>" + wdt("Refresh") + "</span>";
 			gez.appendChild(yenileDug);
 		}
 
@@ -623,9 +628,9 @@
 			var dosya = gercek.length - klasor;
 			var secili = (browser.checked || []).length;
 
-			var metin = klasor + " klasör, " + dosya + " dosya";
+			var metin = klasor + " " + wdt("folders") + ", " + dosya + " " + wdt("files");
 			if (secili) {
-				metin += " · " + secili + " seçili";
+				metin += " · " + secili + " " + wdt("selected");
 			}
 			sol.textContent = metin;
 			sag.textContent = kok.$store.state.cwd.location || "/";

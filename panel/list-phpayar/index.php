@@ -1,10 +1,10 @@
 <?php
 /**
- * WebDanışmanı — "PHP Ayarları" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/phpayar/index.php
+ * WebDanışmanı — "PHP Settings" page
+ * Installs to: /usr/local/hestia/web/list/phpayar/index.php
  *
- * cPanel "MultiPHP INI Editor" karşılığı. Değerler belge kökündeki
- * .user.ini dosyasına yazılır; root betiği wd-phpayar tavanları uygular.
+ * Counterpart to cPanel "MultiPHP INI Editor". Values are written to
+ * .user.ini in the document root; the root script wd-phpayar enforces caps.
  */
 
 ob_start();
@@ -27,7 +27,7 @@ $wd_domain = wd_modul_domain_sec($wd_doms, $wd_ham_domain);
 if (!empty($_POST["ok"])) {
 	verify_csrf($_POST);
 	if ($wd_ham_domain === "" || !isset($wd_doms[$wd_ham_domain])) {
-		$wd_hata = "Geçersiz alan adı.";
+		$wd_hata = wd__("Invalid domain.");
 	} else {
 		$wd_domain = $wd_ham_domain;
 		$islem = (string) ($_POST["islem"] ?? "kaydet");
@@ -37,7 +37,7 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/phpayar/?domain=" . urlencode($wd_domain) . "&durum=silindi");
 				exit();
 			}
-			$wd_hata = "Kaldırılamadı: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not remove: %s"), $d["hata"] ?? "");
 		} elseif ($islem === "gunluk-temizle") {
 			$d = wd_modul_json("wd-phpayar", ["gunluk-temizle", $wd_user, $wd_domain]);
 			header("Location: /list/phpayar/?domain=" . urlencode($wd_domain) . "&durum=gunluk-temiz");
@@ -62,16 +62,16 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/phpayar/?domain=" . urlencode($wd_domain) . "&durum=kaydedildi" . $n);
 				exit();
 			}
-			$wd_hata = "Kaydedilemedi: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not save: %s"), $d["hata"] ?? "");
 		}
 	}
 }
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"kaydedildi" => "PHP ayarları kaydedildi. PHP en geç 5 dakika içinde yeni değerleri kullanır.",
-		"silindi" => "Özel ayarlar kaldırıldı; sunucu varsayılanları geçerli.",
-		"gunluk-temiz" => "Hata günlüğü temizlendi.",
+		"kaydedildi" => wd__("PHP settings saved. PHP will use the new values within 5 minutes at most."),
+		"silindi" => wd__("Custom settings removed; server defaults apply."),
+		"gunluk-temiz" => wd__("Error log cleared."),
 	]);
 	if (!empty($_GET["n"])) {
 		$wd_notlar = explode(" · ", (string) $_GET["n"]);
@@ -83,7 +83,7 @@ $wd_gunluk = [];
 if ($wd_domain !== "") {
 	$wd_ayar = wd_modul_json("wd-phpayar", ["oku", $wd_user, $wd_domain]);
 	if (empty($wd_ayar["ok"])) {
-		$wd_hata = $wd_hata !== "" ? $wd_hata : ("Ayarlar okunamadı: " . ($wd_ayar["hata"] ?? ""));
+		$wd_hata = $wd_hata !== "" ? $wd_hata : sprintf(wd__("Could not read settings: %s"), $wd_ayar["hata"] ?? "");
 		$wd_ayar = null;
 	} else {
 		$g = wd_modul_json("wd-phpayar", ["gunluk", $wd_user, $wd_domain, "80"]);

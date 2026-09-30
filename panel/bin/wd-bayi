@@ -47,6 +47,15 @@ import subprocess
 import sys
 import time
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 AYAR = HESTIA + "/wd/bayi.json"
 CACHE = HESTIA + "/wd/cache/bayi.json"
@@ -126,11 +135,11 @@ def bayi_al(d, bayi):
 def musteri_dogrula(d, bayi, user):
     b = bayi_al(d, bayi)
     if not b:
-        return None, "Bu hesap bayi değil."
+        return None, _("This account is not a reseller.")
     if user not in b["musteriler"]:
-        return None, "Bu kullanıcı sizin müşteriniz değil."
+        return None, _("This user is not your customer.")
     if user == yonetici_adi() or user == bayi:
-        return None, "Bu kullanıcı üzerinde işlem yapılamaz."
+        return None, _("This user cannot be modified.")
     return b, None
 
 
@@ -168,11 +177,11 @@ def bayi_ekle(bayi):
     try:
         g = json.loads(sys.stdin.read() or "{}")
     except ValueError:
-        return hata("JSON çözülemedi.")
+        return hata(_("Could not parse JSON."))
     if bayi == yonetici_adi():
-        return hata("Yönetici bayi olamaz.")
+        return hata(_("Administrator cannot be a reseller."))
     if bayi not in hestia_json(["v-list-users", "json"]):
-        return hata("Böyle bir kullanıcı yok: " + bayi)
+        return hata(_("No such user: %s") % bayi)
     d = ayar_oku()
     b = d["bayiler"].setdefault(bayi, {"musteriler": []})
     b["ad"] = str(g.get("ad", "")).strip()[:80]
@@ -189,7 +198,7 @@ def bayi_ekle(bayi):
 def bayi_sil(bayi):
     d = ayar_oku()
     if bayi not in d["bayiler"]:
-        return hata("Bayi yok.")
+        return hata(_("Reseller not found."))
     del d["bayiler"][bayi]
     ayar_yaz(d)
     print(json.dumps({"ok": True}))
@@ -200,17 +209,17 @@ def bayi_ata(bayi, user, cikar=False):
     d = ayar_oku()
     b = bayi_al(d, bayi)
     if not b:
-        return hata("Bayi yok.")
+        return hata(_("Reseller not found."))
     if cikar:
         b["musteriler"] = [u for u in b["musteriler"] if u != user]
     else:
         if user == yonetici_adi() or user == bayi:
-            return hata("Bu kullanıcı atanamaz.")
+            return hata(_("This user cannot be assigned."))
         if user not in hestia_json(["v-list-users", "json"]):
-            return hata("Böyle bir kullanıcı yok: " + user)
+            return hata(_("No such user: %s") % user)
         for ad, ob in d["bayiler"].items():
             if ad != bayi and user in ob.get("musteriler", []):
-                return hata("Bu kullanıcı zaten '%s' bayisine bağlı." % ad)
+                return hata(_("This user is already linked to reseller '%s'.") % ad)
         if user not in b["musteriler"]:
             b["musteriler"].append(user)
     ayar_yaz(d)
@@ -223,7 +232,7 @@ def liste(bayi):
     d = ayar_oku()
     b = bayi_al(d, bayi)
     if not b:
-        return hata("Bu hesap bayi değil.")
+        return hata(_("This account is not a reseller."))
     musteriler = []
     kayip = []
     for u in b["musteriler"]:
@@ -251,33 +260,33 @@ def ekle(bayi):
     try:
         g = json.loads(sys.stdin.read() or "{}")
     except ValueError:
-        return hata("JSON çözülemedi.")
+        return hata(_("Could not parse JSON."))
     d = ayar_oku()
     b = bayi_al(d, bayi)
     if not b:
-        return hata("Bu hesap bayi değil.")
+        return hata(_("This account is not a reseller."))
     if len(b["musteriler"]) >= int(b["azami"]):
-        return hata("Müşteri sınırınıza ulaştınız (%d)." % b["azami"])
+        return hata(_("You have reached your customer limit (%d).") % b["azami"])
     user = str(g.get("kullanici", "")).strip().lower()
     if not KULLANICI_DESENI.match(user):
-        return hata("Kullanıcı adı harfle başlamalı; küçük harf, rakam, - ve _ (2-32 karakter).")
+        return hata(_("Username must start with a letter; lowercase letters, digits, - and _ (2-32 characters)."))
     if user in hestia_json(["v-list-users", "json"]):
-        return hata("Bu kullanıcı adı alınmış.")
+        return hata(_("This username is taken."))
     sifre = str(g.get("sifre", ""))
     if len(sifre) < 8:
-        return hata("Şifre en az 8 karakter olmalı.")
+        return hata(_("Password must be at least 8 characters."))
     eposta = str(g.get("eposta", "")).strip()
     if not EPOSTA_DESENI.match(eposta):
-        return hata("Geçerli bir e-posta girin.")
+        return hata(_("Enter a valid email address."))
     paket = str(g.get("paket", "")).strip()
     izinli = b["paketler"] or sorted(hestia_json(["v-list-user-packages", "json"]).keys())
     if paket not in izinli:
-        return hata("Bu paketi açma yetkiniz yok.")
+        return hata(_("You are not allowed to create this package."))
     ad = re.sub(r"[^A-Za-z0-9ÇĞİÖŞÜçğıöşü .'-]", "", str(g.get("ad", "")))[:60].strip() or user
     parcalar = ad.split(" ", 1)
     rc, out, err = hestia(["v-add-user", user, sifre, eposta, paket, parcalar[0], parcalar[1] if len(parcalar) > 1 else ""])
     if rc != 0:
-        return hata("Hesap açılamadı: " + (err or out)[-200:])
+        return hata(_("Could not create account: %s") % (err or out)[-200:])
     b["musteriler"].append(user)
     ayar_yaz(d)
     print(json.dumps({"ok": True, "kullanici": user}))
@@ -291,7 +300,7 @@ def askiya(bayi, user, kaldir=False):
         return hata(h)
     rc, out, err = hestia(["v-unsuspend-user" if kaldir else "v-suspend-user", user])
     if rc != 0:
-        return hata((err or out)[-200:] or "İşlem başarısız.")
+        return hata((err or out)[-200:] or _("Action failed."))
     print(json.dumps({"ok": True}))
     return 0
 
@@ -300,17 +309,17 @@ def sifre(bayi, user):
     try:
         g = json.loads(sys.stdin.read() or "{}")
     except ValueError:
-        return hata("JSON çözülemedi.")
+        return hata(_("Could not parse JSON."))
     d = ayar_oku()
     b, h = musteri_dogrula(d, bayi, user)
     if not b:
         return hata(h)
     yeni = str(g.get("sifre", ""))
     if len(yeni) < 8:
-        return hata("Şifre en az 8 karakter olmalı.")
+        return hata(_("Password must be at least 8 characters."))
     rc, out, err = hestia(["v-change-user-password", user, yeni])
     if rc != 0:
-        return hata((err or out)[-200:] or "Şifre değiştirilemedi.")
+        return hata((err or out)[-200:] or _("Could not change password."))
     print(json.dumps({"ok": True}))
     return 0
 
@@ -322,10 +331,10 @@ def paket(bayi, user, yeni):
         return hata(h)
     izinli = b["paketler"] or sorted(hestia_json(["v-list-user-packages", "json"]).keys())
     if not PAKET_DESENI.match(yeni) or yeni not in izinli:
-        return hata("Bu paketi atama yetkiniz yok.")
+        return hata(_("You are not allowed to assign this package."))
     rc, out, err = hestia(["v-change-user-package", user, yeni])
     if rc != 0:
-        return hata((err or out)[-200:] or "Paket değiştirilemedi.")
+        return hata((err or out)[-200:] or _("Could not change package."))
     print(json.dumps({"ok": True}))
     return 0
 
@@ -337,7 +346,7 @@ def sil(bayi, user):
         return hata(h)
     rc, out, err = hestia(["v-delete-user", user], 600)
     if rc != 0:
-        return hata((err or out)[-200:] or "Hesap silinemedi.")
+        return hata((err or out)[-200:] or _("Could not delete account."))
     b["musteriler"] = [u for u in b["musteriler"] if u != user]
     ayar_yaz(d)
     print(json.dumps({"ok": True}))
@@ -356,7 +365,7 @@ def main():
         return 2
     bayi = sys.argv[2]
     if not re.match(r"^[a-z0-9._-]{1,32}$", bayi, re.I):
-        return hata("Geçersiz bayi adı.")
+        return hata(_("Invalid reseller name."))
     if mod == "bayi-ekle":
         return bayi_ekle(bayi)
     if mod == "bayi-sil":
@@ -372,7 +381,7 @@ def main():
         return 2
     user = sys.argv[3]
     if not re.match(r"^[a-z0-9._-]{1,32}$", user, re.I):
-        return hata("Geçersiz kullanıcı.")
+        return hata(_("Invalid user."))
     if mod == "bayi-ata":
         return bayi_ata(bayi, user)
     if mod == "bayi-cikar":
@@ -385,7 +394,7 @@ def main():
         return sifre(bayi, user)
     if mod == "paket":
         if len(sys.argv) < 5:
-            return hata("Paket adı gerekli.")
+            return hata(_("Package name required."))
         return paket(bayi, user, sys.argv[4])
     if mod == "sil":
         return sil(bayi, user)

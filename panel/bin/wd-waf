@@ -35,6 +35,15 @@ import time
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 HTTP_CONF = "/etc/nginx/conf.d/wd-waf.conf"
 AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
@@ -197,7 +206,7 @@ limit_req_status 429;
             shutil.move(yedek, HTTP_CONF)
         else:
             os.unlink(HTTP_CONF)
-        return hata("nginx http bağlamı yazılamadı: " + cikti[-200:])
+        return hata(_("Could not write nginx http context: %s") % cikti[-200:])
     if os.path.isfile(yedek):
         os.unlink(yedek)
     nginx_yenile()
@@ -226,7 +235,7 @@ def dogrula(g):
         if not ip:
             continue
         if not IP_DESENI.match(ip):
-            return None, "Geçersiz IP: %s" % ip[:40]
+            return None, _("Invalid IP: %s") % ip[:40]
         ipler.append(ip)
     temiz["izinli_ip"] = ipler
     return temiz, None
@@ -251,7 +260,7 @@ def oku(user, domain):
 def yaz(user, domain, gelen):
     conf, jyol = yollar(user, domain)
     if not conf:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
     temiz, h = dogrula(gelen)
     if temiz is None:
         return hata(h)
@@ -270,7 +279,7 @@ def yaz(user, domain, gelen):
         else:
             os.unlink(conf)
         nginx_dogrula()
-        return hata("nginx yapılandırması geçersiz, değişiklik geri alındı: " + cikti.splitlines()[-1][:200])
+        return hata(_("Invalid nginx configuration, change reverted: %s") % cikti.splitlines()[-1][:200])
     if os.path.isfile(yedek):
         os.unlink(yedek)
     with open(jyol, "w", encoding="utf-8") as fh:
@@ -284,7 +293,7 @@ def yaz(user, domain, gelen):
 def sil(user, domain):
     conf, jyol = yollar(user, domain)
     if not conf:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
     for y in (conf, jyol):
         if y and os.path.isfile(y):
             os.unlink(y)
@@ -343,7 +352,7 @@ def istatistik(user, domain):
                 if len(istek) >= 2:
                     yollar_c[istek[1][:80]] += 1
     except Exception as e:
-        return hata("Günlük okunamadı: %s" % e)
+        return hata(_("Could not read log: %s") % e)
     print(json.dumps({"ok": True, "var": True, "engellenen": engellenen, "hiz": hiz,
                       "ipler": [{"ip": a, "adet": b} for a, b in ipler.most_common(8)],
                       "yollar": [{"yol": a, "adet": b} for a, b in yollar_c.most_common(8)]}, ensure_ascii=False))
@@ -362,9 +371,9 @@ def main():
         return 2
     user, domain = sys.argv[2], sys.argv[3]
     if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
-        return hata("Geçersiz kullanıcı ya da alan adı.")
+        return hata(_("Invalid user or domain."))
     if not domain_gecerli(user, domain):
-        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+        return hata(_("This domain does not belong to user '%s'.") % user)
     if mod == "oku":
         return oku(user, domain)
     if mod == "sil":
@@ -375,7 +384,7 @@ def main():
         try:
             gelen = json.loads(sys.stdin.read() or "{}")
         except ValueError:
-            return hata("JSON çözülemedi.")
+            return hata(_("Could not parse JSON."))
         return yaz(user, domain, gelen)
     sys.stderr.write(__doc__)
     return 2

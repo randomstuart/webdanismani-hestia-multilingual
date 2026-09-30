@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 """
-WebDanışmanı — Disk Kullanım Analizi toplayıcısı
+WebDanışmanı — Disk Usage Analysis collector
 
-Kurulum yeri: /usr/local/hestia/wd/bin/wd-disk
+Installs to: /usr/local/hestia/wd/bin/wd-disk
 
-NEDEN VAR?
-  HestiaCP disk kullanımını yalnızca TOPLAM olarak tutar (U_DISK, U_DISK_WEB,
-  U_DISK_MAIL, U_DISK_DB). "Kotam neden doldu?" sorusunun cevabı yoktur:
-  hangi alan adı, hangi dizin, hangi dosya yer kaplıyor görünmez.
+WHY IT EXISTS
+  HestiaCP only tracks disk usage as a TOTAL (U_DISK, U_DISK_WEB,
+  U_DISK_MAIL, U_DISK_DB). There is no answer to "why is my quota full?":
+  which domain, directory, or file is using space is invisible.
 
-  cPanel'de "Disk Usage", Plesk'te "Disk Space Usage" bu işi yapar; HestiaCP'de
-  karşılığı yoktur. Bu toplayıcı o kırılımı üretir.
+  cPanel "Disk Usage" and Plesk "Disk Space Usage" do this; HestiaCP has
+  no counterpart. This collector produces that breakdown.
 
-TASARIM
-  * Sayfa açılışında ÇALIŞMAZ. `du` ve `find` büyük hesaplarda saniyeler
-    sürer; sonuç önbelleğe yazılır ve cron tazeler.
-  * `du -x` ile dosya sistemi sınırı aşılmaz (bağlı diskler sayılmaz).
-  * Süre sınırı vardır: bir kullanıcı için tarama SURE_SINIRI saniyeyi
-    aşarsa o kullanıcı "eksik" işaretlenir. Yarım veriyi tam gibi göstermek,
-    hiç göstermemekten kötüdür.
-  * Yalnızca OKUR. Hiçbir dosyayı silmez veya değiştirmez.
+DESIGN
+  * Does NOT run on page open. `du` and `find` take seconds on large accounts;
+    results are cached and refreshed by cron.
+  * `du -x` stays within the filesystem boundary (mounted disks are not counted).
+  * There is a time limit: if a user scan exceeds SURE_SINIRI seconds, that
+    user is marked "incomplete". Showing half data as complete is worse than
+    showing nothing.
+  * READ-ONLY. Never deletes or modifies any file.
 
-Kullanım:
-  wd-disk refresh            taramayı yap, önbelleği yaz (cron)
-  wd-disk json [azami_yas]   önbellekten oku, bayatsa tazele
-  wd-disk plain              kısa metin özet
+Usage:
+  wd-disk refresh            run scan, write cache (cron)
+  wd-disk json [max_age]     read cache, refresh if stale
+  wd-disk plain              short text summary
 """
 
 import json
@@ -32,6 +32,16 @@ import os
 import subprocess
 import sys
 import time
+
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+N_ = lambda s: s  # mark for .po extract; translate in PHP (cached JSON)
 
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache/disk.json"
@@ -127,18 +137,22 @@ def kullanici_tara(user, home):
         sayilan += b
         kategoriler.append({"etiket": etiket, "yol": altyol, "bayt": b, "ipucu": ipucu})
 
-    ekle("Web siteleri", "web", "public_html, günlükler ve istatistikler dahil")
-    ekle("E-posta", "mail", "posta kutularındaki iletiler")
-    ekle("Yedekler", "backup", "hesap yedek arşivleri")
-    ekle("Geçici dosyalar", "tmp", "oturum ve yükleme geçici dosyaları")
+    ekle(N_("Websites"), "web",
+         N_("Includes public_html, logs and statistics"))
+    ekle(N_("Email"), "mail",
+         N_("Messages in mailboxes"))
+    ekle(N_("Backups"), "backup",
+         N_("Account backup archives"))
+    ekle(N_("Temporary files"), "tmp",
+         N_("Session and upload temporary files"))
 
     diger = max(0, toplam - sayilan)
     if diger > 0:
         kategoriler.append({
-            "etiket": "Diğer",
-            "yol": "",
+            "etiket": N_("Other"),
+            "yol": "other",
             "bayt": diger,
-            "ipucu": "ana dizindeki diğer dosyalar (gizli dizinler, betikler)",
+            "ipucu": N_("Other files in the home directory (hidden dirs, scripts)"),
         })
 
     # --- Alan adı kırılımı ---
@@ -265,11 +279,11 @@ def main():
         yaz(veri)
 
     if mod == "plain":
-        print("son tarama %s" % time.strftime("%d.%m.%Y %H:%M",
+        print(N_("last scan %s") % time.strftime("%d.%m.%Y %H:%M",
                                               time.localtime(veri["ts"])))
         for k in veri["kullanicilar"]:
             print("  %-12s %10s%s" % (k["user"], insan(k["toplam"]),
-                                      "  (EKSIK)" if k["eksik"] else ""))
+                                      "  (INCOMPLETE)" if k["eksik"] else ""))
             for c in k["kategoriler"][:5]:
                 print("      %-18s %10s" % (c["etiket"], insan(c["bayt"])))
         return 0

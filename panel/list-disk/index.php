@@ -1,15 +1,15 @@
 <?php
 /**
- * WebDanışmanı — "Disk Kullanımı" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/disk/index.php
+ * WebDanışmanı — "Disk Usage" page
+ * Installs to: /usr/local/hestia/web/list/disk/index.php
  *
- * YENİ dosyadır; HestiaCP güncellemelerinden etkilenmez.
+ * NEW file; unaffected by HestiaCP updates.
  *
- * NE İŞE YARAR?
- * HestiaCP disk kullanımını yalnızca TOPLAM olarak gösterir; "kotam neden
- * doldu?" sorusunun cevabı panelde yoktur. Bu sayfa kırılımı verir:
- * hangi alan adı, hangi dizin, hangi dosya. (cPanel "Disk Usage",
- * Plesk "Disk Space Usage" karşılığı.)
+ * WHAT IT DOES
+ * HestiaCP only shows disk usage as a TOTAL; the panel has no answer to
+ * "why is my quota full?" This page breaks it down: which domain, which
+ * directory, which file. (Counterpart to cPanel "Disk Usage" /
+ * Plesk "Disk Space Usage".)
  */
 
 $TAB = "DISK";

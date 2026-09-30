@@ -1,13 +1,13 @@
 <?php
 /**
- * WebDanışmanı — sol menü (sidebar)
- * Kurulum yeri: /usr/local/hestia/web/templates/includes/wd-sidebar.php
+ * WebDanışmanı — sidebar
+ * Installs to: /usr/local/hestia/web/templates/includes/wd-sidebar.php
  *
- * panel.php içindeki stok <ul class="main-menu-list"> bloğunun yerini alır.
- * $panel, $user, $TAB  -> panel.php kapsamından gelir.
+ * Replaces the stock <ul class="main-menu-list"> block in panel.php.
+ * $panel, $user, $TAB come from panel.php scope.
  *
- * Stok sınıf adları (main-menu-*) BİLEREK korunur; böylece yama uygulanmamış
- * bir HestiaCP güncellemesinden sonra bile tema CSS'i tutarlı kalır.
+ * Stock class names (main-menu-*) are kept on purpose so theme CSS still
+ * works after an unpatched HestiaCP update.
  */
 
 require_once $_SERVER["DOCUMENT_ROOT"] . "/inc/wd-helpers.php";
@@ -16,7 +16,7 @@ $wd_p = $panel[$user] ?? [];
 $wd_adm = $_SESSION["userContext"] === "admin" && ($_SESSION["look"] ?? "") === "";
 $wd_imp = !empty($_SESSION["look"]);
 
-/** Menü öğesi çizer. */
+/** Render one menu item. */
 $wd_item = function (array $o) use ($TAB) {
 	$active = in_array($TAB, $o["tabs"], true) ? " active" : "";
 	$badge = $o["badge"] ?? null;
@@ -30,9 +30,7 @@ $wd_item = function (array $o) use ($TAB) {
 		echo ' target="_blank" rel="noopener"';
 	}
 	echo ">";
-	// Uzun etiket sidebar için; kısa etiket <1024px'teki yatay menü için.
-	// Aynı metni CSS ile kısaltmak mümkün olmadığından ikisi de basılıp
-	// kırılım noktasında biri gizleniyor.
+	// Long label for sidebar; short label for <1024px horizontal menu.
 	$short = $o["short"] ?? $o["label"];
 	echo '<p class="main-menu-item-label"><i class="fas ' . wd_e($o["icon"]) . '"></i>';
 	echo '<span class="wd-label-long">' . wd_e($o["label"]) . "</span>";
@@ -45,65 +43,63 @@ $wd_item = function (array $o) use ($TAB) {
 	echo "</a></li>";
 };
 
-/** "kullanılan / limit" biçiminde tooltip metni. */
+/** "used / limit" tooltip text. */
 $wd_tip = function ($label, $used, $limit) {
 	return $label . ": " . $used . " / " . ($limit === "unlimited" ? "∞" : $limit);
 };
 ?>
 <ul x-cloak x-show="open" class="main-menu-list">
 
-	<?php // --- Araçlar (kontrol paneli ana sayfası) ---
+	<?php
  $wd_item([
  	"tabs" => ["TOOLS"],
- 	"label" => "Araçlar", "short" => "ARAÇLAR",
+ 	"label" => wd__("Tools"), "short" => wd__("TOOLS"),
  	"icon" => "fa-grip",
  	"href" => "/list/tools/",
- 	"title" => "Tüm yönetim araçları",
+ 	"title" => wd__("All management tools"),
  ]); ?>
 
-	<?php // --- Sağlık Merkezi ---
- // Rozet yalnızca ÖNBELLEKTEN gelir; burada DNS sorgusu ya da sudo çağrısı
- // yapılmaz. Veri yoksa rozet çizilmez — "0" göstermek "sorun yok" demek
- // olurdu, oysa henüz bilinmiyor.
+	<?php
+ // Badge from CACHE only — no DNS/sudo here.
  $wd_hs = wd_health_sorun_sayisi(
  	empty($_SESSION["look"]) ? $_SESSION["user"] : $_SESSION["look"],
  	$wd_adm,
  );
  $wd_item([
  	"tabs" => ["HEALTH"],
- 	"label" => "Sağlık Merkezi", "short" => "SAĞLIK",
+ 	"label" => wd__("Health Center"), "short" => wd__("HEALTH"),
  	"icon" => "fa-stethoscope",
  	"href" => "/list/health/",
  	"badge" => $wd_hs !== null && $wd_hs > 0 ? $wd_hs : null,
  	"badge_class" => "wd-menu-badge-alert",
  	"title" => $wd_hs === null
- 		? "Mail, DNS ve SSL denetimi"
+ 		? wd__("Mail, DNS and SSL checks")
  		: ($wd_hs > 0
- 			? $wd_hs . " kontrol dikkat istiyor"
- 			: "Tüm kontroller sorunsuz"),
+ 			? sprintf(wd_n__("%d check needs attention", "%d checks need attention", $wd_hs), $wd_hs)
+ 			: wd__("All checks OK")),
  ]); ?>
 
-	<?php // --- Güvenlik (yalnızca yönetici) ---
+	<?php
  if ($wd_adm) {
  	$wd_item([
  		"tabs" => ["GUVENLIK"],
- 		"label" => "Güvenlik", "short" => "GÜVENLİK",
+ 		"label" => wd__("Security"), "short" => wd__("SECURITY"),
  		"icon" => "fa-shield-halved",
  		"href" => "/list/guvenlik/",
- 		"title" => "Sunucu sertleştirme ve zararlı kod taraması",
+ 		"title" => wd__("Server hardening and malware scan"),
  	]);
  } ?>
 
-	<?php // --- Disk Kullanımı ---
+	<?php
  $wd_item([
  	"tabs" => ["DISK"],
- 	"label" => "Disk Kullanımı", "short" => "DİSK",
+ 	"label" => wd__("Disk Usage"), "short" => wd__("DISK"),
  	"icon" => "fa-hard-drive",
  	"href" => "/list/disk/",
- 	"title" => "Yerin nereye gittiğini gösterir",
+ 	"title" => wd__("Shows where disk space is used"),
  ]); ?>
 
-	<?php // --- Kullanıcılar (yalnızca yönetici) ---
+	<?php
  if ($wd_adm) {
  	$uc = $wd_p["U_USERS"] ?? 0;
  	if (($_SESSION["user"] ?? "") !== "admin" && ($_SESSION["POLICY_SYSTEM_HIDE_ADMIN"] ?? "") === "yes") {
@@ -111,79 +107,79 @@ $wd_tip = function ($label, $used, $limit) {
  	}
  	$wd_item([
  		"tabs" => ["USER", "LOG"],
- 		"label" => "Kullanıcılar", "short" => "KULLANICI",
+ 		"label" => wd__("Users"), "short" => wd__("USERS"),
  		"icon" => "fa-users",
  		"href" => "/list/user/",
  		"badge" => $uc,
- 		"title" => "Kullanıcılar: " . $uc . " · Askıya alınmış: " . ($wd_p["SUSPENDED_USERS"] ?? 0),
+ 		"title" => sprintf(wd__("Users: %s · Suspended: %s"), $uc, $wd_p["SUSPENDED_USERS"] ?? 0),
  	]);
  } ?>
 
-	<?php // --- WEB ---
+	<?php
  if (!empty($_SESSION["WEB_SYSTEM"]) && ($wd_p["WEB_DOMAINS"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["WEB"],
- 		"label" => "WEB — Alan Adları", "short" => "WEB",
+ 		"label" => wd__("WEB — Domains"), "short" => "WEB",
  		"icon" => "fa-earth-americas",
  		"href" => "/list/web/",
  		"badge" => $wd_p["U_WEB_DOMAINS"] ?? 0,
- 		"title" => $wd_tip("Alan adları", $wd_p["U_WEB_DOMAINS"] ?? 0, $wd_p["WEB_DOMAINS"] ?? "unlimited") .
- 			" · Takma adlar: " . ($wd_p["U_WEB_ALIASES"] ?? 0) .
- 			" · Askıya alınmış: " . ($wd_p["SUSPENDED_WEB"] ?? 0),
+ 		"title" => $wd_tip(wd__("Domains"), $wd_p["U_WEB_DOMAINS"] ?? 0, $wd_p["WEB_DOMAINS"] ?? "unlimited") .
+ 			" · " . sprintf(wd__("Aliases: %s"), $wd_p["U_WEB_ALIASES"] ?? 0) .
+ 			" · " . sprintf(wd__("Suspended: %s"), $wd_p["SUSPENDED_WEB"] ?? 0),
  	]);
  } ?>
 
-	<?php // --- DNS ---
+	<?php
  if (!empty($_SESSION["DNS_SYSTEM"]) && ($wd_p["DNS_DOMAINS"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["DNS"],
- 		"label" => "DNS Bölgeleri", "short" => "DNS",
+ 		"label" => wd__("DNS Zones"), "short" => "DNS",
  		"icon" => "fa-book-atlas",
  		"href" => "/list/dns/",
  		"badge" => $wd_p["U_DNS_DOMAINS"] ?? 0,
- 		"title" => $wd_tip("Bölgeler", $wd_p["U_DNS_DOMAINS"] ?? 0, $wd_p["DNS_DOMAINS"] ?? "unlimited") .
- 			" · Kayıtlar: " . ($wd_p["U_DNS_RECORDS"] ?? 0),
+ 		"title" => $wd_tip(wd__("Zones"), $wd_p["U_DNS_DOMAINS"] ?? 0, $wd_p["DNS_DOMAINS"] ?? "unlimited") .
+ 			" · " . sprintf(wd__("Records: %s"), $wd_p["U_DNS_RECORDS"] ?? 0),
  	]);
  } ?>
 
-	<?php // --- MAIL ---
+	<?php
  if (!empty($_SESSION["MAIL_SYSTEM"]) && ($wd_p["MAIL_DOMAINS"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["MAIL"],
- 		"label" => "MAIL — E-posta", "short" => "POSTA",
+ 		"label" => wd__("MAIL — Email"), "short" => wd__("MAIL"),
  		"icon" => "fa-envelopes-bulk",
  		"href" => "/list/mail/",
  		"badge" => $wd_p["U_MAIL_ACCOUNTS"] ?? 0,
- 		"title" => $wd_tip("Alan adları", $wd_p["U_MAIL_DOMAINS"] ?? 0, $wd_p["MAIL_DOMAINS"] ?? "unlimited") .
- 			" · Hesaplar: " . ($wd_p["U_MAIL_ACCOUNTS"] ?? 0),
+ 		"title" => $wd_tip(wd__("Domains"), $wd_p["U_MAIL_DOMAINS"] ?? 0, $wd_p["MAIL_DOMAINS"] ?? "unlimited") .
+ 			" · " . sprintf(wd__("Accounts: %s"), $wd_p["U_MAIL_ACCOUNTS"] ?? 0),
  	]);
  } ?>
 
-	<?php // --- VERİTABANI ---
+	<?php
  if (!empty($_SESSION["DB_SYSTEM"]) && ($wd_p["DATABASES"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["DB"],
- 		"label" => "DB — Veritabanları", "short" => "DB",
+ 		"label" => wd__("DB — Databases"), "short" => "DB",
  		"icon" => "fa-database",
  		"href" => "/list/db/",
  		"badge" => $wd_p["U_DATABASES"] ?? 0,
- 		"title" => $wd_tip("Veritabanları", $wd_p["U_DATABASES"] ?? 0, $wd_p["DATABASES"] ?? "unlimited"),
+ 		"title" => $wd_tip(wd__("Databases"), $wd_p["U_DATABASES"] ?? 0, $wd_p["DATABASES"] ?? "unlimited"),
  	]);
  } ?>
 
-	<?php // --- CRON ---
+	<?php
  if (!empty($_SESSION["CRON_SYSTEM"]) && ($wd_p["CRON_JOBS"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["CRON"],
- 		"label" => "CRON Görevleri", "short" => "CRON",
+ 		"label" => wd__("CRON Jobs"), "short" => "CRON",
  		"icon" => "fa-clock",
  		"href" => "/list/cron/",
  		"badge" => $wd_p["U_CRON_JOBS"] ?? 0,
- 		"title" => $wd_tip("Görevler", $wd_p["U_CRON_JOBS"] ?? 0, $wd_p["CRON_JOBS"] ?? "unlimited"),
+ 		"title" => $wd_tip(wd__("Jobs"), $wd_p["U_CRON_JOBS"] ?? 0, $wd_p["CRON_JOBS"] ?? "unlimited"),
  	]);
  } ?>
 
-	<?php // --- YEDEK ---
+	<?php
  if (
  	!empty($_SESSION["BACKUP_SYSTEM"]) &&
  	(($wd_p["BACKUPS"] ?? "0") !== "0" ||
@@ -192,18 +188,18 @@ $wd_tip = function ($label, $used, $limit) {
  ) {
  	$wd_item([
  		"tabs" => ["BACKUP"],
- 		"label" => "Yedekler", "short" => "YEDEK",
+ 		"label" => wd__("Backups"), "short" => wd__("BACKUP"),
  		"icon" => "fa-file-zipper",
  		"href" => "/list/backup/",
  		"badge" => $wd_p["U_BACKUPS"] ?? 0,
- 		"title" => $wd_tip("Yedekler", $wd_p["U_BACKUPS"] ?? 0, $wd_p["BACKUPS"] ?? "unlimited"),
+ 		"title" => $wd_tip(wd__("Backups"), $wd_p["U_BACKUPS"] ?? 0, $wd_p["BACKUPS"] ?? "unlimited"),
  	]);
  } ?>
 
 	<li class="main-menu-sep" aria-hidden="true"></li>
 
-	<?php // --- Ek modüller (inc/wd-modul.php): yalnız kısa liste; tamamı Araçlar sayfasında.
- // Rozetler ÖNBELLEKTEN gelir (erişim: çökük site, WP: bekleyen güncelleme); sudo çağrısı yok.
+	<?php
+ // Extra modules — short list only; full list on Tools page.
  if (is_file($_SERVER["DOCUMENT_ROOT"] . "/inc/wd-modul.php")) {
  	require_once $_SERVER["DOCUMENT_ROOT"] . "/inc/wd-modul.php";
  	$wd_mod_user = empty($_SESSION["look"]) ? $_SESSION["user"] : $_SESSION["look"];
@@ -225,69 +221,65 @@ $wd_tip = function ($label, $used, $limit) {
  	}
  } ?>
 
-	<?php // --- Dosya Yöneticisi ---
+	<?php
  if (($_SESSION["FILE_MANAGER"] ?? "") === "true") {
  	$hide_fm = $_SESSION["userContext"] === "admin" && ($_SESSION["look"] ?? "") === "admin" && ($_SESSION["POLICY_SYSTEM_PROTECTED_ADMIN"] ?? "") === "yes";
  	if (!$hide_fm) {
- 		$wd_item(["tabs" => ["FM"], "label" => "Dosya Yöneticisi", "short" => "DOSYA", "icon" => "fa-folder-open", "href" => "/fm/"]);
+ 		$wd_item(["tabs" => ["FM"], "label" => wd__("File Manager"), "short" => wd__("FILES"), "icon" => "fa-folder-open", "href" => "/fm/"]);
  	}
  } ?>
 
-	<?php // --- Web Terminali ---
+	<?php
  if (($_SESSION["WEB_TERMINAL"] ?? "") === "true" && ($_SESSION["login_shell"] ?? "") !== "nologin") {
- 	$wd_item(["tabs" => ["TERMINAL"], "label" => "Web Terminali", "short" => "TERMİNAL", "icon" => "fa-terminal", "href" => "/list/terminal/"]);
+ 	$wd_item(["tabs" => ["TERMINAL"], "label" => wd__("Web Terminal"), "short" => wd__("TERMINAL"), "icon" => "fa-terminal", "href" => "/list/terminal/"]);
  } ?>
 
-	<?php // --- İstatistikler ---
- $wd_item(["tabs" => ["STATS"], "label" => "İstatistikler", "short" => "İSTATİSTİK", "icon" => "fa-chart-line", "href" => "/list/stats/"]); ?>
+	<?php
+ $wd_item(["tabs" => ["STATS"], "label" => wd__("Statistics"), "short" => wd__("STATS"), "icon" => "fa-chart-line", "href" => "/list/stats/"]); ?>
 
-	<?php // --- Sunucu Ayarları (yalnızca yönetici) ---
+	<?php
  if ((($_SESSION["userContext"] === "admin" && ($_SESSION["POLICY_SYSTEM_HIDE_SERVICES"] ?? "") !== "yes") ||
  	($_SESSION["user"] ?? "") === ($_SESSION["ROOT_USER"] ?? "")) && !$wd_imp) {
  	$wd_item([
  		"tabs" => ["SERVER", "IP", "RRD", "FIREWALL", "UPDATES", "PACKAGE", "NOTIFICATIONS"],
- 		"label" => "Sunucu Ayarları", "short" => "SUNUCU",
+ 		"label" => wd__("Server Settings"), "short" => wd__("SERVER"),
  		"icon" => "fa-gear",
  		"href" => "/list/server/",
  	]);
  } ?>
 
-	<?php // --- Günlükler ---
+	<?php
  if ($wd_adm) {
- 	$wd_item(["tabs" => ["LOG"], "label" => "Günlükler", "short" => "GÜNLÜK", "icon" => "fa-clock-rotate-left", "href" => "/list/log/"]);
+ 	$wd_item(["tabs" => ["LOG"], "label" => wd__("Logs"), "short" => wd__("LOGS"), "icon" => "fa-clock-rotate-left", "href" => "/list/log/"]);
  } ?>
 
 </ul>
 
-<?php // --- Sunucu yükü kartı ---
-// Yük ortalaması hassas bir veri değil ve tasarımda müşteri görünümünde de var.
+<?php
 if (true) {
 	$wd_l = wd_load();
 	if ($wd_l !== null) { ?>
 		<div class="wd-load">
-			<div class="wd-load-label">SUNUCU YÜKÜ</div>
+			<div class="wd-load-label"><?= wd_esc__("SERVER LOAD") ?></div>
 			<div class="wd-load-value">
-				<?= wd_e(number_format($wd_l["l1"], 2, ",", ".")) ?><span class="wd-load-cores">/ <?= wd_e($wd_l["cores"]) ?> çekirdek</span>
+				<?= wd_e(number_format($wd_l["l1"], 2, ".", ",")) ?><span class="wd-load-cores">/ <?= wd_e($wd_l["cores"]) ?> <?= wd_esc__("cores") ?></span>
 			</div>
 			<div class="wd-bar <?= wd_level($wd_l["pct"]) ?>"
-				role="img" aria-label="Sistem yükü: <?= wd_e(number_format($wd_l["l1"], 2, ",", ".")) ?> / <?= wd_e($wd_l["cores"]) ?> çekirdek">
+				role="img" aria-label="<?= wd_e(sprintf(wd__("System load: %s / %s cores"), number_format($wd_l["l1"], 2, ".", ","), $wd_l["cores"])) ?>">
 				<span style="width: <?= $wd_l["pct"] === null ? 4 : max(2, min(100, $wd_l["pct"])) ?>%"></span>
 			</div>
-			<div class="wd-load-uptime">Çalışma süresi <?= wd_e(wd_human_uptime(wd_uptime_seconds())) ?></div>
+			<div class="wd-load-uptime"><?= wd_esc__("Uptime") ?> <?= wd_e(wd_human_uptime(wd_uptime_seconds())) ?></div>
 		</div>
 	<?php }
 } ?>
 
-<?php // --- Künye ---
-// Tema ve ek modüllerin kaynağı ile destek adresi. Sidebar YENİ bir dosya
-// olduğu için bu blok HestiaCP güncellemelerinde silinmez. ?>
 <div class="wd-credit">
 	<a href="https://webdanismani.com" target="_blank" rel="noopener noreferrer">
-		<span class="wd-credit-k">Tema &amp; modüller</span>
+		<span class="wd-credit-k"><?= wd_esc__("Theme & modules") ?></span>
 		<span class="wd-credit-v">webdanismani.com</span>
 	</a>
 	<a href="https://oblifex.com" target="_blank" rel="noopener noreferrer">
-		<span class="wd-credit-k">Destek &amp; forum</span>
+		<span class="wd-credit-k"><?= wd_esc__("Support & forum") ?></span>
 		<span class="wd-credit-v">oblifex.com</span>
 	</a>
 </div>

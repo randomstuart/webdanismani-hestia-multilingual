@@ -59,33 +59,60 @@ function wd_modul_admin(): bool {
  */
 function wd_modul_calistir(string $betik, array $args = [], ?string $stdin = null, int $zaman_asimi = 180): array {
 	if (!preg_match('/^wd-[a-z0-9-]+$/', $betik)) {
-		return [1, "", "geçersiz betik adı"];
+		return [1, "", wd__("invalid script name")];
 	}
 	$yol = WD_MODUL_BIN . "/" . $betik;
 	if (!is_file($yol)) {
-		return [1, "", "betik kurulu değil: " . $betik];
+		return [1, "", sprintf(wd__("script not installed: %s"), $betik)];
 	}
 	$cmd = "/usr/bin/sudo " . $yol;
 	foreach ($args as $a) {
 		$cmd .= " " . escapeshellarg((string) $a);
 	}
 	$desc = [0 => ["pipe", "r"], 1 => ["pipe", "w"], 2 => ["pipe", "w"]];
-	$p = proc_open($cmd, $desc, $boru);
+	$env = wd_sudo_env();
+	$p = proc_open($cmd, $desc, $boru, null, $env);
 	if (!is_resource($p)) {
-		return [1, "", "süreç başlatılamadı"];
+		return [1, "", wd__("could not start process")];
 	}
 	if ($stdin !== null) {
 		fwrite($boru[0], $stdin);
 	}
 	fclose($boru[0]);
-	// Uzun işlemler (klon, yedek geri yükleme) için zaman aşımı: bloklanan
-	// okuma yerine akış zaman sınırı.
+	// Long jobs (clone, backup restore): stream timeout instead of blocking forever.
 	stream_set_timeout($boru[1], $zaman_asimi);
 	$out = stream_get_contents($boru[1]);
 	$err = stream_get_contents($boru[2]);
 	fclose($boru[1]);
 	fclose($boru[2]);
 	return [proc_close($p), (string) $out, (string) $err];
+}
+
+/**
+ * Environment for sudo helpers: pass panel language so Python gettext matches UI.
+ *
+ * @return array<string, string>
+ */
+function wd_sudo_env(): array {
+	$env = [];
+	foreach ($_ENV as $k => $v) {
+		if (is_string($k) && is_string($v)) {
+			$env[$k] = $v;
+		}
+	}
+	foreach ($_SERVER as $k => $v) {
+		if (is_string($k) && is_string($v) && !isset($env[$k]) && preg_match('/^[A-Z_][A-Z0-9_]*$/', $k)) {
+			$env[$k] = $v;
+		}
+	}
+	$lang = strtolower((string) ($_SESSION["language"] ?? $_SESSION["LANGUAGE"] ?? "en"));
+	$lang = preg_replace("/[^a-z]/", "", $lang) ?: "en";
+	$env["WD_LANG"] = $lang;
+	$env["LANGUAGE"] = $lang;
+	$env["LANG"] = $lang . "_" . strtoupper($lang) . ".UTF-8";
+	$env["LC_ALL"] = $env["LANG"];
+	$env["LC_MESSAGES"] = $env["LANG"];
+	return $env;
 }
 
 /**
@@ -152,23 +179,23 @@ function wd_modul_bayi_mi(string $user): bool {
  */
 function wd_modul_listesi(bool $is_admin, string $user): array {
 	$hepsi = [
-		["kod" => "phpayar", "ad" => "PHP Ayarları", "kisa" => "PHP", "ikon" => "fa-code", "href" => "/list/phpayar/", "tab" => "PHPAYAR", "grup" => "web", "yetki" => "hepsi", "aciklama" => "Yükleme boyutu, zaman aşımı, hata gösterimi ve PHP hata günlüğü"],
-		["kod" => "waf", "ad" => "Uygulama Güvenlik Duvarı", "kisa" => "WAF", "ikon" => "fa-shield-virus", "href" => "/list/waf/", "tab" => "WAF", "grup" => "web", "yetki" => "hepsi", "aciklama" => "Kötü bot ve saldırı kalıplarını engeller, giriş sayfasını kaba kuvvete karşı korur"],
-		["kod" => "erisim", "ad" => "Erişim İzleme", "kisa" => "ERİŞİM", "ikon" => "fa-heart-pulse", "href" => "/list/erisim/", "tab" => "ERISIM", "grup" => "web", "yetki" => "hepsi", "aciklama" => "Siteler 5 dakikada bir dışarıdan denetlenir; çökünce bildirim gelir"],
-		["kod" => "wp", "ad" => "WordPress Araçları", "kisa" => "WP", "ikon" => "fa-w", "href" => "/list/wp/", "tab" => "WP", "grup" => "web", "yetki" => "hepsi", "aciklama" => "Güncellemeler, otomatik güncelleme, bütünlük doğrulama, tek tık yönetici girişi"],
-		["kod" => "klon", "ad" => "Klon / Staging", "kisa" => "KLON", "ikon" => "fa-clone", "href" => "/list/klon/", "tab" => "KLON", "grup" => "web", "yetki" => "hepsi", "aciklama" => "Sitenin test kopyasını çıkar, değişiklikleri yayına al"],
-		["kod" => "kur", "ad" => "Uygulama Kurucu", "kisa" => "KUR", "ikon" => "fa-download", "href" => "/list/kur/", "tab" => "KUR", "grup" => "server", "yetki" => "admin", "aciklama" => "Katalogdaki uygulama paketlerini seçilen alan adına kur"],
-		["kod" => "git", "ad" => "Git Dağıtım", "kisa" => "GIT", "ikon" => "fa-code-branch", "href" => "/list/git/", "tab" => "GIT", "grup" => "web", "yetki" => "hepsi", "aciklama" => "Depoyu siteye klonla, tek tıkla ya da otomatik çek"],
-		["kod" => "node", "ad" => "Node.js Uygulamaları", "kisa" => "NODE", "ikon" => "fa-cube", "href" => "/list/node/", "tab" => "NODE", "grup" => "web", "yetki" => "hepsi", "aciklama" => "Node.js uygulamasını servis olarak çalıştır, alan adına bağla"],
-		["kod" => "yedek", "ad" => "Yedek Gezgini", "kisa" => "GEZGİN", "ikon" => "fa-box-archive", "href" => "/list/yedek/", "tab" => "YEDEKGEZGIN", "grup" => "backup", "yetki" => "hepsi", "aciklama" => "Yedeğin içinde gez, tek dosya ya da klasörü geri yükle"],
-		["kod" => "bayi", "ad" => "Bayi Yönetimi", "kisa" => "BAYİ", "ikon" => "fa-users-gear", "href" => "/list/bayi/", "tab" => "BAYI", "grup" => "server", "yetki" => "bayi", "aciklama" => "Kendi müşterilerinizi açın, askıya alın, paketini değiştirin"],
+		["kod" => "phpayar", "ad" => wd__("PHP Settings"), "kisa" => "PHP", "ikon" => "fa-code", "href" => "/list/phpayar/", "tab" => "PHPAYAR", "grup" => "web", "yetki" => "hepsi", "aciklama" => wd__("Upload size, timeouts, error display, and PHP error log")],
+		["kod" => "waf", "ad" => wd__("Web Application Firewall"), "kisa" => "WAF", "ikon" => "fa-shield-virus", "href" => "/list/waf/", "tab" => "WAF", "grup" => "web", "yetki" => "hepsi", "aciklama" => wd__("Blocks bad bots and attack patterns; rate-limits login pages")],
+		["kod" => "erisim", "ad" => wd__("Uptime Monitor"), "kisa" => wd__("UPTIME"), "ikon" => "fa-heart-pulse", "href" => "/list/erisim/", "tab" => "ERISIM", "grup" => "web", "yetki" => "hepsi", "aciklama" => wd__("External HTTP check every 5 minutes; notify after failures")],
+		["kod" => "wp", "ad" => wd__("WordPress Tools"), "kisa" => "WP", "ikon" => "fa-w", "href" => "/list/wp/", "tab" => "WP", "grup" => "web", "yetki" => "hepsi", "aciklama" => wd__("Updates, auto-update, integrity check, one-click admin login")],
+		["kod" => "klon", "ad" => wd__("Clone / Staging"), "kisa" => wd__("CLONE"), "ikon" => "fa-clone", "href" => "/list/klon/", "tab" => "KLON", "grup" => "web", "yetki" => "hepsi", "aciklama" => wd__("Clone a site for testing, then push changes live")],
+		["kod" => "kur", "ad" => wd__("App Installer"), "kisa" => wd__("INSTALL"), "ikon" => "fa-download", "href" => "/list/kur/", "tab" => "KUR", "grup" => "server", "yetki" => "admin", "aciklama" => wd__("Install catalog apps onto a selected domain")],
+		["kod" => "git", "ad" => wd__("Git Deploy"), "kisa" => "GIT", "ikon" => "fa-code-branch", "href" => "/list/git/", "tab" => "GIT", "grup" => "web", "yetki" => "hepsi", "aciklama" => wd__("Clone a repo into a site; manual or automatic pull")],
+		["kod" => "node", "ad" => wd__("Node.js Apps"), "kisa" => "NODE", "ikon" => "fa-cube", "href" => "/list/node/", "tab" => "NODE", "grup" => "web", "yetki" => "hepsi", "aciklama" => wd__("Run a Node.js app as a service and bind it to a domain")],
+		["kod" => "yedek", "ad" => wd__("Backup Browser"), "kisa" => wd__("BROWSER"), "ikon" => "fa-box-archive", "href" => "/list/yedek/", "tab" => "YEDEKGEZGIN", "grup" => "backup", "yetki" => "hepsi", "aciklama" => wd__("Browse a backup archive; restore a single file or folder")],
+		["kod" => "bayi", "ad" => wd__("Reseller Management"), "kisa" => wd__("RESELLER"), "ikon" => "fa-users-gear", "href" => "/list/bayi/", "tab" => "BAYI", "grup" => "server", "yetki" => "bayi", "aciklama" => wd__("Create, suspend, and re-package your own customers")],
 	];
 
 	$gorunen = [];
 	$bayi = !$is_admin && wd_modul_bayi_mi($user);
 	foreach ($hepsi as $m) {
 		if (!is_dir($_SERVER["DOCUMENT_ROOT"] . "/list/" . $m["kod"])) {
-			continue; // kurulmamış modül listelenmez
+			continue; // skip modules not installed
 		}
 		if ($m["yetki"] === "admin" && !$is_admin) {
 			continue;
@@ -179,8 +206,8 @@ function wd_modul_listesi(bool $is_admin, string $user): array {
 			}
 			if ($bayi) {
 				$m["grup"] = "account";
-				$m["ad"] = "Müşterilerim";
-				$m["kisa"] = "MÜŞTERİ";
+				$m["ad"] = wd__("My Customers");
+				$m["kisa"] = wd__("CUSTOMERS");
 			}
 		}
 		$gorunen[] = $m;
@@ -258,7 +285,7 @@ function wd_modul_domain_kutusu(array $doms, string $secili, string $yol, array 
 	if (count($doms) < 2) {
 		return;
 	}
-	echo '<div class="wd-card"><div class="wd-card-head">Alan Adı</div><div class="wd-card-body wd-card-body-pad">';
+	echo '<div class="wd-card"><div class="wd-card-head">' . wd_esc__("Domain") . '</div><div class="wd-card-body wd-card-body-pad">';
 	echo '<form method="get" action="' . wd_e($yol) . '" class="wd-inline-select">';
 	foreach ($ek_get as $k => $v) {
 		echo '<input type="hidden" name="' . wd_e($k) . '" value="' . wd_e($v) . '">';
@@ -268,7 +295,7 @@ function wd_modul_domain_kutusu(array $doms, string $secili, string $yol, array 
 		echo '<option value="' . wd_e($d) . '"' . ($d === $secili ? " selected" : "") . ">" . wd_e($d) . "</option>";
 	}
 	echo "</select>";
-	echo '<noscript><button type="submit" class="button button-secondary">Seç</button></noscript>';
+	echo '<noscript><button type="submit" class="button button-secondary">' . wd_esc__("Select") . "</button></noscript>";
 	echo "</form></div></div>\n";
 }
 
@@ -283,41 +310,41 @@ function wd_modul_form_gizli(string $islem, string $domain = ""): string {
 	return $s;
 }
 
-/** Unix zamanını "gg.aa.yyyy ss:dd" yapar. */
+/** Format a unix timestamp for display. */
 function wd_modul_tarih(?int $ts): string {
 	if (!$ts) {
 		return "—";
 	}
-	return date("d.m.Y H:i", $ts);
+	return date("Y-m-d H:i", $ts);
 }
 
-/** Saniyeyi kısa süreye çevirir ("3 dk", "2 sa 10 dk", "5 gün"). */
+/** Short duration ("3 min", "2 h 10 min", "5 days"). */
 function wd_modul_sure(?int $sn): string {
 	if ($sn === null) {
 		return "—";
 	}
 	if ($sn < 60) {
-		return $sn . " sn";
+		return $sn . " " . wd__("s");
 	}
 	if ($sn < 3600) {
-		return intdiv($sn, 60) . " dk";
+		return intdiv($sn, 60) . " " . wd__("min");
 	}
 	if ($sn < 86400) {
 		$h = intdiv($sn, 3600);
 		$m = intdiv($sn % 3600, 60);
-		return $h . " sa" . ($m > 0 ? " " . $m . " dk" : "");
+		return $h . " " . wd__("h") . ($m > 0 ? " " . $m . " " . wd__("min") : "");
 	}
 	$g = intdiv($sn, 86400);
 	$h = intdiv($sn % 86400, 3600);
-	return $g . " gün" . ($h > 0 ? " " . $h . " sa" : "");
+	return $g . " " . wd_n__("day", "days", $g) . ($h > 0 ? " " . $h . " " . wd__("h") : "");
 }
 
-/** Yüzdeyi "%99,8" biçiminde yazar. */
+/** Format a percentage. */
 function wd_modul_yuzde(?float $v, int $ondalik = 1): string {
 	if ($v === null) {
 		return "—";
 	}
-	return "%" . number_format($v, $ondalik, ",", ".");
+	return number_format($v, $ondalik, ".", ",") . "%";
 }
 
 /** Bayt → okunur birim (wd_bayt varsa onu kullanır). */
@@ -332,7 +359,7 @@ function wd_modul_bayt(int $b): string {
 		$v /= 1024;
 		$i++;
 	}
-	return number_format($v, $i === 0 ? 0 : 1, ",", ".") . " " . $birim[$i];
+	return number_format($v, $i === 0 ? 0 : 1, ".", ",") . " " . $birim[$i];
 }
 
 /**

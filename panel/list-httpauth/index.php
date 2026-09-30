@@ -1,25 +1,24 @@
 <?php
 /**
- * WebDanışmanı — "Dizin Şifre Koruma" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/httpauth/index.php
+ * WebDanışmanı — "Directory Password Protection" page
+ * Installs to: /usr/local/hestia/web/list/httpauth/index.php
  *
- * YENİ dosyadır; HestiaCP güncellemelerinden etkilenmez.
+ * NEW file; unaffected by HestiaCP updates.
  *
- * NE İŞE YARAR?
- * Bir web sitesini tarayıcı tabanlı kullanıcı adı/parola ile korur
- * (HTTP Basic Auth). HestiaCP'de bu yetenek CLI olarak vardır
- * (v-add/change/delete-web-domain-httpauth) ama PANELDE ARAYÜZÜ YOKTUR.
- * cPanel'deki "Directory Privacy", Plesk'teki "Password-protected
- * directories" karşılığıdır.
+ * WHAT IT DOES
+ * Protects a site with browser-based username/password (HTTP Basic Auth).
+ * HestiaCP has this capability on the CLI
+ * (v-add/change/delete-web-domain-httpauth) but NO PANEL UI.
+ * Counterpart to cPanel "Directory Privacy" / Plesk "Password-protected
+ * directories".
  *
- * GÜVENLİK NOTLARI
- *  - Kullanıcı adı DAİMA oturumdan alınır. İstekten gelen bir kullanıcı adı
- *    kabul edilseydi, bir müşteri başka bir hesabın sitesini koruyabilir ya da
- *    korumasını kaldırabilirdi.
- *  - Alan adı, kullanıcının KENDİ alan adları arasında olmak zorundadır;
- *    v-komutu da bunu doğrular ama savunma tek katmana bırakılmaz.
- *  - Tüm POST istekleri HestiaCP'nin kendi verify_csrf() denetiminden geçer.
- *  - Kabuk argümanları quoteshellarg() ile kaçırılır.
+ * SECURITY NOTES
+ *  - Username ALWAYS comes from the session. Accepting a username from the
+ *    request would let a customer protect or unprotect another account's site.
+ *  - Domain must be among the user's OWN domains; the v-command also checks
+ *    this, but defense is not left to one layer.
+ *  - All POST requests pass HestiaCP's own verify_csrf().
+ *  - Shell arguments are escaped with quoteshellarg().
  */
 
 use function Hestiacp\quoteshellarg\quoteshellarg;
@@ -56,13 +55,11 @@ if (!empty($_POST["ok"])) {
 	$parola = (string) ($_POST["v_password"] ?? "");
 
 	if (!wd_domain_sahibi_mi($wd_user, $domain)) {
-		$wd_hata = _("Invalid domain") . ": " . htmlspecialchars($domain);
+		$wd_hata = wd__("Invalid domain") . ": " . htmlspecialchars($domain);
 	} elseif (!wd_auth_ad_gecerli($auth_user)) {
-		$wd_hata =
-			"Kullanıcı adı 2-32 karakter olmalı ve yalnızca harf, rakam, nokta, " .
-			"alt çizgi veya tire içerebilir.";
+		$wd_hata = wd__("Username must be 2–32 characters and contain only letters, digits, dots, underscores, or hyphens.");
 	} elseif ($islem !== "sil" && strlen($parola) < 8) {
-		$wd_hata = "Parola en az 8 karakter olmalı.";
+		$wd_hata = wd__("Password must be at least 8 characters.");
 	} else {
 		$cmd = "";
 		if ($islem === "ekle") {
@@ -74,7 +71,7 @@ if (!empty($_POST["ok"])) {
 		}
 
 		if ($cmd === "") {
-			$wd_hata = "Bilinmeyen işlem.";
+			$wd_hata = wd__("Unknown action.");
 		} else {
 			$arg =
 				quoteshellarg($wd_user) .
@@ -95,7 +92,7 @@ if (!empty($_POST["ok"])) {
 				// kendi hata metni gösterilir.
 				$wd_hata = trim(implode(" ", $out));
 				if ($wd_hata === "") {
-					$wd_hata = "İşlem başarısız (kod " . (int) $rc . ").";
+					$wd_hata = sprintf(wd__("Action failed (code %d)."), (int) $rc);
 				}
 			} else {
 				$msg = [
@@ -119,9 +116,9 @@ if (!empty($_POST["ok"])) {
 if (empty($wd_hata) && isset($_GET["durum"])) {
 	$d = htmlspecialchars((string) ($_GET["d"] ?? ""), ENT_QUOTES, "UTF-8");
 	$mesajlar = [
-		"koruma-eklendi" => "Şifre koruması eklendi: " . $d,
-		"parola-degisti" => "Parola güncellendi: " . $d,
-		"koruma-kaldirildi" => "Şifre koruması kaldırıldı: " . $d,
+		"koruma-eklendi" => sprintf(wd__("Password protection added: %s"), $d),
+		"parola-degisti" => sprintf(wd__("Password updated: %s"), $d),
+		"koruma-kaldirildi" => sprintf(wd__("Password protection removed: %s"), $d),
 	];
 	$wd_bilgi = $mesajlar[$_GET["durum"]] ?? "";
 }

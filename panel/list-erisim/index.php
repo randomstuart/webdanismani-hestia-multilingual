@@ -1,10 +1,10 @@
 <?php
 /**
- * WebDanışmanı — "Erişim İzleme" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/erisim/index.php
+ * WebDanışmanı — "Access Monitoring" page
+ * Installs to: /usr/local/hestia/web/list/erisim/index.php
  *
- * Siteler cron ile 5 dakikada bir dışarıdan denetlenir; sayfa ÖNBELLEKTEN
- * okur. "Şimdi Dene" düğmesi tek site için anlık kontrol yapar.
+ * Sites are probed externally every 5 minutes via cron; the page reads from
+ * CACHE. The "Try Now" button runs an on-demand check for a single site.
  */
 
 ob_start();
@@ -26,20 +26,20 @@ if (!empty($_POST["ok"])) {
 	// Yönetici her siteyi, müşteri yalnız kendi sitesini deneyebilir.
 	$sahip = $wd_is_admin || isset($wd_doms[$dom]);
 	if (!$sahip || !preg_match('/^[a-z0-9.-]{3,253}$/i', $dom)) {
-		$wd_hata = "Geçersiz alan adı.";
+		$wd_hata = wd__("Invalid domain.");
 	} else {
 		$d = wd_modul_json("wd-erisim", ["simdi", $dom], null, 60);
 		if (!empty($d["ok"])) {
 			header("Location: /list/erisim/?durum=denendi&d=" . urlencode($dom));
 			exit();
 		}
-		$wd_hata = "Kontrol yapılamadı: " . ($d["hata"] ?? "");
+		$wd_hata = sprintf(wd__("Check failed: %s"), $d["hata"] ?? "");
 	}
 }
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"denendi" => "{d} şimdi denendi; sonuç aşağıda güncellendi.",
+		"denendi" => wd__("{d} checked now; result updated below."),
 	]);
 }
 

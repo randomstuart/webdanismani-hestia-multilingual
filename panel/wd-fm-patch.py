@@ -54,8 +54,10 @@ YEDEK = HEDEF + ".wd-orig"
 # yüzden içinde tek tırnak KULLANILMAZ, yalnızca çift tırnak vardır.
 CAPA = '"add_to_body" => \'\n<script>'
 STIL = '<link rel="stylesheet" href="/fm/css/wd-fm.css">'
+# Per-user language map (PHP), then shell script
+I18N = '<script src="/fm/wd-fm-i18n.php"></script>'
 BETIK = '<script src="/fm/js/wd-fm.js"></script>'
-EKLENEN = STIL + "\n" + BETIK
+EKLENEN = STIL + "\n" + I18N + "\n" + BETIK
 
 
 def php_bin():
@@ -98,7 +100,9 @@ def temizle(icerik):
     uygulanmaz. (Bu bir kez yaşandı.)
     """
     for parca in ("\n\t" + EKLENEN, EKLENEN + "\n", EKLENEN,
+                  "\n\t" + I18N + "\n" + BETIK, I18N + "\n" + BETIK,
                   "\n\t" + BETIK, BETIK + "\n", BETIK,
+                  "\n\t" + I18N, I18N + "\n", I18N,
                   "\n\t" + STIL, STIL + "\n", STIL):
         icerik = icerik.replace(parca, "")
     return icerik
@@ -111,7 +115,7 @@ def apply():
 
     ham = oku()
 
-    if STIL in ham and BETIK in ham:
+    if STIL in ham and BETIK in ham and I18N in ham:
         print("  [ATLA] dosya yoneticisi temasi zaten bagli")
         return 2
 

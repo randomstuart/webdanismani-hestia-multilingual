@@ -1,39 +1,39 @@
 #!/usr/bin/env python3
 """
-WebDanışmanı — Güvenlik Denetimi
+WebDanışmanı — Security Audit
 
-Kurulum yeri: /usr/local/hestia/wd/bin/wd-guvenlik
+Installs to: /usr/local/hestia/wd/bin/wd-guvenlik
 
-NE YAPAR?
-  Sunucunun güvenlik duruşunu sürekli denetler ve düzeltmeleri KORUMALI
-  biçimde uygular. Sağlık Merkezi'yle aynı desen: toplayıcı önbelleğe yazar,
-  panel önbelleği okur, uyarı katmanı bulguları bildirime taşır.
+WHAT IT DOES
+  Continuously audits the server's security posture and applies fixes in a
+  GUARDED way. Same pattern as Health Center: collector writes cache, panel
+  reads cache, alert layer turns findings into notifications.
 
-DENETLENENLER
-  SSH        root girişi, parola girişi, anahtar varlığı, MaxAuthTries
-  Panel      2FA, API açıklığı, CSRF politikası
-  Saldırı    fail2ban jail sağlığı, güncel banlar, en çok deneyen IP'ler
-  Sistem     bekleyen güvenlik güncellemeleri
-  PHP        desteği bitmiş sürümler kurulu mu, kullanılıyor mu
-  Dosya      web köklerinde dünyaya yazılabilir dosyalar
-  Servis     gereksiz açık portlar (düz FTP gibi)
+AUDITED
+  SSH        root login, password login, key presence, MaxAuthTries
+  Panel      2FA, API exposure, CSRF policy
+  Attacks    fail2ban jail health, current bans, top probing IPs
+  System     pending security updates
+  PHP        end-of-life versions installed / in use
+  Files      world-writable files under web roots
+  Services   unnecessary open ports (plain FTP, etc.)
 
-SERTLEŞTİRME NEDEN "KORUMALI"?
-  SSH parola girişini kapatmak, sunucuda çalışan bir anahtar yoksa erişimi
-  TAMAMEN kaybettirir. Bu yüzden her sertleştirme işlemi önce ön koşulunu
-  denetler ve koşul sağlanmıyorsa ÇALIŞMAYI REDDEDER. Ayrıca sshd
-  yapılandırması yazıldıktan sonra `sshd -t` ile doğrulanır; geçersizse eski
-  hâl geri yüklenir ve `reload` kullanılır (mevcut oturumlar düşmez).
+WHY HARDENING IS "GUARDED"
+  Disabling SSH password login with no working key on the server loses access
+  COMPLETELY. Every hardening action therefore checks its precondition first
+  and REFUSES to run if unmet. After writing sshd config, `sshd -t` validates;
+  on failure the old state is restored and `reload` is used (existing sessions
+  stay up).
 
-Kullanım:
-  wd-guvenlik refresh              denetimi çalıştır, önbelleğe yaz (cron)
+Usage:
+  wd-guvenlik refresh              run audit, write cache (cron)
   wd-guvenlik json | plain
-  wd-guvenlik uygula <islem>       sertleştirme uygula
-      ssh-parola-kapat    SSH parola girişini kapat (anahtar şart)
-      ssh-root-kapat      root ile doğrudan girişi kapat (sudo'lu kullanıcı şart)
-      ftp-kapat           düz FTP servisini durdur ve kapat
-      eol-php-kaldir      kullanılmayan EOL PHP sürümlerini kaldır
-  wd-guvenlik uygula <islem> --kuru   ne yapılacağını yaz, uygulama
+  wd-guvenlik uygula <islem>       apply hardening
+      ssh-parola-kapat    disable SSH password login (key required)
+      ssh-root-kapat      disable direct root login (sudo user required)
+      ftp-kapat           stop and disable plain FTP
+      eol-php-kaldir      remove unused EOL PHP versions
+  wd-guvenlik uygula <islem> --kuru   print what would be done, do not apply
 """
 
 import glob
@@ -44,6 +44,16 @@ import shutil
 import subprocess
 import sys
 import time
+
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+N_ = lambda s: s  # mark for .po extract; translate in PHP (cached JSON)
 
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache/guvenlik.json"
@@ -149,49 +159,49 @@ def ssh_kontrolleri():
     # --- Anahtar durumu: diğer kontrollerin ön koşulu ---
     if not anahtarlar:
         ck.append(kontrol(
-            "ssh_anahtar", "SSH anahtarı", "warn", "yok",
-            "Hiçbir hesapta SSH anahtarı tanımlı değil.",
-            "Parola girişini kapatmadan ÖNCE anahtar ekleyin: "
-            "ssh-copy-id root@sunucu",
+            "ssh_anahtar", N_("SSH key"), "warn", N_("none"),
+            N_("No account has an SSH key configured."),
+            N_("Add a key BEFORE disabling password login: "
+              "ssh-copy-id root@server"),
         ))
     else:
         ck.append(kontrol(
-            "ssh_anahtar", "SSH anahtarı", "ok",
+            "ssh_anahtar", N_("SSH key"), "ok",
             ", ".join("%s(%d)" % (k, v) for k, v in sorted(anahtarlar.items())),
         ))
 
     # --- Parola girişi ---
     if parola == "yes":
         ck.append(kontrol(
-            "ssh_parola", "SSH parola girişi", "fail", "açık",
-            "Sunucu parola denemelerine açık; kaba kuvvet saldırılarının hedefi.",
-            "Anahtar girişi çalışıyorsa parola girişini kapatın."
+            "ssh_parola", N_("SSH password login"), "fail", N_("enabled"),
+            N_("Server accepts password attempts; a target for brute-force attacks."),
+            N_("Disable password login if key-based login works.")
             if toplam_anahtar else
-            "ÖNCE kendi SSH anahtarınızı ekleyin, sonra kapatın.",
+            N_("FIRST add your own SSH key, then disable password login."),
             "ssh-parola-kapat" if toplam_anahtar else None,
         ))
     else:
-        ck.append(kontrol("ssh_parola", "SSH parola girişi", "ok", "kapalı"))
+        ck.append(kontrol("ssh_parola", N_("SSH password login"), "ok", N_("disabled")))
 
     # --- root girişi ---
     if root in ("yes", "prohibit-password", "without-password"):
         seviye = "warn" if root != "yes" else "fail"
         ck.append(kontrol(
-            "ssh_root", "SSH root girişi", seviye,
-            "açık" if root == "yes" else "yalnızca anahtarla",
-            "root hesabı doğrudan hedef alınabiliyor."
+            "ssh_root", N_("SSH root login"), seviye,
+            N_("enabled") if root == "yes" else N_("key-only"),
+            N_("The root account can be targeted directly.")
             if root == "yes" else
-            "root anahtarla giriş yapabiliyor; parolayla giremiyor.",
-            "Sudo yetkili ayrı bir kullanıcı açıp root girişini kapatın.",
+            N_("Root can log in with a key; not with a password."),
+            N_("Create a separate sudo-capable user and disable root login."),
             "ssh-root-kapat" if root == "yes" else None,
         ))
     else:
-        ck.append(kontrol("ssh_root", "SSH root girişi", "ok", "kapalı"))
+        ck.append(kontrol("ssh_root", N_("SSH root login"), "ok", N_("disabled")))
 
     if maxauth and maxauth.isdigit() and int(maxauth) > 4:
-        ck.append(kontrol("ssh_maxauth", "Deneme sınırı", "warn", maxauth,
-                          "Bağlantı başına izin verilen deneme sayısı yüksek.",
-                          "sshd_config içinde MaxAuthTries 4 yapın."))
+        ck.append(kontrol("ssh_maxauth", N_("Attempt limit"), "warn", maxauth,
+                          N_("Allowed attempts per connection is high."),
+                          N_("Set MaxAuthTries 4 in sshd_config.")))
     return ck
 
 
@@ -200,8 +210,8 @@ def fail2ban_kontrolleri():
     ck = []
     rc, out, _ = kabuk(["fail2ban-client", "status"])
     if rc != 0:
-        return [kontrol("f2b", "fail2ban", "fail", "çalışmıyor",
-                        "Kaba kuvvet koruması devre dışı.",
+        return [kontrol("f2b", "fail2ban", "fail", N_("not running"),
+                        N_("Brute-force protection is disabled."),
                         "systemctl enable --now fail2ban")]
 
     m = re.search(r"Jail list:\s*(.*)", out)
@@ -215,7 +225,8 @@ def fail2ban_kontrolleri():
         toplam += int(b.group(1)) if b else 0
 
     ck.append(kontrol("f2b", "fail2ban", "ok",
-                      "%d jail · %d aktif ban · %d toplam" % (len(jailler), simdi, toplam)))
+                      N_("%d jails · %d active bans · %d total")
+                      % (len(jailler), simdi, toplam)))
     return ck
 
 
@@ -270,34 +281,36 @@ def panel_kontrolleri():
 
     if twofa_yok:
         ck.append(kontrol(
-            "twofa", "Panel 2FA", "fail", "kapalı: " + ", ".join(twofa_yok),
-            "Yönetici hesabı yalnızca parolayla korunuyor; panel dışarıya açık.",
-            "Panel > Hesap Ayarları > İki Adımlı Doğrulama'yı etkinleştirin.",
+            "twofa", N_("Panel 2FA"), "fail", N_("off: ") + ", ".join(twofa_yok),
+            N_("Admin account is protected by password only; the panel is exposed."),
+            N_("Panel > Account Settings > enable Two-Factor Authentication."),
         ))
     elif yoneticiler:
-        ck.append(kontrol("twofa", "Panel 2FA", "ok", "tüm yöneticilerde açık"))
+        ck.append(kontrol("twofa", N_("Panel 2FA"), "ok",
+                          N_("enabled for all admins")))
 
     # --- API ---
     api = cfg.get("API", "")
     izin = (cfg.get("API_ALLOWED_IP") or "").strip()
     if api == "yes" and izin == "":
         # Boş liste HestiaCP'de "hiç kimse" demektir — açık DEĞİL.
-        ck.append(kontrol("api", "API erişimi", "ok",
-                          "etkin ama IP listesi boş (kimse bağlanamaz)"))
+        ck.append(kontrol("api", N_("API access"), "ok",
+                          N_("enabled but IP list empty (nobody can connect)")))
     elif api == "yes" and ("0.0.0.0" in izin):
         ck.append(kontrol(
-            "api", "API erişimi", "fail", "herkese açık",
-            "API 0.0.0.0 ile tüm dünyaya açılmış.",
+            "api", N_("API access"), "fail", N_("open to everyone"),
+            N_("API is open to the world via 0.0.0.0."),
             "v-change-sys-config-value API_ALLOWED_IP 'MAGAZA_IP'",
         ))
     elif api == "yes":
-        ck.append(kontrol("api", "API erişimi", "ok", "kısıtlı: " + izin))
+        ck.append(kontrol("api", N_("API access"), "ok",
+                          N_("restricted: ") + izin))
     else:
-        ck.append(kontrol("api", "API erişimi", "ok", "kapalı"))
+        ck.append(kontrol("api", N_("API access"), "ok", N_("disabled")))
 
     if cfg.get("POLICY_CSRF_STRICTNESS", "1") != "1":
-        ck.append(kontrol("csrf", "CSRF koruması", "warn", "gevşetilmiş",
-                          "Panel CSRF denetimi tam sıkılıkta değil.",
+        ck.append(kontrol("csrf", N_("CSRF protection"), "warn", N_("relaxed"),
+                          N_("Panel CSRF checks are not at full strictness."),
                           "v-change-sys-config-value POLICY_CSRF_STRICTNESS '1'"))
     return ck
 
@@ -306,28 +319,31 @@ def panel_kontrolleri():
 def guncelleme_kontrolu():
     rc, out, _ = kabuk(["apt-get", "-s", "upgrade"], timeout=120)
     if rc != 0:
-        return [kontrol("guncelleme", "Güncellemeler", "bilinmiyor", "kontrol edilemedi")]
+        return [kontrol("guncelleme", N_("Updates"), "bilinmiyor",
+                        N_("could not check"))]
     satirlar = [s for s in out.splitlines() if s.startswith("Inst ")]
     guvenlik = [s for s in satirlar if "security" in s.lower()]
     if guvenlik:
         return [kontrol(
-            "guncelleme", "Güvenlik güncellemeleri", "fail",
-            "%d paket" % len(guvenlik),
-            "Yayınlanmış güvenlik yamaları kurulmamış.",
-            "Sunucuda: apt-get update && apt-get upgrade",
+            "guncelleme", N_("Security updates"), "fail",
+            ngettext("%d package", "%d packages", len(guvenlik)) % len(guvenlik),
+            N_("Published security patches are not installed."),
+            N_("On the server: apt-get update && apt-get upgrade"),
         )]
     if satirlar:
-        return [kontrol("guncelleme", "Güncellemeler", "warn",
-                        "%d paket (güvenlik dışı)" % len(satirlar),
-                        "Bekleyen güncellemeler var.")]
-    return [kontrol("guncelleme", "Güncellemeler", "ok", "güncel")]
+        return [kontrol("guncelleme", N_("Updates"), "warn",
+                        ngettext("%d package (non-security)",
+                                 "%d packages (non-security)",
+                                 len(satirlar)) % len(satirlar),
+                        N_("There are pending updates."))]
+    return [kontrol("guncelleme", N_("Updates"), "ok", N_("up to date"))]
 
 
 def php_kontrolu():
     kurulu = sorted(os.listdir("/etc/php")) if os.path.isdir("/etc/php") else []
     eol_kurulu = [v for v in kurulu if v in EOL_PHP]
     if not eol_kurulu:
-        return [kontrol("php_eol", "PHP sürümleri", "ok", ", ".join(kurulu))]
+        return [kontrol("php_eol", N_("PHP versions"), "ok", ", ".join(kurulu))]
 
     # Kullanımda mı? Kullanılmayan EOL sürüm düşük risktir ama kaldırılmalıdır.
     kullanan = []
@@ -341,15 +357,15 @@ def php_kontrolu():
 
     if kullanan:
         return [kontrol(
-            "php_eol", "Desteği biten PHP", "fail", ", ".join(kullanan),
-            "Bu sürümler güvenlik yaması ALMIYOR ve aktif sitelerde kullanılıyor.",
-            "Siteleri güncel bir PHP sürümüne taşıyın.",
+            "php_eol", N_("End-of-life PHP"), "fail", ", ".join(kullanan),
+            N_("These versions no longer receive security patches and are used on live sites."),
+            N_("Move sites to a current PHP version."),
         )]
     return [kontrol(
-        "php_eol", "Desteği biten PHP", "warn", ", ".join(eol_kurulu),
-        "Kurulu ama hiçbir site kullanmıyor. Panelden seçilebildiği için "
-        "kaldırılması daha güvenli.",
-        "Kullanılmayan EOL sürümleri kaldırın.",
+        "php_eol", N_("End-of-life PHP"), "warn", ", ".join(eol_kurulu),
+        N_("Installed but unused by any site. Safer to remove since they remain "
+          "selectable in the panel."),
+        N_("Remove unused EOL versions."),
         "eol-php-kaldir",
     )]
 
@@ -386,16 +402,17 @@ def guvenlik_duvari_portlari():
     return portlar, araliklar
 
 
-# Bilinen ama dikkat gerektiren servisler.
+# Bilinen ama dikkat gerektiren servisler. — metinler runtime'da çevrilir
 DIKKAT_PORT = {
-    21: ("Düz FTP", "FTP parolaları şifresiz gönderir; ağdaki biri okuyabilir.",
-         "Müşteriler SFTP kullanabiliyorsa FTP'yi kapatın.", "ftp-kapat"),
-    8085: ("Web Terminali",
-           "Tarayıcıdan root kabuğu açan servis dünyaya açık. Meşru bir "
-           "HestiaCP servisidir ama saldırı yüzeyi büyüktür.",
-           "Kullanmıyorsanız kapatın: v-change-sys-config-value "
-           "WEB_TERMINAL 'false' — ya da güvenlik duvarında yalnızca kendi "
-           "IP'nize açın.", None),
+    21: ("Plain FTP",
+         "FTP sends passwords unencrypted; anyone on the network can read them.",
+         "Disable FTP if clients can use SFTP.", "ftp-kapat"),
+    8085: ("Web Terminal",
+           "A service that opens a root shell from the browser is exposed to the "
+           "world. It is a legitimate HestiaCP service but has a large attack surface.",
+           "If unused, disable: v-change-sys-config-value "
+           "WEB_TERMINAL 'false' — or open it in the firewall only to your own IP.",
+           None),
 }
 
 
@@ -403,25 +420,25 @@ def port_kontrolu():
     ck = []
     fw, araliklar = guvenlik_duvari_portlari()
     if fw is None:
-        return [kontrol("port", "Açık portlar", "bilinmiyor",
-                        "güvenlik duvarı listesi okunamadı")]
+        return [kontrol("port", N_("Open ports"), "bilinmiyor",
+                        N_("firewall list could not be read"))]
 
     for p, (ad, note, cozum, islem) in DIKKAT_PORT.items():
         if p in fw:
-            ck.append(kontrol("port_%d" % p, "%s (port %d)" % (ad, p),
-                              "warn", "dışarıya açık", note, cozum, islem))
+            ck.append(kontrol("port_%d" % p, N_("%s (port %d)") % (_(ad), p),
+                              "warn", N_("open externally"), _(note), _(cozum), islem))
 
     hepsi = sorted(fw) + ["%d-%d" % a for a in sorted(araliklar)]
     beklenmeyen = sorted(fw - BEKLENEN_PORT - set(DIKKAT_PORT))
     if beklenmeyen:
         ck.append(kontrol(
-            "port", "Beklenmeyen açık port", "warn",
+            "port", N_("Unexpected open port"), "warn",
             ", ".join(str(x) for x in beklenmeyen),
-            "Güvenlik duvarı bu portları dışarıya açıyor.",
-            "Gerekli değilse Panel > Güvenlik Duvarı'ndan kapatın.",
+            N_("The firewall is exposing these ports externally."),
+            N_("Close them in Panel > Firewall if not needed."),
         ))
     else:
-        ck.append(kontrol("port", "Açık portlar", "ok",
+        ck.append(kontrol("port", N_("Open ports"), "ok",
                           ", ".join(str(x) for x in hepsi)))
     return ck
 
@@ -433,11 +450,13 @@ def dosya_kontrolu():
     dosyalar = [s for s in out.splitlines() if s.strip()]
     if dosyalar:
         return [kontrol(
-            "dosya_izin", "Dünyaya yazılabilir dosya", "fail", "%d dosya" % len(dosyalar),
-            "Bu dosyaları sunucudaki herhangi bir kullanıcı değiştirebilir.",
-            "İzinleri düzeltin: chmod o-w <dosya>",
+            "dosya_izin", N_("World-writable files"), "fail",
+            ngettext("%d file", "%d files", len(dosyalar)) % len(dosyalar),
+            N_("Any local user on the server can modify these files."),
+            N_("Fix permissions: chmod o-w <file>"),
         )]
-    return [kontrol("dosya_izin", "Dosya izinleri", "ok", "dünyaya yazılabilir dosya yok")]
+    return [kontrol("dosya_izin", N_("File permissions"), "ok",
+                    N_("no world-writable files"))]
 
 
 # ------------------------------------------------------------- toplama
@@ -495,11 +514,11 @@ def sshd_yaz(satirlar, kuru=False):
         else:
             with open(SSHD_WD, "w", encoding="utf-8") as fh:
                 fh.write(eski)
-        return False, "sshd dogrulamasi basarisiz: " + err.strip()[:200]
+        return False, N_("sshd validation failed: ") + err.strip()[:200]
 
     kabuk(["systemctl", "reload", "ssh"])
     kabuk(["systemctl", "reload", "sshd"])
-    return True, "uygulandi"
+    return True, N_("applied")
 
 
 def mevcut_sshd_parca():
@@ -526,10 +545,10 @@ def uygula(islem, kuru=False):
         anahtarlar = ssh_anahtarlari(yalniz_girisebilen=True)
         if not anahtarlar:
             return hata_yaz(
-                "Giris yapabilen hicbir hesapta SSH anahtari yok (anahtar var "
-                "ama kabugu nologin olan hesaplar sayilmaz). Parola girisi "
-                "kapatilirsa erisimi TAMAMEN kaybedersiniz. Once calisan bir "
-                "anahtar ekleyin ve baglanabildiginizi dogrulayin.")
+                N_("No login-capable account has an SSH key (keys on nologin "
+                  "shells do not count). Disabling password login would lock "
+                  "you out completely. Add a working key first and verify "
+                  "you can connect."))
         ok, mesaj = sshd_yaz(parca_guncelle("PasswordAuthentication", "no"), kuru)
         return sonuc_yaz(ok, mesaj, {"anahtarlar": anahtarlar})
 
@@ -540,21 +559,21 @@ def uygula(islem, kuru=False):
                    if k != "root" and sudo_yetkili(k)}
         if not adaylar:
             return hata_yaz(
-                "root disinda; SSH anahtari olan, kabugu gecerli VE sudo "
-                "yetkili bir hesap yok. root girisi kapatilirsa sunucuyu "
-                "yonetemezsiniz. Once boyle bir kullanici acin ve onunla "
-                "baglanabildiginizi dogrulayin.")
+                N_("No non-root account has an SSH key, a valid shell, AND sudo. "
+                  "Disabling root login would leave the server unmanageable. "
+                  "Create such a user first and verify you can connect with it."))
         ok, mesaj = sshd_yaz(parca_guncelle("PermitRootLogin", "no"), kuru)
         return sonuc_yaz(ok, mesaj, {"adaylar": adaylar})
 
     if islem == "ftp-kapat":
         if kuru:
-            return sonuc_yaz(True, "kuru: vsftpd durdurulup devre disi birakilacak")
+            return sonuc_yaz(True, N_("dry-run: vsftpd will be stopped and disabled"))
         kabuk(["systemctl", "stop", "vsftpd"])
         kabuk(["systemctl", "disable", "vsftpd"])
         kabuk([HESTIA + "/bin/v-delete-firewall-rule", "1"]) if False else None
         rc, out, _ = kabuk(["systemctl", "is-active", "vsftpd"])
-        return sonuc_yaz(out.strip() != "active", "vsftpd durumu: " + out.strip())
+        return sonuc_yaz(out.strip() != "active",
+                         N_("vsftpd status: ") + out.strip())
 
     if islem == "eol-php-kaldir":
         kurulu = sorted(os.listdir("/etc/php")) if os.path.isdir("/etc/php") else []
@@ -569,14 +588,14 @@ def uygula(islem, kuru=False):
             if out.strip() in ("", "0"):
                 hedef.append(v)
         if not hedef:
-            return hata_yaz("Kaldirilabilecek kullanilmayan EOL PHP surumu yok.")
+            return hata_yaz(N_("No unused EOL PHP versions that can be removed."))
         if kuru:
-            return sonuc_yaz(True, "kuru: kaldirilacak -> " + ", ".join(hedef))
+            return sonuc_yaz(True, N_("dry-run: will remove -> ") + ", ".join(hedef))
         for v in hedef:
             kabuk([HESTIA + "/bin/v-delete-web-php", v], timeout=300)
-        return sonuc_yaz(True, "kaldirildi: " + ", ".join(hedef))
+        return sonuc_yaz(True, N_("removed: ") + ", ".join(hedef))
 
-    return hata_yaz("Bilinmeyen islem: " + islem)
+    return hata_yaz(N_("Unknown action: ") + islem)
 
 
 def hata_yaz(mesaj):
@@ -603,7 +622,7 @@ def main():
 
     if mod == "uygula":
         if len(sys.argv) < 3:
-            return hata_yaz("Islem belirtilmedi.")
+            return hata_yaz(N_("Action not specified."))
         r = uygula(sys.argv[2], "--kuru" in sys.argv)
         if "--kuru" not in sys.argv:
             yaz(topla())
@@ -621,13 +640,13 @@ def main():
 
     if mod == "plain":
         o = d["ozet"]
-        print("guvenlik: %d hata, %d uyari, %d sorunsuz"
+        print(N_("security: %d errors, %d warnings, %d ok")
               % (o.get("fail", 0), o.get("warn", 0), o.get("ok", 0)))
         for c in d["kontroller"]:
             if c["durum"] in ("fail", "warn"):
                 print("  [%-4s] %-26s %s" % (c["durum"], c["label"], c["deger"]))
         for s in d.get("saldirganlar", [])[:5]:
-            print("  saldirgan: %-16s %d deneme" % (s["ip"], s["deneme"]))
+            print(N_("  attacker: %-16s %d attempts") % (s["ip"], s["deneme"]))
         return 0
 
     print(json.dumps(d, ensure_ascii=False))

@@ -38,6 +38,15 @@ import subprocess
 import sys
 import time
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 KAYIT = HESTIA + "/wd/cache/klon.json"
 WP = "/usr/local/bin/wp"
@@ -56,7 +65,7 @@ def kabuk(cmd, timeout=600, stdin=None):
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, input=stdin)
         return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
     except subprocess.TimeoutExpired:
-        return 124, "", "zaman aşımı"
+        return 124, "", _("timed out")
     except Exception as e:
         return 1, "", str(e)
 
@@ -128,9 +137,9 @@ def db_kopyala(kaynak_db, hedef_db):
         p1.wait(timeout=60)
         e1 = p1.stderr.read().decode("utf-8", "replace") if p1.stderr else ""
         if p1.returncode != 0:
-            return False, (e1 or "mysqldump başarısız")[-300:]
+            return False, (e1 or _("mysqldump failed"))[-300:]
         if p2.returncode != 0:
-            return False, (e2.decode("utf-8", "replace") or "mysql içe aktarma başarısız")[-300:]
+            return False, (e2.decode("utf-8", "replace") or _("mysql import failed"))[-300:]
         return True, ""
     except Exception as e:
         return False, str(e)[:300]
@@ -174,7 +183,7 @@ def wp_config_yaz(docroot, db_ad, db_user, db_sifre):
 
 def wp_calistir(user, docroot, args, timeout=900):
     if not os.path.isfile(WP):
-        return 1, "", "wp-cli yok"
+        return 1, "", _("wp-cli missing")
     home = ev_dizini(user) or "/tmp"
     return kabuk(["sudo", "-u", user, "-H", "env", "HOME=" + home, "WP_CLI_CACHE_DIR=/tmp/wd-wpcli-" + user,
                   WP, "--path=" + docroot, "--no-color", "--skip-plugins", "--skip-themes"] + args, timeout)
@@ -193,7 +202,7 @@ def db_olustur(user, onek):
     sifre = secrets.token_urlsafe(18).replace("-", "a").replace("_", "b")[:20]
     rc, out, err = hestia(["v-add-database", user, sonek, sonek, sifre, "mysql", "localhost", "utf8mb4"])
     if rc != 0:
-        return None, (err or out or "v-add-database başarısız")
+        return None, (err or out or _("v-add-database failed"))
     return {"ad": "%s_%s" % (user, sonek), "kullanici": "%s_%s" % (user, sonek), "sifre": sifre, "sonek": sonek}, None
 
 
@@ -235,23 +244,23 @@ def liste(user):
 def olustur(user, kaynak, hedef, secenek):
     doms = hestia_json(["v-list-web-domains", user, "json"])
     if kaynak not in doms:
-        return hata("Kaynak alan adı bu hesaba ait değil.")
+        return hata(_("Source domain does not belong to this account."))
     if hedef == kaynak or hedef in doms:
-        return hata("Hedef alan adı zaten var.")
+        return hata(_("Target domain already exists."))
     home = ev_dizini(user)
     if not home:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
     kaynak_root = os.path.join(home, "web", kaynak, "public_html")
     if not os.path.isdir(kaynak_root):
-        return hata("Kaynak belge kökü yok.")
+        return hata(_("Source document root does not exist."))
     d = kayit_oku()
     if any(k.get("hedef") == hedef for k in d.get("klonlar", [])):
-        return hata("Bu hedef için zaten kayıt var.")
+        return hata(_("A record already exists for this target."))
 
     # 1) alan adı
     rc, out, err = hestia(["v-add-web-domain", user, hedef])
     if rc != 0:
-        return hata("Alan adı açılamadı: " + (err or out or "kod %d" % rc)[-200:])
+        return hata(_("Could not create domain: %s") % (err or out or _("code %d") % rc)[-200:])
     kaynak_bilgi = doms[kaynak]
     for komut, anahtar in (("v-change-web-domain-backend-tpl", "BACKEND"), ("v-change-web-domain-proxy-tpl", "PROXY"), ("v-change-web-domain-tpl", "TPL")):
         deger = str(kaynak_bilgi.get(anahtar, "")).strip()
@@ -272,7 +281,7 @@ def olustur(user, kaynak, hedef, secenek):
     rc, out, err = kabuk(["rsync", "-a", "--delete", "--exclude=.well-known", kaynak_root + "/", hedef_root + "/"], 3600)
     if rc != 0:
         hestia(["v-delete-web-domain", user, hedef])
-        return hata("Dosyalar kopyalanamadı: " + (err or out)[-200:])
+        return hata(_("Could not copy files: %s") % (err or out)[-200:])
     chown_agac(hedef_root, user)
 
     # 3) veritabanı
@@ -287,29 +296,29 @@ def olustur(user, kaynak, hedef, secenek):
     elif db_istek and db_istek != "auto":
         if not DB_DESENI.match(db_istek):
             hestia(["v-delete-web-domain", user, hedef])
-            return hata("Veritabanı adı geçersiz.")
+            return hata(_("Invalid database name."))
         dbler = hestia_json(["v-list-databases", user, "json"])
         if db_istek not in dbler:
             hestia(["v-delete-web-domain", user, hedef])
-            return hata("Bu veritabanı hesabınıza ait değil: " + db_istek)
+            return hata(_("This database does not belong to your account: %s") % db_istek)
         kaynak_db = db_istek
         kayit["wp"] = bool(wpc)
     if kaynak_db:
         yeni, h = db_olustur(user, "stg")
         if yeni is None:
             hestia(["v-delete-web-domain", user, hedef])
-            return hata("Staging veritabanı açılamadı: " + h)
+            return hata(_("Could not create staging database: %s") % h)
         ok, h = db_kopyala(kaynak_db, yeni["ad"])
         if not ok:
             hestia(["v-delete-database", user, yeni["ad"]])
             hestia(["v-delete-web-domain", user, hedef])
-            return hata("Veritabanı kopyalanamadı: " + h)
+            return hata(_("Could not copy database: %s") % h)
         kayit.update({"db_kaynak": kaynak_db, "db_hedef": yeni["ad"], "db_kullanici": yeni["kullanici"], "db_sifre": yeni["sifre"]})
         if wpc and wpc.get("DB_NAME") == kaynak_db:
             try:
                 wp_config_yaz(hedef_root, yeni["ad"], yeni["kullanici"], yeni["sifre"])
             except Exception as e:
-                return hata("wp-config.php güncellenemedi: %s" % e)
+                return hata(_("Could not update wp-config.php: %s") % e)
             chown_agac(hedef_root, user)
             adres_degistir(user, hedef_root, kaynak, hedef)
 
@@ -329,35 +338,35 @@ def yayinla(user, hedef):
     d = kayit_oku()
     kayit = next((k for k in d.get("klonlar", []) if k.get("user") == user and k.get("hedef") == hedef), None)
     if not kayit:
-        return hata("Bu hedef için klon kaydı yok.")
+        return hata(_("No clone record for this target."))
     kaynak = kayit["kaynak"]
     home = ev_dizini(user)
     kaynak_root = os.path.join(home, "web", kaynak, "public_html")
     hedef_root = os.path.join(home, "web", hedef, "public_html")
     if not os.path.isdir(kaynak_root) or not os.path.isdir(hedef_root):
-        return hata("Belge kökü bulunamadı.")
+        return hata(_("Document root not found."))
     ts = time.strftime("%Y%m%d-%H%M%S")
     yedek_dizin = os.path.join(home, "web", kaynak, "private")
     os.makedirs(yedek_dizin, exist_ok=True)
     yedek_tar = os.path.join(yedek_dizin, "wd-klon-yedek-%s.tar.gz" % ts)
     rc, out, err = kabuk(["tar", "-czf", yedek_tar, "-C", os.path.dirname(kaynak_root), "public_html"], 3600)
     if rc != 0:
-        return hata("Canlı site yedeklenemedi: " + (err or out)[-200:])
+        return hata(_("Could not back up live site: %s") % (err or out)[-200:])
     if kayit.get("db_kaynak"):
         if not db_dosyaya(kayit["db_kaynak"], os.path.join(yedek_dizin, "wd-klon-yedek-%s.sql" % ts)):
-            return hata("Canlı veritabanı yedeklenemedi; yayına alma durduruldu.")
+            return hata(_("Could not back up live database; publish aborted."))
     chown_agac(yedek_dizin, user)
 
     rc, out, err = kabuk(["rsync", "-a", "--delete", "--exclude=.well-known", "--exclude=wp-config.php",
                           "--exclude=.user.ini", "--exclude=.wd-kur.json", hedef_root + "/", kaynak_root + "/"], 3600)
     if rc != 0:
-        return hata("Dosyalar aktarılamadı: " + (err or out)[-200:] + " — yedek: " + yedek_tar)
+        return hata(_("Could not transfer files: %s — backup: %s") % ((err or out)[-200:], yedek_tar))
     chown_agac(kaynak_root, user)
 
     if kayit.get("db_kaynak") and kayit.get("db_hedef"):
         ok, h = db_kopyala(kayit["db_hedef"], kayit["db_kaynak"])
         if not ok:
-            return hata("Veritabanı aktarılamadı: " + h + " — yedek: " + yedek_dizin)
+            return hata(_("Could not transfer database: %s — backup: %s") % (h, yedek_dizin))
         if kayit.get("wp"):
             adres_degistir(user, kaynak_root, hedef, kaynak)
     kayit["son_yayin"] = int(time.time())
@@ -370,12 +379,12 @@ def sil(user, hedef):
     d = kayit_oku()
     kayit = next((k for k in d.get("klonlar", []) if k.get("user") == user and k.get("hedef") == hedef), None)
     if not kayit:
-        return hata("Bu hedef için klon kaydı yok.")
+        return hata(_("No clone record for this target."))
     if kayit.get("db_hedef"):
         hestia(["v-delete-database", user, kayit["db_hedef"]])
     rc, out, err = hestia(["v-delete-web-domain", user, hedef])
     if rc != 0 and "doesn't exist" not in (out + err).lower():
-        return hata("Alan adı silinemedi: " + (err or out)[-200:])
+        return hata(_("Could not delete domain: %s") % (err or out)[-200:])
     kaynak = kayit["kaynak"]
     if hedef.endswith("." + kaynak):
         alt = hedef[: -len(kaynak) - 1]
@@ -395,15 +404,15 @@ def main():
         return 2
     mod, user = sys.argv[1], sys.argv[2]
     if not KULLANICI_DESENI.match(user):
-        return hata("Geçersiz kullanıcı.")
+        return hata(_("Invalid user."))
     if mod == "liste":
         return liste(user)
     if mod == "olustur":
         if len(sys.argv) < 5:
-            return hata("Kullanım: olustur USER KAYNAK HEDEF")
+            return hata(_("Usage: olustur USER SOURCE TARGET"))
         kaynak, hedef = sys.argv[3].lower(), sys.argv[4].lower()
         if not AD_DESENI.match(kaynak) or not AD_DESENI.match(hedef):
-            return hata("Geçersiz alan adı.")
+            return hata(_("Invalid domain."))
         try:
             secenek = json.loads(sys.stdin.read() or "{}")
         except ValueError:
@@ -411,10 +420,10 @@ def main():
         return olustur(user, kaynak, hedef, secenek)
     if mod in ("yayinla", "sil"):
         if len(sys.argv) < 4:
-            return hata("Kullanım: %s USER HEDEF" % mod)
+            return hata(_("Usage: %s USER TARGET") % mod)
         hedef = sys.argv[3].lower()
         if not AD_DESENI.match(hedef):
-            return hata("Geçersiz alan adı.")
+            return hata(_("Invalid domain."))
         return yayinla(user, hedef) if mod == "yayinla" else sil(user, hedef)
     sys.stderr.write(__doc__)
     return 2

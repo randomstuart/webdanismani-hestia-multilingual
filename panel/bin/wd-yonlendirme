@@ -42,6 +42,15 @@ import shutil
 import subprocess
 import sys
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 
 # Güvenlik başlıkları: adı -> (başlık, değer)
@@ -169,9 +178,9 @@ def kurallari_dogrula(k):
         kaynak = str(r.get("kaynak", "")).strip()
         hedef = str(r.get("hedef", "")).strip()
         if not YOL_DESENI.match(kaynak):
-            return None, "Geçersiz kaynak yol: %s" % kaynak[:60]
+            return None, _("Invalid source path: %s") % kaynak[:60]
         if not HEDEF_DESENI.match(hedef):
-            return None, "Geçersiz hedef: %s" % hedef[:60]
+            return None, _("Invalid destination: %s") % hedef[:60]
         temiz["yollar"].append({
             "kaynak": kaynak, "hedef": hedef,
             "kod": 302 if str(r.get("kod")) == "302" else 301,
@@ -185,14 +194,14 @@ def kurallari_dogrula(k):
     for ip in (k.get("engelli_ip") or [])[:200]:
         ip = str(ip).strip()
         if not IP_DESENI.match(ip):
-            return None, "Geçersiz IP: %s" % ip[:40]
+            return None, _("Invalid IP: %s") % ip[:40]
         temiz["engelli_ip"].append(ip)
 
     temiz["hotlink"] = bool(k.get("hotlink"))
     for d in (k.get("hotlink_izinli") or [])[:30]:
         d = str(d).strip()
         if not AD_DESENI.match(d):
-            return None, "Geçersiz hotlink alan adı: %s" % d[:60]
+            return None, _("Invalid hotlink domain: %s") % d[:60]
         temiz["hotlink_izinli"].append(d)
 
     return temiz, None
@@ -218,7 +227,7 @@ def oku(user, domain):
 def yaz(user, domain, kurallar_ham):
     conf, jyol = yollar(user, domain)
     if not conf:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
 
     temiz, h = kurallari_dogrula(kurallar_ham)
     if temiz is None:
@@ -243,7 +252,7 @@ def yaz(user, domain, kurallar_ham):
         else:
             os.unlink(conf)
         nginx_dogrula()
-        return hata("nginx yapılandırması geçersiz, değişiklik geri alındı: "
+        return hata(_("nginx configuration invalid, change rolled back: ")
                     + cikti.splitlines()[-1][:200])
 
     if os.path.isfile(yedek):
@@ -263,7 +272,7 @@ def yaz(user, domain, kurallar_ham):
 def sil(user, domain):
     conf, jyol = yollar(user, domain)
     if not conf:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
     for y in (conf, jyol):
         if y and os.path.isfile(y):
             os.unlink(y)
@@ -282,9 +291,9 @@ def main():
     mod, user, domain = sys.argv[1], sys.argv[2], sys.argv[3]
 
     if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
-        return hata("Geçersiz kullanıcı ya da alan adı.")
+        return hata(_("Invalid user or domain."))
     if not domain_gecerli(user, domain):
-        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+        return hata(_("This domain does not belong to user '%s'.") % user)
 
     if mod == "oku":
         return oku(user, domain)
@@ -294,7 +303,7 @@ def main():
         try:
             gelen = json.loads(sys.stdin.read() or "{}")
         except ValueError:
-            return hata("Kural JSON'u çözülemedi.")
+            return hata(_("Could not parse rule JSON."))
         if mod == "onizle":
             temiz, h = kurallari_dogrula(gelen)
             if temiz is None:

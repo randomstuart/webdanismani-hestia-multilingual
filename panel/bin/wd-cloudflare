@@ -47,6 +47,15 @@ import time
 import urllib.error
 import urllib.request
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 AYAR = HESTIA + "/wd/cloudflare.json"
 CACHE = HESTIA + "/wd/cache/cloudflare.json"
@@ -99,7 +108,7 @@ def cf(yol, yontem="GET", govde=None, timeout=25):
     """Cloudflare API çağrısı. (ok, veri veya hata metni)"""
     t = jeton()
     if not t:
-        return False, "Cloudflare jetonu tanımlı değil."
+        return False, _("Cloudflare token is not configured.")
     url = CF_API + yol
     veri = json.dumps(govde).encode("utf-8") if govde is not None else None
     req = urllib.request.Request(url, data=veri, method=yontem)
@@ -120,7 +129,7 @@ def cf(yol, yontem="GET", govde=None, timeout=25):
 
     if not d.get("success"):
         hatalar = "; ".join(x.get("message", "") for x in d.get("errors", []))
-        return False, hatalar or "bilinmeyen API hatası"
+        return False, hatalar or _("unknown API error")
     return True, d.get("result")
 
 
@@ -136,7 +145,7 @@ def ip_guncelle(sessiz=False):
         v4 = [s.strip() for s in http_get(CF_V4).splitlines() if s.strip()]
         v6 = [s.strip() for s in http_get(CF_V6).splitlines() if s.strip()]
     except Exception as e:
-        sys.stderr.write("Cloudflare IP listesi alinamadi: %s\n" % e)
+        sys.stderr.write(_("Could not fetch Cloudflare IP list: %s\n") % e)
         return 1
 
     cidr = re.compile(r"^[0-9a-fA-F:.]+/\d{1,3}$")
@@ -145,7 +154,7 @@ def ip_guncelle(sessiz=False):
 
     if len(v4) < 5 or len(v6) < 2:
         sys.stderr.write(
-            "Liste beklenenden kisa (v4=%d v6=%d); dosya DEGISTIRILMEDI.\n"
+            _("List shorter than expected (v4=%d v6=%d); file NOT changed.\n")
             % (len(v4), len(v6)))
         return 1
 
@@ -178,7 +187,7 @@ def ip_guncelle(sessiz=False):
         # Geri al: bozuk bir include nginx'i komple durdurur.
         with open(NGINX_INC, "w", encoding="utf-8") as fh:
             fh.write(eski)
-        sys.stderr.write("nginx dogrulamasi basarisiz, geri alindi:\n%s\n" % err)
+        sys.stderr.write(_("nginx validation failed, rolled back:\n%s\n") % err)
         return 1
 
     # --- Apache (nginx'in arkasinda; gercek IP'yi ondan devralir) ---
@@ -195,7 +204,7 @@ def ip_guncelle(sessiz=False):
         rc2, _, err2 = kabuk(["apache2ctl", "-t"])
         if rc2 != 0:
             kabuk(["a2disconf", "wd-cloudflare"])
-            sys.stderr.write("apache dogrulamasi basarisiz, devre disi:\n%s\n" % err2)
+            sys.stderr.write(_("apache validation failed, disabled:\n%s\n") % err2)
         else:
             kabuk(["systemctl", "reload", "apache2"])
 
@@ -212,7 +221,7 @@ def jeton_kaydet():
     """Jetonu STDIN'den okur (argv'de gecerse `ps` ciktisinda gorunurdu)."""
     t = sys.stdin.read().strip()
     if not t or len(t) < 20:
-        sys.stderr.write("Gecersiz jeton.\n")
+        sys.stderr.write(_("Invalid token.\n"))
         return 1
 
     d = ayar_oku()
@@ -271,7 +280,7 @@ def zon_bul(domain):
         for z in liste:
             if z["ad"] == ust:
                 return z, None
-    return None, "Cloudflare hesabinda '%s' icin bolge bulunamadi." % domain
+    return None, _("No zone found for '%s' in the Cloudflare account.") % domain
 
 
 def onbellek_temizle(domain):
@@ -318,13 +327,13 @@ def dns_gonder(user, domain, kuru=False):
 
     rc, out, _ = kabuk([HESTIA + "/bin/v-list-dns-records", user, domain, "json"])
     if rc != 0:
-        print(json.dumps({"ok": False, "hata": "Hestia bolgesi okunamadi"},
+        print(json.dumps({"ok": False, "hata": _("Could not read Hestia zone")},
                          ensure_ascii=False))
         return 1
     try:
         yerel = json.loads(out)
     except ValueError:
-        print(json.dumps({"ok": False, "hata": "Bolge JSON'u cozulemedi"},
+        print(json.dumps({"ok": False, "hata": _("Could not parse zone JSON")},
                          ensure_ascii=False))
         return 1
 
@@ -360,7 +369,7 @@ def dns_gonder(user, domain, kuru=False):
                 atlandi += 1
                 continue
             if kuru:
-                print("  [guncellenecek] %-6s %-32s %s -> %s"
+                print(_("  [will update] %-6s %-32s %s -> %s")
                       % (tur, tam, u.get("content"), deger))
                 guncellendi += 1
                 continue
@@ -371,7 +380,7 @@ def dns_gonder(user, domain, kuru=False):
                 hatalar.append("%s %s: %s" % (tur, tam, s))
         else:
             if kuru:
-                print("  [eklenecek]     %-6s %-32s %s" % (tur, tam, deger))
+                print(_("  [will add]     %-6s %-32s %s") % (tur, tam, deger))
                 eklendi += 1
                 continue
             o, s = cf("/zones/%s/dns_records" % z["id"], "POST", govde)
@@ -464,16 +473,16 @@ def main():
         bilgi = durum_topla()
         onbellege_yaz(bilgi)
         if mod == "durum":
-            print("  Jeton        : %s" % ("var" if bilgi["jeton_var"] else "yok"))
-            print("  Gercek IP    : %s (v4 %d, v6 %d)"
-                  % ("etkin" if bilgi["gercek_ip_aktif"] else "PASIF",
+            print(_("  Token        : %s") % (_("yes") if bilgi["jeton_var"] else _("no")))
+            print(_("  Real IP      : %s (v4 %d, v6 %d)")
+                  % (_("active") if bilgi["gercek_ip_aktif"] else _("INACTIVE"),
                      bilgi["ip_v4"], bilgi["ip_v6"]))
-            print("  IP guncelleme: %s" % (bilgi["ip_guncelleme"] or "-"))
+            print(_("  IP updated   : %s") % (bilgi["ip_guncelleme"] or "-"))
             if bilgi["hata"]:
-                print("  API hatasi   : %s" % bilgi["hata"])
+                print(_("  API error    : %s") % bilgi["hata"])
             for z in bilgi["zonlar"]:
-                print("  bolge: %-28s %s %s" % (z["ad"], z["durum"],
-                                                "(duraklatildi)" if z["duraklatildi"] else ""))
+                print(_("  zone: %-28s %s %s") % (z["ad"], z["durum"],
+                                                _("(paused)") if z["duraklatildi"] else ""))
         else:
             print(json.dumps(bilgi, ensure_ascii=False))
         return 0

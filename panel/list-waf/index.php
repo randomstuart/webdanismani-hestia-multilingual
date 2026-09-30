@@ -1,7 +1,7 @@
 <?php
 /**
- * WebDanışmanı — "Uygulama Güvenlik Duvarı" sayfası
- * Kurulum yeri: /usr/local/hestia/web/list/waf/index.php
+ * WebDanışmanı — "Application Firewall" page
+ * Installs to: /usr/local/hestia/web/list/waf/index.php
  */
 
 ob_start();
@@ -23,7 +23,7 @@ $wd_domain = wd_modul_domain_sec($wd_doms, $wd_ham_domain);
 if (!empty($_POST["ok"])) {
 	verify_csrf($_POST);
 	if ($wd_ham_domain === "" || !isset($wd_doms[$wd_ham_domain])) {
-		$wd_hata = "Geçersiz alan adı.";
+		$wd_hata = wd__("Invalid domain.");
 	} else {
 		$wd_domain = $wd_ham_domain;
 		$islem = (string) ($_POST["islem"] ?? "kaydet");
@@ -33,7 +33,7 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/waf/?domain=" . urlencode($wd_domain) . "&durum=silindi");
 				exit();
 			}
-			$wd_hata = "Kaldırılamadı: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not remove: %s"), $d["hata"] ?? "");
 		} else {
 			$ipler = array_values(array_filter(array_map("trim", preg_split('/[\s,]+/', (string) ($_POST["v_izinli_ip"] ?? "")) ?: []), "strlen"));
 			$kurallar = [
@@ -52,16 +52,16 @@ if (!empty($_POST["ok"])) {
 				header("Location: /list/waf/?domain=" . urlencode($wd_domain) . "&durum=" . (!empty($d["etkin"]) ? "kaydedildi" : "kapatildi"));
 				exit();
 			}
-			$wd_hata = "Kaydedilemedi: " . ($d["hata"] ?? "");
+			$wd_hata = sprintf(wd__("Could not save: %s"), $d["hata"] ?? "");
 		}
 	}
 }
 
 if ($wd_hata === "") {
 	$wd_bilgi = wd_modul_durum_mesaji([
-		"kaydedildi" => "Güvenlik duvarı kuralları kaydedildi ve yayına alındı.",
-		"kapatildi" => "Güvenlik duvarı bu alan adı için kapatıldı (kurallar saklandı).",
-		"silindi" => "Tüm WAF kuralları kaldırıldı.",
+		"kaydedildi" => wd__("Firewall rules saved and published."),
+		"kapatildi" => wd__("Firewall disabled for this domain (rules kept)."),
+		"silindi" => wd__("All WAF rules removed."),
 	]);
 }
 
@@ -70,7 +70,7 @@ $wd_ist = null;
 if ($wd_domain !== "") {
 	$wd_waf = wd_modul_json("wd-waf", ["oku", $wd_user, $wd_domain]);
 	if (empty($wd_waf["ok"])) {
-		$wd_hata = $wd_hata !== "" ? $wd_hata : ("Kurallar okunamadı: " . ($wd_waf["hata"] ?? ""));
+		$wd_hata = $wd_hata !== "" ? $wd_hata : sprintf(wd__("Could not read rules: %s"), $wd_waf["hata"] ?? "");
 		$wd_waf = null;
 	} else {
 		$wd_ist = wd_modul_json("wd-waf", ["istatistik", $wd_user, $wd_domain], null, 60);

@@ -38,6 +38,16 @@ import subprocess
 import sys
 import time
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+N_ = lambda s: s  # mark for .po extract; translate in PHP (cached JSON)
+
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache/tarama.json"
 
@@ -47,40 +57,40 @@ SURE_SINIRI = 600                     # saniye
 
 TARANAN_UZANTI = (".php", ".phtml", ".php5", ".php7", ".inc", ".phar")
 
-# (ad, puan, açıklama, derlenmiş desen)
+# (ad, puan, açıklama, derlenmiş desen) — açıklama runtime'da çevrilir
 KALIPLAR = [
     ("eval_gizli", 45,
-     "Gizlenmiş veriyi doğrudan çalıştırıyor (klasik webshell imzası)",
+     N_("Runs obfuscated data directly (classic webshell signature)"),
      re.compile(rb"eval\s*\(\s*(base64_decode|gzinflate|str_rot13|gzuncompress|rawurldecode)", re.I)),
     ("preg_e", 40,
-     "preg_replace /e değiştiricisi — kod çalıştırır, PHP 7'de kaldırıldı",
+     N_("preg_replace /e modifier — executes code; removed in PHP 7"),
      re.compile(rb"preg_replace\s*\(\s*['\"].*/[imsxu]*e[imsxu]*['\"]", re.I)),
     # Bu iki kalıp TEK BAŞINA eşiği geçmelidir: istekten gelen veriyi doğrudan
     # çalıştırmanın meşru bir kullanımı yoktur. (Ölçüldü: 30 puanla
     # `system($_GET["cmd"])` eşiğin altında kalıp kaçıyordu.)
     ("dinamik_cagri", 45,
-     "İstekten gelen adı fonksiyon olarak çağırıyor",
+     N_("Calls a name from the request as a function"),
      re.compile(rb"\$_(GET|POST|REQUEST|COOKIE)\s*\[[^\]]*\]\s*\(", re.I)),
     ("sistem_komut", 45,
-     "İstekten gelen veriyi sistem komutu olarak çalıştırıyor",
+     N_("Runs request data as a system command"),
      re.compile(rb"(system|exec|shell_exec|passthru|popen|proc_open)\s*\(\s*\$_(GET|POST|REQUEST|COOKIE)", re.I)),
     ("uzun_base64", 20,
-     "Çok uzun base64 bloğu (gizlenmiş kod olabilir)",
+     N_("Very long base64 block (may be obfuscated code)"),
      re.compile(rb"['\"][A-Za-z0-9+/]{300,}={0,2}['\"]")),
     ("karakter_gizleme", 25,
-     "Fonksiyon adı karakter karakter kuruluyor (imza atlatma)",
+     N_("Function name built character by character (signature evasion)"),
      re.compile(rb"(chr\s*\(\s*\d+\s*\)\s*\.\s*){5,}")),
     ("dosya_yaz_calistir", 20,
-     "Dosya yazıp hemen dahil ediyor",
+     N_("Writes a file then immediately includes it"),
      re.compile(rb"(file_put_contents|fwrite)[^;]{0,200};[^;]{0,80}(include|require)", re.I | re.S)),
     ("gizli_iframe", 15,
-     "Görünmez iframe (ziyaretçi yönlendirme / zararlı dağıtım)",
+     N_("Invisible iframe (visitor redirect / malware distribution)"),
      re.compile(rb"<iframe[^>]{0,200}(width\s*=\s*['\"]?0|display\s*:\s*none)", re.I)),
     ("posta_dongusu", 20,
-     "Döngü içinde mail gönderimi (spam betiği)",
+     N_("Sends mail inside a loop (spam script)"),
      re.compile(rb"(for|while|foreach)[^{]{0,120}\{[^}]{0,400}\bmail\s*\(", re.I | re.S)),
     ("shell_adi", 45,
-     "Bilinen webshell adı geçiyor",
+     N_("Known webshell name present"),
      re.compile(rb"(c99shell|r57shell|WSO\s*\d|FilesMan|b374k|IndoXploit|MiniShell)", re.I)),
 ]
 
@@ -133,7 +143,7 @@ def dosya_incele(yol):
     if BILINEN_YOL.search(yol):
         puan = int(puan * 0.5)
         bulgular.append({"kalip": "bilinen_yol", "puan": 0,
-                         "aciklama": "Bilinen uygulama dizini — puan düşürüldü"})
+                         "aciklama": N_("Known application directory — score reduced")})
 
     return puan, bulgular
 
@@ -225,7 +235,7 @@ def main():
 
     if mod == "dosya":
         if len(sys.argv) < 3:
-            print(json.dumps({"ok": False, "hata": "yol verilmedi"}))
+            print(json.dumps({"ok": False, "hata": N_("path not provided")}))
             return 2
         puan, bulgular = dosya_incele(sys.argv[2])
         print(json.dumps({"ok": True, "puan": puan, "esik": ESIK,
@@ -256,10 +266,10 @@ def main():
         yaz(d)
 
     if mod == "plain":
-        print("tarama: %d dosya, %d bulgu (%.1f sn)"
+        print(N_("scan: %d files, %d findings (%.1f s)")
               % (d["sayac"]["taranan"], len(d["bulgular"]), d["sure"]))
         if d.get("eksik"):
-            print("  UYARI: tarama sinira takildi, sonuc eksik olabilir")
+            print(N_("  WARNING: scan hit a limit; results may be incomplete"))
         for b in d["bulgular"][:15]:
             print("  [%-4s] puan %-3d %s" % (b["seviye"], b["puan"], b["kisa"]))
             for x in b["bulgular"][:2]:

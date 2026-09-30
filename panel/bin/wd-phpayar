@@ -40,6 +40,15 @@ import re
 import subprocess
 import sys
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 KAYNAK_CACHE = HESTIA + "/wd/cache/kaynak.json"
 KAYNAK_AYAR = HESTIA + "/wd/kaynak.json"
@@ -220,9 +229,9 @@ def dogrula(gelen, tav):
         v = str(gelen.get(anahtar, varsayilan)).strip().upper()
         mb = mb_cevir(v)
         if mb is None:
-            return None, "%s geçersiz: %s" % (anahtar, v[:20])
+            return None, _("%s is invalid: %s") % (anahtar, v[:20])
         if mb > tavan_mb:
-            notlar.append("%s tavana (%dM) indirildi" % (anahtar, tavan_mb))
+            notlar.append(_("%s reduced to cap (%dM)") % (anahtar, tavan_mb))
             mb = tavan_mb
         if mb < 1:
             mb = 1
@@ -238,7 +247,7 @@ def dogrula(gelen, tav):
     # post >= upload olmalı, yoksa yükleme sessizce başarısız olur
     if mb_cevir(v) < mb_cevir(temiz["upload_max_filesize"]):
         v = temiz["upload_max_filesize"]
-        notlar.append("post_max_size, upload_max_filesize'a eşitlendi")
+        notlar.append(_("post_max_size equalized to upload_max_filesize"))
     temiz["post_max_size"] = v
     v, h = boyut("memory_limit", tav["bellek_mb"], "128M")
     if h:
@@ -249,9 +258,9 @@ def dogrula(gelen, tav):
         try:
             n = int(str(gelen.get(anahtar, varsayilan)).strip())
         except ValueError:
-            return None, "%s sayı olmalı" % anahtar
+            return None, _("%s must be a number") % anahtar
         if n > tavan:
-            notlar.append("%s tavana (%d) indirildi" % (anahtar, tavan))
+            notlar.append(_("%s reduced to cap (%d)") % (anahtar, tavan))
             n = tavan
         if n < en_az:
             n = en_az
@@ -288,7 +297,7 @@ def dogrula(gelen, tav):
 def oku(user, domain, bilgi):
     ini, gunluk, kok = yollar(user, domain)
     if not ini:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
     tav = tavanlar(domain)
     mevcut = ini_oku(ini)
     php = re.search(r"PHP-(\d)_(\d)", str(bilgi.get("BACKEND", "")))
@@ -320,9 +329,9 @@ def oku(user, domain, bilgi):
 def yaz(user, domain, gelen):
     ini, gunluk, kok = yollar(user, domain)
     if not ini:
-        return hata("Kullanıcı ev dizini bulunamadı.")
+        return hata(_("User home directory not found."))
     if not os.path.isdir(os.path.dirname(ini)):
-        return hata("Belge kökü yok: " + os.path.dirname(ini))
+        return hata(_("Document root missing: ") + os.path.dirname(ini))
     tav = tavanlar(domain)
     temiz, h, notlar = dogrula(gelen, tav)
     if temiz is None:
@@ -334,7 +343,7 @@ def yaz(user, domain, gelen):
     try:
         ini_yaz(ini, temiz, user, korunan)
     except Exception as e:
-        return hata("Yazılamadı: %s" % e)
+        return hata(_("Could not write: %s") % e)
     print(json.dumps({"ok": True, "notlar": notlar, "degerler": temiz}, ensure_ascii=False))
     return 0
 
@@ -361,7 +370,7 @@ def gunluk_oku(user, domain, n):
             fh.seek(boyut - oku_boyut)
             veri = fh.read().decode("utf-8", "replace")
     except Exception as e:
-        return hata("Günlük okunamadı: %s" % e)
+        return hata(_("Could not read log: %s") % e)
     satirlar = [s for s in veri.splitlines() if s.strip()][-n:]
     print(json.dumps({"ok": True, "satirlar": satirlar, "boyut": boyut}, ensure_ascii=False))
     return 0
@@ -382,10 +391,10 @@ def main():
         return 2
     mod, user, domain = sys.argv[1], sys.argv[2], sys.argv[3]
     if not KULLANICI_DESENI.match(user) or not AD_DESENI.match(domain):
-        return hata("Geçersiz kullanıcı ya da alan adı.")
+        return hata(_("Invalid user or domain."))
     bilgi = domain_bilgi(user, domain)
     if not bilgi:
-        return hata("Bu alan adı '%s' kullanıcısına ait değil." % user)
+        return hata(_("This domain does not belong to user '%s'.") % user)
 
     if mod == "oku":
         return oku(user, domain, bilgi)
@@ -393,7 +402,7 @@ def main():
         try:
             gelen = json.loads(sys.stdin.read() or "{}")
         except ValueError:
-            return hata("JSON çözülemedi.")
+            return hata(_("Could not parse JSON."))
         return yaz(user, domain, gelen)
     if mod == "sil":
         return sil(user, domain)

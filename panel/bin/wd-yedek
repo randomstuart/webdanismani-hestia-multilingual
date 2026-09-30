@@ -37,6 +37,15 @@ import subprocess
 import sys
 import time
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 CACHE_DIZIN = HESTIA + "/wd/cache/yedek"
 AD_DESENI = re.compile(r"^[a-z0-9.-]{3,253}$", re.I)
@@ -152,10 +161,10 @@ def uye_listesi(user, yedek, domain):
             pass
     dis = yedek_yolu(user, yedek)
     if not dis:
-        return None, "Yedek dosyası bulunamadı (artımlı/uzak modda dosya gezgini desteklenmez)."
+        return None, _("Backup file not found (file browser is not supported in incremental/remote mode).")
     uye = ic_arsiv_uyesi(dis, domain)
     if not uye:
-        return None, "Bu yedekte alan adının dosya arşivi yok."
+        return None, _("This backup has no file archive for the domain.")
     try:
         p1 = subprocess.Popen(["tar", "-xOf", dis, uye], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         p2 = subprocess.Popen(acici(uye), stdin=p1.stdout, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -166,7 +175,7 @@ def uye_listesi(user, yedek, domain):
         p2.wait(timeout=60)
         p1.wait(timeout=60)
     except Exception as e:
-        return None, "Arşiv okunamadı: %s" % e
+        return None, _("Could not read archive: %s") % e
     uyeler = []
     for s in cikti.decode("utf-8", "replace").splitlines():
         # -rw-r--r-- user/group  1234 2026-09-01 10:00 public_html/index.php
@@ -189,7 +198,7 @@ def uye_listesi(user, yedek, domain):
 def icerik(user, yedek, domain, yol):
     yol = yol_temizle(yol)
     if yol is None:
-        return hata("Geçersiz yol.")
+        return hata(_("Invalid path."))
     uyeler, h = uye_listesi(user, yedek, domain)
     if uyeler is None:
         return hata(h)
@@ -231,22 +240,22 @@ def icerik(user, yedek, domain, yol):
 def geri_yukle(user, yedek, domain, yol, yerine):
     yol = yol_temizle(yol)
     if not yol:
-        return hata("Geri yüklenecek dosya ya da klasör yolu gerekli.")
+        return hata(_("Path of the file or folder to restore is required."))
     home = ev_dizini(user)
     if not home or domain not in hestia_json(["v-list-web-domains", user, "json"]):
-        return hata("Alan adı bu hesaba ait değil.")
+        return hata(_("Domain does not belong to this account."))
     dis = yedek_yolu(user, yedek)
     if not dis:
-        return hata("Yedek dosyası bulunamadı.")
+        return hata(_("Backup file not found."))
     uye = ic_arsiv_uyesi(dis, domain)
     if not uye:
-        return hata("Bu yedekte alan adının dosya arşivi yok.")
+        return hata(_("This backup has no file archive for the domain."))
     uyeler, h = uye_listesi(user, yedek, domain)
     if uyeler is None:
         return hata(h)
     hedefler = [u for u in uyeler if u[0] == yol or u[0].startswith(yol + "/")]
     if not hedefler:
-        return hata("Yedekte böyle bir yol yok: " + yol)
+        return hata(_("No such path in the backup: %s") % yol)
     pw = pwd.getpwnam(user)
     ts = time.strftime("%Y%m%d-%H%M%S")
     gecici = os.path.join(home, "web", domain, "private", ".wd-geri-tmp-" + ts)
@@ -262,15 +271,15 @@ def geri_yukle(user, yedek, domain, yol, yerine):
         p1.wait(timeout=60)
         if p3.returncode != 0:
             shutil.rmtree(gecici, ignore_errors=True)
-            return hata("Arşivden çıkarılamadı: " + e3.decode("utf-8", "replace")[-200:])
+            return hata(_("Could not extract from archive: %s") % e3.decode("utf-8", "replace")[-200:])
     except Exception as e:
         shutil.rmtree(gecici, ignore_errors=True)
-        return hata("Geri yükleme hatası: %s" % e)
+        return hata(_("Restore error: %s") % e)
 
     cikan = os.path.join(gecici, yol)
     if not os.path.exists(cikan):
         shutil.rmtree(gecici, ignore_errors=True)
-        return hata("Çıkarılan içerik bulunamadı.")
+        return hata(_("Extracted content not found."))
 
     if yerine:
         canli = os.path.join(home, "web", domain, yol)
@@ -308,7 +317,7 @@ def main():
         return 2
     mod, user = sys.argv[1], sys.argv[2]
     if not KULLANICI_DESENI.match(user):
-        return hata("Geçersiz kullanıcı.")
+        return hata(_("Invalid user."))
     if mod == "liste":
         return liste(user)
     if len(sys.argv) < 5:
@@ -316,12 +325,12 @@ def main():
         return 2
     yedek, domain = sys.argv[3], sys.argv[4]
     if not YEDEK_DESENI.match(yedek) or not AD_DESENI.match(domain):
-        return hata("Geçersiz yedek adı ya da alan adı.")
+        return hata(_("Invalid backup name or domain."))
     if mod == "icerik":
         return icerik(user, yedek, domain, sys.argv[5] if len(sys.argv) > 5 else "")
     if mod == "geri-yukle":
         if len(sys.argv) < 6:
-            return hata("Yol gerekli.")
+            return hata(_("Path required."))
         return geri_yukle(user, yedek, domain, sys.argv[5], "--yerine" in sys.argv[6:])
     sys.stderr.write(__doc__)
     return 2

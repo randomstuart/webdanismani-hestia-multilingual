@@ -34,6 +34,15 @@ import subprocess
 import sys
 import time
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache"
 DURUM = CACHE + "/uyari-durum.json"
@@ -162,7 +171,7 @@ def uyarilari_topla(ayar):
                     "anahtar": "saglik:sunucu:%s" % c.get("id"),
                     "user": yonetici,
                     "seviye": c["durum"],
-                    "baslik": "Sunucu: %s" % c.get("label", ""),
+                    "baslik": _("Server: %s") % c.get("label", ""),
                     "metin": "%s %s %s" % (c.get("deger", ""), c.get("not", ""),
                                            c.get("cozum", "")),
                 })
@@ -185,7 +194,7 @@ def uyarilari_topla(ayar):
                         "anahtar": "yedek:%s:%s" % (y["user"], c.get("id")),
                         "user": y["user"],
                         "seviye": c["durum"],
-                        "baslik": "Yedek: %s" % c.get("label", ""),
+                        "baslik": _("Backup: %s") % c.get("label", ""),
                         "metin": "%s %s %s" % (c.get("deger", ""), c.get("not", ""),
                                                c.get("cozum", "")),
                     })
@@ -199,7 +208,7 @@ def uyarilari_topla(ayar):
                     "anahtar": "guvenlik:%s" % c.get("id"),
                     "user": yonetici,
                     "seviye": c["durum"],
-                    "baslik": "Güvenlik: %s" % c.get("label", ""),
+                    "baslik": _("Security: %s") % c.get("label", ""),
                     "metin": "%s %s %s" % (c.get("deger", ""), c.get("not", ""),
                                            c.get("cozum", "")),
                 })
@@ -216,8 +225,8 @@ def uyarilari_topla(ayar):
                 "anahtar": "tarama:%s" % b.get("yol"),
                 "user": yonetici,
                 "seviye": b["seviye"],
-                "baslik": "Şüpheli dosya: %s" % b.get("kisa", "")[-60:],
-                "metin": "Puan %s. %s Dosyayı inceleyin; silmeden önce yedek alın."
+                "baslik": _("Suspicious file: %s") % b.get("kisa", "")[-60:],
+                "metin": _("Score %s. %s Inspect the file; take a backup before deleting.")
                          % (b.get("puan"),
                             " ".join(x.get("aciklama", "") for x in b.get("bulgular", [])[:2])),
             })
@@ -232,21 +241,20 @@ def uyarilari_topla(ayar):
                 continue
             pct = k.get("toplam", 0) / (kota_mb * 1048576.0) * 100
             if pct >= ayar["disk_kritik"]:
-                seviye, etiket = "fail", "kritik"
+                seviye, anahtar_etiket, etiket = "fail", "critical", _("critical")
             elif pct >= ayar["disk_uyari"]:
-                seviye, etiket = "warn", "yüksek"
+                seviye, anahtar_etiket, etiket = "warn", "high", _("high")
             else:
                 continue
             if seviye not in seviyeler:
                 continue
             uyarilar.append({
-                "anahtar": "disk:%s:%s" % (k["user"], etiket),
+                "anahtar": "disk:%s:%s" % (k["user"], anahtar_etiket),
                 "user": k["user"],
                 "seviye": seviye,
-                "baslik": "Disk kullanımı %s (%%%.0f)" % (etiket, pct),
-                "metin": "Hesap kotasının %%%.0f'ini kullanıyor. "
-                         "Disk Kullanımı sayfasından neyin yer kapladığını "
-                         "görebilirsiniz." % pct,
+                "baslik": _("Disk usage %s (%%%.0f)") % (etiket, pct),
+                "metin": _("Account is using %%%.0f of its quota. "
+                           "You can see what is taking space on the Disk Usage page.") % pct,
             })
 
     return uyarilar
@@ -269,7 +277,7 @@ def calistir(ayar, kuru=False):
             atlanan += 1
             continue
 
-        etiket = "HATA" if u["seviye"] == "fail" else "UYARI"
+        etiket = _("ERROR") if u["seviye"] == "fail" else _("WARNING")
         baslik = "[%s] %s" % (etiket, u["baslik"])
         govde = "<p>%s</p>" % u["metin"].strip()
 
@@ -297,8 +305,8 @@ def calistir(ayar, kuru=False):
             print("  [duzeldi] %-10s %s" % (bilgi.get("user", "?"), k))
             continue
         bildir(bilgi.get("user", ayar.get("yonetici", "admin")),
-               "[DÜZELDİ] " + k.split(":")[-1],
-               "<p>Daha önce bildirilen sorun artık görünmüyor: <code>%s</code></p>" % k,
+               _("[RESOLVED] ") + k.split(":")[-1],
+               _("<p>A previously reported issue is no longer visible: <code>%s</code></p>") % k,
                "success")
 
     if not kuru:
@@ -314,9 +322,9 @@ def calistir(ayar, kuru=False):
 def durum_yaz_rapor():
     d = durum_oku()
     if not d:
-        print("Etkin uyarı yok.")
+        print(_("No active alerts."))
         return 0
-    print("%-52s %-6s %s" % ("ANAHTAR", "SEVIYE", "SON BILDIRIM"))
+    print("%-52s %-6s %s" % (_("KEY"), _("LEVEL"), _("LAST NOTIFIED")))
     for k, v in sorted(d.items()):
         print("%-52s %-6s %s" % (
             k[:52], v.get("seviye", "?"),
@@ -335,7 +343,7 @@ def main():
     if mod == "sifirla":
         if os.path.isfile(DURUM):
             os.unlink(DURUM)
-        print("durum temizlendi")
+        print(_("status cleared"))
         return 0
 
     sys.stderr.write(__doc__)

@@ -32,6 +32,15 @@ import sys
 import time
 from datetime import datetime, timedelta
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 DIZIN = HESTIA + "/wd/cache/gecmis"
 OLCUM = HESTIA + "/wd/bin/wd-site-usage"
@@ -53,7 +62,7 @@ def ornek_al(sample_ms=250):
 def ornekle():
     veri = ornek_al()
     if veri is None:
-        sys.stderr.write("olcum alinamadi\n")
+        sys.stderr.write(_("could not take measurement\n"))
         return 1
 
     siteler = veri.get("sites") or {}
@@ -202,12 +211,12 @@ def main():
     d = ozetle(gun, site)
 
     if mod == "plain":
-        print("gecmis: %d ornek, son %d gun" % (d["ornek"], d["gun"]))
+        print(_("history: %d samples, last %d days") % (d["ornek"], d["gun"]))
         if d["ilk"]:
-            print("  en eski kayit: %s"
+            print(_("  oldest record: %s")
                   % time.strftime("%d.%m.%Y %H:%M", time.localtime(d["ilk"])))
         for s in d["siteler"][:12]:
-            print("  %-32s cpu ort %%%-5.1f tepe %%%-5.1f  bellek tepe %d MB"
+            print(_("  %-32s cpu avg %%%-5.1f peak %%%-5.1f  mem peak %d MB")
                   % (s["site"][:32], s["cpu_ort"], s["cpu_max"],
                      s["mem_max"] // 1024))
         return 0

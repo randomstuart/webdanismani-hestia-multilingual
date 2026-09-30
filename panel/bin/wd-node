@@ -36,6 +36,15 @@ import subprocess
 import sys
 import time
 
+import sys as _wd_sys
+_wd_lib = "/usr/local/hestia/wd/lib"
+if _wd_lib not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_lib)
+_wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
+if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
+    _wd_sys.path.insert(0, _wd_pkg)
+from wd_i18n import _, ngettext  # noqa: E402
+
 HESTIA = "/usr/local/hestia"
 KAYIT = HESTIA + "/wd/cache/node.json"
 TPL_ADI = "wd-node"
@@ -68,7 +77,7 @@ def kabuk(cmd, timeout=120):
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip()
     except subprocess.TimeoutExpired:
-        return 124, "", "zaman aşımı"
+        return 124, "", _("timed out")
     except Exception as e:
         return 1, "", str(e)
 
@@ -164,12 +173,12 @@ def sablon_uret():
     for uzanti in ("tpl", "stpl"):
         kaynak = os.path.join(dizin, "default." + uzanti)
         if not os.path.isfile(kaynak):
-            return hata("Stok şablon yok: " + kaynak)
+            return hata(_("Stock template missing: %s") % kaynak)
         with open(kaynak, encoding="utf-8") as fh:
             metin = fh.read()
         yeni = blok_degistir(metin, "location /", "\t\tinclude %home%/%user%/conf/web/%domain%/nginx.wdnode.conf*;")
         if yeni is None:
-            return hata("Stok şablonda 'location /' bloğu çözümlenemedi: " + kaynak)
+            return hata(_("Could not resolve 'location /' block in stock template: %s") % kaynak)
         yeni = "# WebDanismani Node.js sablonu - stok default." + uzanti + " temel alinarak uretildi. Elle duzenlemeyin.\n" + yeni
         hedef = os.path.join(dizin, TPL_ADI + "." + uzanti)
         with open(hedef, "w", encoding="utf-8") as fh:
@@ -227,33 +236,33 @@ def liste(user):
 def ekle(user, domain, secenek):
     node = node_yolu()
     if not node:
-        return hata("Sunucuda Node.js kurulu değil (yönetici: NodeSource deposundan nodejs kurmalı).")
+        return hata(_("Node.js is not installed on the server (admin: install nodejs from the NodeSource repository)."))
     if not sablon_var():
         rc = sablon_uret()
         if rc != 0:
             return rc
     doms = hestia_json(["v-list-web-domains", user, "json"])
     if domain not in doms:
-        return hata("Alan adı bu hesaba ait değil.")
+        return hata(_("Domain does not belong to this account."))
     d = kayit_oku()
     if any(a.get("domain") == domain for a in d.get("uygulamalar", [])):
-        return hata("Bu alan adında zaten bir Node.js uygulaması tanımlı.")
+        return hata(_("A Node.js application is already defined for this domain."))
     giris = str(secenek.get("giris", "app.js") or "app.js").strip().lstrip("/")
     if not DOSYA_DESENI.match(giris) or ".." in giris:
-        return hata("Giriş dosyası adı geçersiz.")
+        return hata(_("Invalid entry file name."))
     alt = str(secenek.get("alt_dizin", "") or "").strip().strip("/")
     if alt and (not ALT_DESENI.match(alt)):
-        return hata("Alt dizin geçersiz.")
+        return hata(_("Invalid subdirectory."))
     home = ev_dizini(user)
     calisma = os.path.join(home, "web", domain, "public_html", alt) if alt else os.path.join(home, "web", domain, "public_html")
     if not os.path.isdir(calisma):
-        return hata("Çalışma dizini yok: " + calisma)
+        return hata(_("Working directory does not exist: %s") % calisma)
     if not os.path.isfile(os.path.join(calisma, giris)):
-        return hata("Giriş dosyası bulunamadı: " + giris + " (önce dosyaları yükleyin)")
+        return hata(_("Entry file not found: %s (upload files first)") % giris)
     kayitli = {int(a.get("port", 0)) for a in d.get("uygulamalar", [])}
     port = bos_port(kayitli)
     if not port:
-        return hata("Boş port bulunamadı.")
+        return hata(_("No free port found."))
 
     pw = pwd.getpwnam(user)
     # npm install (isteğe bağlı)
@@ -261,7 +270,7 @@ def ekle(user, domain, secenek):
     if secenek.get("npm") and os.path.isfile(os.path.join(calisma, "package.json")) and not os.path.isdir(os.path.join(calisma, "node_modules")):
         npm = shutil.which("npm") or "/usr/bin/npm"
         rc, out, err = kabuk(["sudo", "-u", user, "-H", "env", "HOME=" + home, npm, "install", "--omit=dev", "--no-audit", "--no-fund", "--prefix", calisma], 900)
-        npm_not = "npm install: " + ("tamam" if rc == 0 else (err or out)[-200:])
+        npm_not = _("npm install: %s") % (_("ok") if rc == 0 else (err or out)[-200:])
 
     # günlük dosyası
     ozel = os.path.join(home, "web", domain, "private")
@@ -303,7 +312,7 @@ WantedBy=multi-user.target
     if rc != 0:
         os.unlink(birim)
         kabuk(["systemctl", "daemon-reload"], 60)
-        return hata("Servis başlatılamadı: " + (err or out)[-200:])
+        return hata(_("Could not start service: %s") % (err or out)[-200:])
 
     # nginx: proxy parçası + şablon
     conf_dizin = os.path.join(home, "conf", "web", domain)
@@ -319,7 +328,7 @@ WantedBy=multi-user.target
         os.unlink(birim)
         os.unlink(conf)
         kabuk(["systemctl", "daemon-reload"], 60)
-        return hata("nginx şablonu atanamadı: " + (err or out)[-200:])
+        return hata(_("Could not assign nginx template: %s") % (err or out)[-200:])
 
     d.setdefault("uygulamalar", []).append({"user": user, "domain": domain, "giris": giris, "alt_dizin": alt,
                                              "port": port, "node": node, "ts": int(time.time())})
@@ -333,7 +342,7 @@ def kaldir(user, domain):
     d = kayit_oku()
     kayit = next((a for a in d.get("uygulamalar", []) if a.get("user") == user and a.get("domain") == domain), None)
     if not kayit:
-        return hata("Bu alan adında Node.js uygulaması yok.")
+        return hata(_("No Node.js application on this domain."))
     kabuk(["systemctl", "disable", "--now", birim_adi(domain)], 60)
     birim = "/etc/systemd/system/" + birim_adi(domain)
     if os.path.isfile(birim):
@@ -354,7 +363,7 @@ def kaldir(user, domain):
 def yeniden(user, domain):
     d = kayit_oku()
     if not any(a.get("user") == user and a.get("domain") == domain for a in d.get("uygulamalar", [])):
-        return hata("Bu alan adında Node.js uygulaması yok.")
+        return hata(_("No Node.js application on this domain."))
     rc, out, err = kabuk(["systemctl", "restart", birim_adi(domain)], 60)
     time.sleep(1.5)
     print(json.dumps({"ok": rc == 0, "durum": birim_durum(domain), "hata": None if rc == 0 else (err or out)[-200:]}, ensure_ascii=False))
@@ -364,7 +373,7 @@ def yeniden(user, domain):
 def gunluk(user, domain, n):
     d = kayit_oku()
     if not any(a.get("user") == user and a.get("domain") == domain for a in d.get("uygulamalar", [])):
-        return hata("Bu alan adında Node.js uygulaması yok.")
+        return hata(_("No Node.js application on this domain."))
     home = ev_dizini(user)
     yol = os.path.join(home, "web", domain, "private", "node.log")
     satirlar = []
@@ -394,7 +403,7 @@ def main():
         return 2
     user = sys.argv[2]
     if not KULLANICI_DESENI.match(user):
-        return hata("Geçersiz kullanıcı.")
+        return hata(_("Invalid user."))
     if mod == "liste":
         return liste(user)
     if len(sys.argv) < 4:
@@ -402,7 +411,7 @@ def main():
         return 2
     domain = sys.argv[3].lower()
     if not AD_DESENI.match(domain):
-        return hata("Geçersiz alan adı.")
+        return hata(_("Invalid domain."))
     if mod == "ekle":
         try:
             secenek = json.loads(sys.stdin.read() or "{}")
