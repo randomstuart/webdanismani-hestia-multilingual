@@ -10,3 +10,4 @@ entegrasyon/
 # İşletim sistemi artıkları
 .DS_Store
 Thumbs.db
+__pycache__/
