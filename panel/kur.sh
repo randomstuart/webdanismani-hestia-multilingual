@@ -505,7 +505,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 */15 * * * * root $WD/bin/wd-kaynak onbellek > /dev/null 2>&1
 
 # Disk kullanim analizi. du/find buyuk hesaplarda pahalidir; 6 saatte bir.
-17 */6 * * * root $WD/bin/wd-disk refresh > /dev/null 2>&1
+17 */6 * * * root WD_LANG=en $WD/bin/wd-disk refresh > /dev/null 2>&1
 
 # Uyari katmani: bulgulari panel bildirimine tasir (tekrar korumali).
 */20 * * * * root $WD/bin/wd-uyari calistir > /dev/null 2>&1

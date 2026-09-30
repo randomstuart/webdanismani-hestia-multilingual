@@ -20,6 +20,19 @@ $wd_renk = [
 	"" => "var(--wd-sep)",
 ];
 
+/* Map legacy Turkish cache labels (pre-i18n) to English msgids. */
+$wd_etiket_tr = [
+	"Web siteleri" => "Websites",
+	"E-posta" => "Email",
+	"Yedekler" => "Backups",
+	"Geçici dosyalar" => "Temporary files",
+	"Diğer" => "Other",
+];
+$wd_etiket = static function (array $c) use ($wd_etiket_tr): string {
+	$e = (string) ($c["etiket"] ?? "");
+	return $wd_etiket_tr[$e] ?? $e;
+};
+
 $wd_toplam_hepsi = 0;
 foreach ($kullanicilar as $k) {
 	$wd_toplam_hepsi += (int) $k["toplam"];
@@ -112,26 +125,28 @@ foreach ($kullanicilar as $k) {
 						<?php // --- Stacked category bar ---
       if (!empty($k["kategoriler"])) { ?>
 							<div class="wd-stack" role="img"
-								aria-label="<?= wd_esc__("Disk breakdown:") ?> <?= wd_e(implode(", ", array_map(function ($c) {
-        	return wd__($c["etiket"] ?? "") . " " . wd_bayt((int) $c["bayt"]);
+								aria-label="<?= wd_esc__("Disk breakdown:") ?> <?= wd_e(implode(", ", array_map(function ($c) use ($wd_etiket) {
+        	return wd__($wd_etiket($c)) . " " . wd_bayt((int) $c["bayt"]);
         }, $k["kategoriler"]))) ?>">
 								<?php foreach ($k["kategoriler"] as $c) {
          	$w = $c["bayt"] / $toplam * 100;
          	if ($w < 0.4) {
          		continue;
          	}
-         	$renk = $wd_renk[$c["yol"] ?? ""] ?? "var(--wd-sep)"; ?>
+         	$renk = $wd_renk[$c["yol"] ?? ""] ?? "var(--wd-sep)";
+									$etiket = $wd_etiket($c); ?>
 									<span style="width: <?= round($w, 2) ?>%; background: <?= $renk ?>"
-										title="<?= wd_e(wd__($c["etiket"] ?? "") . " — " . wd_bayt((int) $c["bayt"])) ?>"></span>
+										title="<?= wd_e(wd__($etiket) . " — " . wd_bayt((int) $c["bayt"])) ?>"></span>
 								<?php } ?>
 							</div>
 
 							<div class="wd-legend">
 								<?php foreach ($k["kategoriler"] as $c) {
-									$renk = $wd_renk[$c["yol"] ?? ""] ?? "var(--wd-sep)"; ?>
+									$renk = $wd_renk[$c["yol"] ?? ""] ?? "var(--wd-sep)";
+									$etiket = $wd_etiket($c); ?>
 									<span class="wd-legend-item" title="<?= wd_e(wd__($c["ipucu"] ?? "")) ?>">
 										<span class="wd-legend-dot" style="background: <?= $renk ?>"></span>
-										<?= wd_e(wd__($c["etiket"] ?? "")) ?>
+										<?= wd_e(wd__($etiket)) ?>
 										<b><?= wd_e(wd_bayt((int) $c["bayt"])) ?></b>
 									</span>
 								<?php } ?>
