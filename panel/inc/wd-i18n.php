@@ -41,13 +41,17 @@ function wd_i18n_boot(): void {
 		return;
 	}
 
+	// Locale + LANGUAGE must be set before bindtextdomain on some PHP builds.
+	wd_i18n_ensure_locale();
+	wd_putenv_lang();
+
 	bindtextdomain(WD_I18N_DOMAIN, WD_I18N_PATH);
 	if (function_exists("bind_textdomain_codeset")) {
 		bind_textdomain_codeset(WD_I18N_DOMAIN, "UTF-8");
 	}
-
-	// So root helpers called via exec()/sudo inherit the panel language.
-	wd_putenv_lang();
+	if (function_exists("textdomain")) {
+		textdomain(WD_I18N_DOMAIN);
+	}
 }
 
 /**
@@ -103,10 +107,6 @@ function wd_i18n_ensure_locale(): void {
 	if (!function_exists("setlocale")) {
 		return;
 	}
-	$cur = setlocale(LC_MESSAGES, "0");
-	if (is_string($cur) && $cur !== "" && $cur !== "C" && stripos($cur, "UTF-8") !== false) {
-		return;
-	}
 	$lang = strtolower((string) ($_SESSION["language"] ?? $_SESSION["LANGUAGE"] ?? "en"));
 	$lang = preg_replace("/[^a-z_]/", "", $lang) ?: "en";
 	$map = [
@@ -124,5 +124,7 @@ function wd_i18n_ensure_locale(): void {
 		[$lang . "_" . strtoupper($lang) . ".UTF-8", $lang . ".UTF-8"],
 		["C.UTF-8", "C"],
 	);
+	// Always align LC_MESSAGES with the panel user language (do not keep a
+	// leftover en_US.UTF-8 when the session language is tr, etc.).
 	@setlocale(LC_MESSAGES, ...$cands);
 }

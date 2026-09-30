@@ -201,12 +201,23 @@ fi
 OWN=$(own_of)
 
 # --- 1) Kaynagi kalici depoya kopyala (guncelleme sonrasi onarim icin) ---
+# Keep the package root (…/panel's parent) before S is rewritten to wd/src,
+# so FM theme files are taken from the fresh checkout, not a stale wd/tema.
+PKG_ROOT="$(cd "$SRC/.." && pwd)"
 mkdir -p "$WD/src"
 if [ "$SRC" != "$WD/src" ]; then
 	cp -r "$SRC/." "$WD/src/" 2>/dev/null
 	inf "kaynak $WD/src altina kopyalandi"
 fi
 S="$WD/src"
+# Mirror FM/theme assets into wd/tema for --onar and future updates
+if [ -d "$PKG_ROOT/tema" ]; then
+	mkdir -p "$WD/tema"
+	for f in wd-fm.css wd-fm.js wd-fm-i18n.php wd-fm-i18n.tr.json wd-fm-i18n.js \
+		wd-modul.css webdanismani.css; do
+		[ -f "$PKG_ROOT/tema/$f" ] && cp -f "$PKG_ROOT/tema/$f" "$WD/tema/$f"
+	done
+fi
 cp -f "$S/wd-patch.py" "$WD/wd-patch.py" 2>/dev/null
 chmod 700 "$WD/wd-patch.py" 2>/dev/null
 
@@ -408,7 +419,7 @@ fi
 # bu yuzden --onar her calistiginda yeniden uygulanir.
 if [ -d "$W/fm/dist/css" ]; then
 	FMCSS=""
-	for c in "$S/../tema/wd-fm.css" "$S/tema/wd-fm.css"; do
+	for c in "$PKG_ROOT/tema/wd-fm.css" "$WD/tema/wd-fm.css" "$S/../tema/wd-fm.css" "$S/tema/wd-fm.css"; do
 		[ -f "$c" ] && FMCSS="$c" && break
 	done
 	if [ -n "$FMCSS" ]; then
@@ -429,6 +440,9 @@ if [ -d "$W/fm/dist/css" ]; then
 				cp -f "$FMI18N_PHP" "$W/fm/wd-fm-i18n.php"
 				chown "$OWN" "$W/fm/wd-fm-i18n.php" 2>/dev/null
 				chmod 644 "$W/fm/wd-fm-i18n.php"
+				ok "fm i18n php endpoint"
+			else
+				err "wd-fm-i18n.php bulunamadi"
 			fi
 			if [ -f "$FMI18N_TR_JSON" ]; then
 				cp -f "$FMI18N_TR_JSON" "$W/fm/dist/js/wd-fm-i18n.tr.json"
