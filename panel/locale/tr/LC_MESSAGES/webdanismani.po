@@ -2031,7 +2031,7 @@ msgstr "Alan Adı Ayarları"
 #: templates/wd-sidebar.php:126
 #: templates/wd-sidebar.php:153
 msgid "Domains"
-msgstr "Alan adları"
+msgstr "Alan Adları"
 
 #: templates/list_yonlendirme.php:140
 msgid "Domains allowed to hotlink"

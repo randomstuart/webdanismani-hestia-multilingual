@@ -47,7 +47,7 @@ if (!empty($_SESSION["WEB_SYSTEM"]) && ($p["WEB_DOMAINS"] ?? "0") !== "0") {
 	if (($_SESSION["FILE_MANAGER"] ?? "") === "true") {
 		$t[] = [wd__("File Manager"), "/fm/", "fa-folder-open"];
 	}
-	$groups[] = ["key" => "web", "title" => wd__("WEB — Domains"), "icon" => "fa-earth-americas", "tools" => $t];
+	$groups[] = ["key" => "web", "title" => wd__("Domains"), "icon" => "fa-earth-americas", "tools" => $t];
 }
 
 /* --- MAIL --- */
@@ -70,7 +70,7 @@ if (!empty($_SESSION["MAIL_SYSTEM"]) && ($p["MAIL_DOMAINS"] ?? "0") !== "0") {
 	if ($wd_is_admin) {
 		$t[] = [wd__("Mail Report"), "/list/mailrapor/", "fa-chart-column"];
 	}
-	$groups[] = ["key" => "mail", "title" => wd__("MAIL — Email"), "icon" => "fa-envelopes-bulk", "tools" => $t];
+	$groups[] = ["key" => "mail", "title" => wd__("Email"), "icon" => "fa-envelopes-bulk", "tools" => $t];
 }
 
 /* --- DNS --- */

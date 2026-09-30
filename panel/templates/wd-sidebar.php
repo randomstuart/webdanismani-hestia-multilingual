@@ -119,7 +119,7 @@ $wd_tip = function ($label, $used, $limit) {
  if (!empty($_SESSION["WEB_SYSTEM"]) && ($wd_p["WEB_DOMAINS"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["WEB"],
- 		"label" => wd__("WEB — Domains"), "short" => "WEB",
+ 		"label" => wd__("Domains"), "short" => "WEB",
  		"icon" => "fa-earth-americas",
  		"href" => "/list/web/",
  		"badge" => $wd_p["U_WEB_DOMAINS"] ?? 0,
@@ -146,7 +146,7 @@ $wd_tip = function ($label, $used, $limit) {
  if (!empty($_SESSION["MAIL_SYSTEM"]) && ($wd_p["MAIL_DOMAINS"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["MAIL"],
- 		"label" => wd__("MAIL — Email"), "short" => wd__("MAIL"),
+ 		"label" => wd__("Email"), "short" => wd__("MAIL"),
  		"icon" => "fa-envelopes-bulk",
  		"href" => "/list/mail/",
  		"badge" => $wd_p["U_MAIL_ACCOUNTS"] ?? 0,
@@ -159,7 +159,7 @@ $wd_tip = function ($label, $used, $limit) {
  if (!empty($_SESSION["DB_SYSTEM"]) && ($wd_p["DATABASES"] ?? "0") !== "0") {
  	$wd_item([
  		"tabs" => ["DB"],
- 		"label" => wd__("DB — Databases"), "short" => "DB",
+ 		"label" => wd__("Databases"), "short" => "DB",
  		"icon" => "fa-database",
  		"href" => "/list/db/",
  		"badge" => $wd_p["U_DATABASES"] ?? 0,
