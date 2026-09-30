@@ -44,8 +44,13 @@ if _wd_lib not in _wd_sys.path:
 _wd_pkg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib")
 if os.path.isdir(_wd_pkg) and _wd_pkg not in _wd_sys.path:
     _wd_sys.path.insert(0, _wd_pkg)
-from wd_i18n import _, ngettext  # noqa: E402
+from wd_i18n import _  # noqa: F401,E402 — available for non-cached CLI output
 N_ = lambda s: s  # mark for .po extract; translate in PHP (cached JSON)
+
+
+def ngettext(singular, plural, n):
+	"""English-only plural pick for cache JSON (do NOT call gettext here)."""
+	return singular if n == 1 else plural
 
 HESTIA = "/usr/local/hestia"
 CACHE = HESTIA + "/wd/cache/health.json"
@@ -98,8 +103,9 @@ def v(*args):
         return {}
 
 
-def kontrol(kid, label, durum, deger="", note="", cozum=""):
-    return {
+def kontrol(kid, label, durum, deger="", note="", cozum="",
+            deger_args=None, not_args=None, cozum_args=None):
+    out = {
         "id": kid,
         "label": label,
         "durum": durum,  # ok | warn | fail | bilinmiyor
@@ -107,25 +113,32 @@ def kontrol(kid, label, durum, deger="", note="", cozum=""):
         "not": note,
         "cozum": cozum,
     }
+    # Keep printf placeholders in msgid; PHP runs wd_msg__() with these args.
+    if deger_args is not None:
+        out["deger_args"] = list(deger_args)
+    if not_args is not None:
+        out["not_args"] = list(not_args)
+    if cozum_args is not None:
+        out["cozum_args"] = list(cozum_args)
+    return out
 
 
 # ------------------------------------------------------------ sunucu düzeyi
 def ptr_kontrol(ip, hostname):
     ptr = dig("-x", ip).rstrip(".")
+    cozum = N_("Set reverse DNS (rDNS/PTR) in your provider console: %s -> %s")
     if not ptr:
         return kontrol(
             "ptr", N_("Reverse DNS (PTR)"), "fail", "—",
             N_("No PTR record."),
-            N_("Set reverse DNS (rDNS/PTR) in your provider console: "
-              "%s -> %s") % (ip, hostname),
+            cozum, cozum_args=[ip, hostname],
         )
     if ptr.lower() == hostname.lower():
         return kontrol("ptr", N_("Reverse DNS (PTR)"), "ok", ptr)
     return kontrol(
         "ptr", N_("Reverse DNS (PTR)"), "fail", ptr,
         N_("PTR does not match the server hostname; many providers reject this mail."),
-        N_("Set reverse DNS (rDNS/PTR) in your provider console: "
-          "%s -> %s") % (ip, hostname),
+        cozum, cozum_args=[ip, hostname],
     )
 
 
@@ -162,16 +175,19 @@ def rbl_kontrol(ip):
         else:
             temiz.append(ad)
 
-    ek = ""
-    if engellenen:
-        ek = N_(" %s could not be queried (resolver block) — does not mean you are listed.") % ", ".join(engellenen)
-
     if listelenen:
+        note = N_("Server IP is on a blacklist; providers that use these lists "
+                  "will reject your mail.")
+        note_args = None
+        if engellenen:
+            note = N_("Server IP is on a blacklist; providers that use these lists "
+                      "will reject your mail. %s could not be queried (resolver block) "
+                      "— does not mean you are listed.")
+            note_args = [", ".join(engellenen)]
         return kontrol(
             "rbl", N_("Blacklist (RBL)"), "fail", ", ".join(listelenen),
-            N_("Server IP is on a blacklist; providers that use these lists "
-              "will reject your mail.") + ek,
-            (N_("Open a delisting request. ") + " · ".join(kanit))
+            note, not_args=note_args,
+            cozum=(N_("Open a delisting request. ") + " · ".join(kanit))
             if kanit else N_("Open a delisting request on the list's website."),
         )
 
@@ -184,11 +200,20 @@ def rbl_kontrol(ip):
               "or use the list's own lookup page."),
         )
 
+    deger = N_("clean: %s")
+    note = ""
+    note_args = None
+    if engellenen:
+        note = N_("Checked lists are clean. %s could not be queried (resolver block) "
+                  "— does not mean you are listed.")
+        note_args = [", ".join(engellenen)]
     return kontrol(
         "rbl", N_("Blacklist (RBL)"),
         "warn" if engellenen else "ok",
-        N_("clean: ") + ", ".join(temiz),
-        (N_("Checked lists are clean.") + ek) if engellenen else "",
+        deger,
+        note,
+        deger_args=[", ".join(temiz)],
+        not_args=note_args,
     )
 
 
@@ -206,20 +231,22 @@ def kuyruk_kontrol():
         except ValueError:
             donmus = 0
 
+    wait_msg = ngettext("%d waiting", "%d waiting", bekleyen)
     ck = [kontrol("kuyruk", N_("Mail queue"), "ok",
-                  ngettext("%d waiting", "%d waiting", bekleyen) % bekleyen)]
+                  wait_msg, deger_args=[bekleyen])]
     if bekleyen > 50:
         ck[0] = kontrol(
             "kuyruk", N_("Mail queue"), "warn",
-            ngettext("%d waiting", "%d waiting", bekleyen) % bekleyen,
-            N_("Queue is building up; there may be a delivery problem."),
+            wait_msg, deger_args=[bekleyen],
+            note=N_("Queue is building up; there may be a delivery problem."),
         )
     if donmus:
+        msg = ngettext("%d message", "%d messages", donmus)
         ck.append(kontrol(
             "donmus", N_("Frozen mail"), "warn",
-            ngettext("%d message", "%d messages", donmus) % donmus,
-            N_("There are frozen messages that could not be delivered."),
-            N_("On the server: exim4 -bpru | awk '{print $3}' | xargs -r exim4 -Mrm"),
+            msg, deger_args=[donmus],
+            note=N_("There are frozen messages that could not be delivered."),
+            cozum=N_("On the server: exim4 -bpru | awk '{print $3}' | xargs -r exim4 -Mrm"),
         ))
     return ck
 
@@ -232,14 +259,16 @@ def spf_kontrol(domain, ip):
         return kontrol(
             "spf", "SPF", "fail", "—",
             N_("No SPF record; your mail will go to spam."),
-            N_('Add a TXT record in DNS: "v=spf1 +a +mx +ip4:%s ~all"') % ip,
+            N_('Add a TXT record in DNS: "v=spf1 +a +mx +ip4:%s ~all"'),
+            cozum_args=[ip],
         )
     if len(kayitlar) > 1:
+        msg = ngettext("%d record", "%d records", len(kayitlar))
         return kontrol(
             "spf", "SPF", "fail",
-            ngettext("%d record", "%d records", len(kayitlar)) % len(kayitlar),
-            N_("Multiple SPF records are invalid; all are ignored."),
-            N_("Leave only one SPF TXT record."),
+            msg, deger_args=[len(kayitlar)],
+            note=N_("Multiple SPF records are invalid; all are ignored."),
+            cozum=N_("Leave only one SPF TXT record."),
         )
     kayit = kayitlar[0]
     yetkili = ("ip4:" + ip) in kayit or re.search(r"[+ ]a\b", kayit) or re.search(r"[+ ]mx\b", kayit)
@@ -247,7 +276,8 @@ def spf_kontrol(domain, ip):
         return kontrol(
             "spf", "SPF", "warn", kayit,
             N_("SPF does not appear to authorize this server."),
-            N_("Add ip4:%s to the record.") % ip,
+            N_("Add ip4:%s to the record."),
+            cozum_args=[ip],
         )
     return kontrol("spf", "SPF", "ok", kayit)
 
@@ -273,7 +303,8 @@ def dkim_kontrol(user, domain):
             N_("DKIM is enabled in the panel but the record is MISSING in DNS; "
               "signatures cannot be verified."),
             N_("Add the mail._domainkey.%s TXT record to DNS "
-              "(same value as Panel > Mail > DKIM).") % domain,
+              "(same value as Panel > Mail > DKIM)."),
+            cozum_args=[domain],
         )
     m2 = re.search(r'p=([A-Za-z0-9+/=]+)', yayinda[0])
     canli = m2.group(1) if m2 else ""
@@ -282,7 +313,8 @@ def dkim_kontrol(user, domain):
             "dkim", "DKIM", "fail", N_("mismatch"),
             N_("The DKIM key in DNS differs from the panel; signatures cannot be verified."),
             N_("Replace the mail._domainkey.%s record in DNS with the value "
-              "from the panel.") % domain,
+              "from the panel."),
+            cozum_args=[domain],
         )
     return kontrol("dkim", "DKIM", "ok", N_("published and matching"))
 
@@ -294,7 +326,8 @@ def dmarc_kontrol(domain):
         return kontrol(
             "dmarc", "DMARC", "warn", "—",
             N_("No DMARC record; spoofed mail can be sent in your domain's name."),
-            '_dmarc.%s TXT: "v=DMARC1; p=quarantine; pct=100"' % domain,
+            '_dmarc.%s TXT: "v=DMARC1; p=quarantine; pct=100"',
+            cozum_args=[domain],
         )
     return kontrol("dmarc", "DMARC", "ok", kayitlar[0])
 
@@ -305,7 +338,8 @@ def mx_kontrol(domain, ip):
         return kontrol(
             "mx", "MX", "fail", "—",
             N_("No MX record; external mail will NOT arrive for this domain."),
-            N_("Add an MX record in DNS: 10 mail.%s") % domain,
+            N_("Add an MX record in DNS: 10 mail.%s"),
+            cozum_args=[domain],
         )
     hedefler = []
     bizde = False
@@ -325,15 +359,16 @@ def mx_kontrol(domain, ip):
         if cozulmeyen:
             return kontrol(
                 "mx", "MX", "fail", ", ".join(hedefler),
-                N_("MX target does not resolve (%s); mail cannot be delivered.")
-                % ", ".join(cozulmeyen),
-                N_("Fix the MX record: 10 mail.%s (do not write the domain twice).")
-                % domain,
+                N_("MX target does not resolve (%s); mail cannot be delivered."),
+                not_args=[", ".join(cozulmeyen)],
+                cozum=N_("Fix the MX record: 10 mail.%s (do not write the domain twice)."),
+                cozum_args=[domain],
             )
         return kontrol(
             "mx", "MX", "warn", ", ".join(hedefler),
             N_("MX does not point to this server; mail is going elsewhere."),
-            N_("If mail should stay on this server, set MX to mail.%s.") % domain,
+            N_("If mail should stay on this server, set MX to mail.%s."),
+            cozum_args=[domain],
         )
     return kontrol("mx", "MX", "ok", ", ".join(hedefler))
 
@@ -359,7 +394,8 @@ def yedek_kontrol(user):
         return [kontrol(
             "yedek_yok", N_("Backup"), "fail", "—",
             N_("This account has no backups."),
-            N_("Panel > Backups > Create Backup; or on the server: v-backup-user %s") % user,
+            N_("Panel > Backups > Create Backup; or on the server: v-backup-user %s"),
+            cozum_args=[user],
         )]
 
     # Tarihe göre sırala (en yeni önce)
@@ -382,25 +418,26 @@ def yedek_kontrol(user):
         pass
 
     tarih_str = "%s %s" % (en_yeni.get("DATE", "?"), en_yeni.get("TIME", "?")[:5])
+    ago = N_("%s (%d hours ago)")
     if yas_saat is None:
         ck.append(kontrol("yedek_yas", N_("Latest backup"), "bilinmiyor", tarih_str,
                           N_("Backup date could not be read.")))
     elif yas_saat > 48:
         ck.append(kontrol(
             "yedek_yas", N_("Latest backup"), "fail",
-            N_("%s (%d hours ago)") % (tarih_str, int(yas_saat)),
-            N_("Backup is older than 48 hours; daily backups may not be running."),
-            N_("Check on the server: grep backup /etc/cron.d/hestia"),
+            ago, deger_args=[tarih_str, int(yas_saat)],
+            note=N_("Backup is older than 48 hours; daily backups may not be running."),
+            cozum=N_("Check on the server: grep backup /etc/cron.d/hestia"),
         ))
     elif yas_saat > 26:
         ck.append(kontrol(
             "yedek_yas", N_("Latest backup"), "warn",
-            N_("%s (%d hours ago)") % (tarih_str, int(yas_saat)),
-            N_("Latest backup is more than a day old."),
+            ago, deger_args=[tarih_str, int(yas_saat)],
+            note=N_("Latest backup is more than a day old."),
         ))
     else:
         ck.append(kontrol("yedek_yas", N_("Latest backup"), "ok",
-                          N_("%s (%d hours ago)") % (tarih_str, int(yas_saat))))
+                          ago, deger_args=[tarih_str, int(yas_saat)]))
 
     # --- 2) Arşiv okunabiliyor mu ---
     # `tar -tf` arşivi AÇMADAN içindekileri listeler; bozuk arşiv burada
@@ -410,7 +447,8 @@ def yedek_kontrol(user):
         ck.append(kontrol(
             "yedek_dosya", N_("Archive file"), "warn", en_yeni_ad,
             N_("Backup record exists but the file was not found under %s "
-              "(it may have been moved to remote storage).") % YEDEK_DIZIN,
+              "(it may have been moved to remote storage)."),
+            not_args=[YEDEK_DIZIN],
         ))
     else:
         rc, out, err = 1, "", ""
@@ -430,13 +468,15 @@ def yedek_kontrol(user):
         elif rc != 0:
             ck.append(kontrol(
                 "yedek_butunluk", N_("Archive integrity"), "fail", N_("CORRUPT"),
-                N_("Backup archive cannot be read: %s") % (err.strip()[:120] or N_("tar error")),
-                N_("This backup cannot be restored. Take a new backup and delete the corrupt one."),
+                N_("Backup archive cannot be read: %s"),
+                not_args=[err.strip()[:120] or N_("tar error")],
+                cozum=N_("This backup cannot be restored. Take a new backup and delete the corrupt one."),
             ))
         else:
             adet = len([s for s in out.splitlines() if s.strip()])
+            msg = ngettext("%d entry", "%d entries", adet)
             ck.append(kontrol("yedek_butunluk", N_("Archive integrity"), "ok",
-                              ngettext("%d entry", "%d entries", adet) % adet))
+                              msg, deger_args=[adet]))
 
     # --- 3) Boyut düşüşü ---
     # Bir müşterinin yedeği aniden küçüldüyse ya veri silinmiştir ya da
@@ -448,10 +488,11 @@ def yedek_kontrol(user):
             if onceki_mb >= 5 and yeni_mb < onceki_mb * 0.5:
                 ck.append(kontrol(
                     "yedek_boyut", N_("Backup size"), "warn",
-                    N_("%.0f MB (previous %.0f MB)") % (yeni_mb, onceki_mb),
-                    N_("Latest backup is less than half the previous one; data loss "
-                      "or an incomplete backup is possible."),
-                    N_("Compare backup contents; take a manual backup if needed."),
+                    N_("%.0f MB (previous %.0f MB)"),
+                    deger_args=[yeni_mb, onceki_mb],
+                    note=N_("Latest backup is less than half the previous one; data loss "
+                          "or an incomplete backup is possible."),
+                    cozum=N_("Compare backup contents; take a manual backup if needed."),
                 ))
             else:
                 ck.append(kontrol("yedek_boyut", N_("Backup size"), "ok",
@@ -496,14 +537,16 @@ def a_kontrol(domain, ip):
         return kontrol(
             "a", N_("A record"), "fail", "—",
             N_("Domain does not resolve to any IP."),
-            N_("Add an A record in DNS: %s -> %s") % (domain, ip),
+            N_("Add an A record in DNS: %s -> %s"),
+            cozum_args=[domain, ip],
         )
     if ip in adres:
         return kontrol("a", N_("A record"), "ok", ", ".join(adres))
     return kontrol(
         "a", N_("A record"), "warn", ", ".join(adres),
         N_("Domain points to another server; the site is not published from here."),
-        N_("If you will host the domain here, set the A record to %s.") % ip,
+        N_("If you will host the domain here, set the A record to %s."),
+        cozum_args=[ip],
     )
 
 
@@ -531,19 +574,21 @@ def ssl_kontrol(user, domain, le_acik):
         return kontrol("ssl", "SSL", "bilinmiyor", m.group(1).strip())
     kalan = int((bitis - time.time()) // 86400)
     tarih = time.strftime("%d.%m.%Y", time.localtime(bitis))
+    days = N_("%d days (%s)")
     if kalan < 0:
         return kontrol(
-            "ssl", "SSL", "fail", N_("expired (%s)") % tarih,
-            N_("Certificate has expired; browsers will show a warning."),
-            N_("Panel > Web > edit domain > save SSL again."),
+            "ssl", "SSL", "fail", N_("expired (%s)"),
+            deger_args=[tarih],
+            note=N_("Certificate has expired; browsers will show a warning."),
+            cozum=N_("Panel > Web > edit domain > save SSL again."),
         )
     if kalan < 14:
         return kontrol(
-            "ssl", "SSL", "warn", N_("%d days (%s)") % (kalan, tarih),
-            N_("Automatic renewal may not have run."),
-            N_("Trigger renewal manually: v-update-letsencrypt-ssl"),
+            "ssl", "SSL", "warn", days, deger_args=[kalan, tarih],
+            note=N_("Automatic renewal may not have run."),
+            cozum=N_("Trigger renewal manually: v-update-letsencrypt-ssl"),
         )
-    return kontrol("ssl", "SSL", "ok", N_("%d days (%s)") % (kalan, tarih))
+    return kontrol("ssl", "SSL", "ok", days, deger_args=[kalan, tarih])
 
 
 # ------------------------------------------------------------------- toplayıcı

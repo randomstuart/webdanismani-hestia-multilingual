@@ -73,12 +73,28 @@ function wd_putenv_lang(): void {
 
 /** Translate a singular string (gettext msgid = English). */
 function wd__(string $msgid): string {
+	// Empty msgid is the PO header entry — never pass it to gettext.
+	if ($msgid === "") {
+		return "";
+	}
 	wd_i18n_boot();
 	if (!function_exists("dgettext")) {
 		return $msgid;
 	}
 	$out = dgettext(WD_I18N_DOMAIN, $msgid);
 	return $out !== "" ? $out : $msgid;
+}
+
+/**
+ * Translate then sprintf. Use when the catalog msgid still has %s / %d
+ * placeholders and args are stored separately in cache JSON.
+ */
+function wd_msg__(string $msgid, array $args = []): string {
+	$t = wd__($msgid);
+	if ($args === []) {
+		return $t;
+	}
+	return vsprintf($t, $args);
 }
 
 /**

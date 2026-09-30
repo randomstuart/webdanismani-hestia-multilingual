@@ -52,16 +52,16 @@ $wd_kontrol_satiri = function (array $c, ?string $domain, array $dom = []) use (
 			<div class="wd-check-top">
 				<span class="wd-check-label"><?= wd_e(wd__($c["label"] ?? "")) ?></span>
 				<?php if (($c["deger"] ?? "") !== "") { ?>
-					<span class="wd-check-value wd-mono"><?= wd_e($c["deger"]) ?></span>
+					<span class="wd-check-value wd-mono"><?= wd_e(wd_msg__($c["deger"], $c["deger_args"] ?? [])) ?></span>
 				<?php } ?>
 			</div>
 			<?php if (!empty($c["not"])) { ?>
-				<p class="wd-check-note"><?= wd_e(wd__($c["not"])) ?></p>
+				<p class="wd-check-note"><?= wd_e(wd_msg__($c["not"], $c["not_args"] ?? [])) ?></p>
 			<?php } ?>
 			<?php if ($sorunlu && !empty($c["cozum"])) { ?>
 				<p class="wd-check-fix">
 					<i class="fas fa-screwdriver-wrench"></i>
-					<span><?= wd_e(wd__($c["cozum"])) ?></span>
+					<span><?= wd_e(wd_msg__($c["cozum"], $c["cozum_args"] ?? [])) ?></span>
 				</p>
 			<?php }
    if ($sorunlu && $domain !== null) {

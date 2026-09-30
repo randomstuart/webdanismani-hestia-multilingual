@@ -499,7 +499,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Saglik denetimini tazeler. Sayfa onbellekten okur, canli DNS sorgusu
 # YAPMAZ; guncelligi bu satir saglar. Rastgele gecikme ayni dakikada baslayan
 # diger islerle cakismayi onler (crontab'da % kacis ister, shuf gerektirmez).
-*/15 * * * * root sleep \$(shuf -i 0-45 -n 1); $WD/bin/wd-health refresh > /dev/null 2>&1
+*/15 * * * * root sleep \$(shuf -i 0-45 -n 1); WD_LANG=en $WD/bin/wd-health refresh > /dev/null 2>&1
 
 # Alan adi -> kaynak kademesi eslemesini panelin okuyacagi dosyaya yazar.
 */15 * * * * root $WD/bin/wd-kaynak onbellek > /dev/null 2>&1

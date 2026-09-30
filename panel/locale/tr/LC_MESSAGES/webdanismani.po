@@ -6009,3 +6009,15 @@ msgstr "{d} bayiden ayrıldı."
 msgid "{d} unsuspended."
 msgstr "{d} askıdan kaldırıldı."
 
+
+msgid "clean: %s"
+msgstr "temiz: %s"
+
+msgid "Checked lists are clean. %s could not be queried (resolver block) — does not mean you are listed."
+msgstr "Kontrol edilen listeler temiz. %s sorgulanamadı (çözümleyici engeli) — listede olduğunuz anlamına gelmez."
+
+msgid "Server IP is on a blacklist; providers that use these lists will reject your mail. %s could not be queried (resolver block) — does not mean you are listed."
+msgstr "Sunucu IP'si bir kara listede; bu listeleri kullanan sağlayıcılar postanızı reddeder. %s sorgulanamadı (çözümleyici engeli) — listede olduğunuz anlamına gelmez."
+
+msgid "Set reverse DNS (rDNS/PTR) in your provider console: %s -> %s"
+msgstr "Sunucu sağlayıcınızın konsolundan ters DNS (rDNS/PTR) tanımlayın: %s -> %s"

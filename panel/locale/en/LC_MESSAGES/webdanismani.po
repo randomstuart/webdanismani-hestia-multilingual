@@ -6009,3 +6009,15 @@ msgstr "{d} unlinked from reseller."
 msgid "{d} unsuspended."
 msgstr "{d} unsuspended."
 
+
+msgid "clean: %s"
+msgstr "clean: %s"
+
+msgid "Checked lists are clean. %s could not be queried (resolver block) — does not mean you are listed."
+msgstr "Checked lists are clean. %s could not be queried (resolver block) — does not mean you are listed."
+
+msgid "Server IP is on a blacklist; providers that use these lists will reject your mail. %s could not be queried (resolver block) — does not mean you are listed."
+msgstr "Server IP is on a blacklist; providers that use these lists will reject your mail. %s could not be queried (resolver block) — does not mean you are listed."
+
+msgid "Set reverse DNS (rDNS/PTR) in your provider console: %s -> %s"
+msgstr "Set reverse DNS (rDNS/PTR) in your provider console: %s -> %s"
