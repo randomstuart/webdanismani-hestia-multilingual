@@ -1,7 +1,7 @@
 /* WebDanışmanı File Manager — Turkish catalog.
    Load BEFORE wd-fm.js so window.WDFM_I18N is ready when wdt() runs. */
 window.WDFM_I18N = {
-	"Tools": "Araçlar",
+	"Dashboard": "Gösterge Paneli",
 	"Health Center": "Sağlık Merkezi",
 	"Disk Usage": "Disk Kullanımı",
 	"Domains": "Alan Adları",

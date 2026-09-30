@@ -130,8 +130,8 @@ def write_pot(entries: dict[tuple[str, str | None], list[str]], dest: Path) -> N
 
 # Built-in Turkish catalog for known shared UI strings (seed; extract fills the rest as empty).
 TR_SEED: dict[str, str] = {
-    "Tools": "Araçlar",
-    "TOOLS": "ARAÇLAR",
+    "Dashboard": "Gösterge Paneli",
+    "DASHBOARD": "GÖSTERGE",
     "All management tools": "Tüm yönetim araçları",
     "Health Center": "Sağlık Merkezi",
     "HEALTH": "SAĞLIK",

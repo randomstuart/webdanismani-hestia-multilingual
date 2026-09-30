@@ -6021,3 +6021,15 @@ msgstr "Server IP is on a blacklist; providers that use these lists will reject 
 
 msgid "Set reverse DNS (rDNS/PTR) in your provider console: %s -> %s"
 msgstr "Set reverse DNS (rDNS/PTR) in your provider console: %s -> %s"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "DASHBOARD"
+msgstr "DASHBOARD"
+
+msgid "Overview and shortcuts"
+msgstr "Overview and shortcuts"
+
+msgid "Overview of your hosting account — HestiaCP"
+msgstr "Overview of your hosting account — HestiaCP"

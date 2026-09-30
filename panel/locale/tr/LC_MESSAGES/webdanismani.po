@@ -6021,3 +6021,15 @@ msgstr "Sunucu IP'si bir kara listede; bu listeleri kullanan sağlayıcılar pos
 
 msgid "Set reverse DNS (rDNS/PTR) in your provider console: %s -> %s"
 msgstr "Sunucu sağlayıcınızın konsolundan ters DNS (rDNS/PTR) tanımlayın: %s -> %s"
+
+msgid "Dashboard"
+msgstr "Gösterge Paneli"
+
+msgid "DASHBOARD"
+msgstr "GÖSTERGE"
+
+msgid "Overview and shortcuts"
+msgstr "Genel bakış ve kısayollar"
+
+msgid "Overview of your hosting account — HestiaCP"
+msgstr "Hosting hesabınıza genel bakış — HestiaCP"

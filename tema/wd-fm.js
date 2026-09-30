@@ -66,7 +66,7 @@
 	   müşteriye açılmayan bir bağlantı göstermek kötü bir deneyimdir ve
 	   dosya yöneticisi tarafında rolü güvenilir biçimde bilemiyoruz. */
 	var MENU = [
-		[wdt("Tools"), "TOOLS", "grid", "/list/tools/"],
+		[wdt("Dashboard"), "DASHBOARD", "grid", "/list/tools/"],
 		[wdt("Health Center"), "HEALTH", "pulse", "/list/health/"],
 		[wdt("Disk Usage"), "DISK", "disk", "/list/disk/"],
 		[wdt("Domains"), "WEB", "globe", "/list/web/"],

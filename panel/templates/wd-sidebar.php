@@ -53,10 +53,10 @@ $wd_tip = function ($label, $used, $limit) {
 	<?php
  $wd_item([
  	"tabs" => ["TOOLS"],
- 	"label" => wd__("Tools"), "short" => wd__("TOOLS"),
+ 	"label" => wd__("Dashboard"), "short" => wd__("DASHBOARD"),
  	"icon" => "fa-grip",
  	"href" => "/list/tools/",
- 	"title" => wd__("All management tools"),
+ 	"title" => wd__("Overview and shortcuts"),
  ]); ?>
 
 	<?php

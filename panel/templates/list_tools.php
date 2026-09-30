@@ -264,9 +264,9 @@ if (!empty($_SESSION["BACKUP_SYSTEM"])) {
 
 			<div class="wd-page-head">
 				<div>
-					<h1 class="wd-title"><?= wd_esc__("Tools") ?></h1>
+					<h1 class="wd-title"><?= wd_esc__("Dashboard") ?></h1>
 					<p class="wd-subtitle">
-						<?= wd_esc__("All management tools for your hosting account — HestiaCP") ?> <?= wd_e($_SESSION["VERSION"] ?? "") ?>
+						<?= wd_esc__("Overview of your hosting account — HestiaCP") ?> <?= wd_e($_SESSION["VERSION"] ?? "") ?>
 					</p>
 				</div>
 				<div class="wd-page-actions">
